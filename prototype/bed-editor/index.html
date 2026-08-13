@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bed Editor Prototype — THROWAWAY</title>
+<script src="https://unpkg.com/konva@9/konva.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  display: flex; height: 100vh; overflow: hidden; background: #f5f3ee;
+}
+
+/* ── Canvas ── */
+#canvas-wrap { flex: 1; position: relative; overflow: hidden; }
+
+#toolbar {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 4px; background: white; padding: 7px 9px;
+  border-radius: 12px; box-shadow: 0 2px 14px rgba(0,0,0,0.13); z-index: 10;
+  white-space: nowrap;
+}
+.tool-sep { width: 1px; background: #eee; margin: 0 3px; }
+.tool-btn {
+  padding: 6px 11px; border: 2px solid transparent; border-radius: 7px;
+  background: none; cursor: pointer; font-size: 12.5px; font-weight: 600;
+  color: #555; transition: all 0.12s;
+}
+.tool-btn:hover { background: #f0f0f0; color: #222; }
+.tool-btn.active { border-color: #2d6a4f; background: #d8f3dc; color: #1b4332; }
+kbd {
+  display: inline-block; margin-left: 3px; padding: 1px 4px;
+  font-family: inherit; font-size: 10px; font-weight: 700;
+  background: #f0f0f0; border: 1px solid #ccc; border-radius: 3px;
+  color: #888; vertical-align: middle; line-height: 1.4;
+}
+.tool-btn.active kbd { background: #b7e4c7; border-color: #74c69d; color: #1b4332; }
+.tool-btn:disabled { cursor: not-allowed; pointer-events: auto; }
+
+#hint {
+  position: absolute; bottom: 16px; left: 16px; background: white;
+  padding: 8px 13px; border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.09); font-size: 12px; color: #666;
+  max-width: 500px; line-height: 1.5;
+}
+
+/* ── Panel ── */
+#panel { width: 272px; background: white; border-left: 1px solid #e5e5e5; display: flex; flex-direction: column; }
+#panel-head { padding: 16px 20px 12px; border-bottom: 1px solid #efefef; }
+#panel-head h1 { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 2px; }
+#panel-head .q { font-size: 11px; color: #888; line-height: 1.4; }
+.throwaway {
+  margin-top: 7px; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: #c0392b; background: #fdf0ee; padding: 2px 6px;
+  border-radius: 4px; display: inline-block;
+}
+#panel-body { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 16px; }
+.section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #bbb; margin-bottom: 5px; }
+.scale-row { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #444; }
+.scale-row input[type="number"] {
+  width: 54px; padding: 4px 7px; border: 1.5px solid #ddd; border-radius: 6px; font-size: 13px; text-align: center;
+}
+.scale-row input[type="number"]:focus { outline: none; border-color: #2d6a4f; }
+.toggle-row { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #444; cursor: pointer; padding: 2px 0; }
+.toggle-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: #2d6a4f; cursor: pointer; flex-shrink: 0; }
+.stat-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; padding: 1px 0; }
+.stat-row .lbl { color: #777; }
+.stat-row .val { font-weight: 700; color: #111; }
+#landmark-list { display: flex; flex-direction: column; gap: 6px; }
+.lm-entry { display: flex; align-items: flex-start; gap: 8px; }
+.lm-dot { width: 9px; height: 9px; background: #e63946; border-radius: 50%; margin-top: 3px; flex-shrink: 0; }
+.lm-name { font-size: 12.5px; font-weight: 600; color: #222; }
+.lm-pos { font-size: 11px; color: #999; }
+.empty { font-size: 12px; color: #bbb; font-style: italic; }
+
+#panel-foot { padding: 12px 14px; border-top: 1px solid #efefef; display: flex; flex-direction: column; gap: 7px; }
+.act-btn {
+  padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 8px; background: white;
+  cursor: pointer; font-size: 13px; font-weight: 600; color: #333; text-align: center; transition: all 0.12s;
+}
+.act-btn:hover { background: #f5f5f5; }
+.act-btn.primary { background: #2d6a4f; color: white; border-color: #2d6a4f; }
+.act-btn.primary:hover { background: #1b4332; }
+.act-btn.danger { color: #c0392b; border-color: #f5c6c6; }
+.act-btn.danger:hover { background: #fff5f4; }
+
+/* ── SVG modal ── */
+#svg-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; align-items: center; justify-content: center; }
+#svg-modal.open { display: flex; }
+#svg-inner { background: white; border-radius: 14px; padding: 22px; max-width: 680px; width: 92%; max-height: 82vh; display: flex; flex-direction: column; gap: 11px; }
+#svg-inner h2 { font-size: 15px; font-weight: 700; }
+#svg-inner .note { font-size: 11.5px; color: #888; line-height: 1.5; }
+#svg-code { font-family: 'Menlo','Courier New',monospace; font-size: 11px; background: #f6f6f6; padding: 13px; border-radius: 8px; white-space: pre; overflow: auto; flex: 1; }
+#close-svg { align-self: flex-start; padding: 7px 16px; background: #f0f0f0; border: none; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<div id="canvas-wrap">
+  <div id="toolbar">
+    <button class="tool-btn" data-tool="select">↖ Select <kbd>V</kbd></button>
+    <button class="tool-btn" data-tool="anchor">◈ Anchor <kbd>A</kbd></button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn active" data-tool="freehand">✏ Freehand <kbd>F</kbd></button>
+    <button class="tool-btn" data-tool="rect">▭ Rect <kbd>R</kbd></button>
+    <button class="tool-btn" data-tool="oval">⬭ Oval <kbd>O</kbd></button>
+    <button class="tool-btn" data-tool="pen">✦ Pen <kbd>P</kbd></button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn" data-tool="landmark">⊕ Landmark <kbd>L</kbd></button>
+  </div>
+  <div id="konva-mount"></div>
+  <div id="hint">Click and drag to trace a freehand bed outline. · Space+drag to pan · Ctrl/Cmd+scroll to zoom</div>
+</div>
+
+<div id="panel">
+  <div id="panel-head">
+    <div class="throwaway">Prototype — throwaway</div>
+    <h1 style="margin-top:7px">Bed Editor</h1>
+    <p class="q">Does Konva.js feel right for drawing garden beds on desktop?</p>
+  </div>
+  <div id="panel-body">
+    <div>
+      <div class="section-label">Grid Scale</div>
+      <div class="scale-row"><span>1 cell =</span>
+        <input type="number" id="scale-ft" value="2" min="0.25" max="20" step="0.25">
+        <span>feet</span>
+      </div>
+    </div>
+    <div>
+      <div class="section-label">Canvas Options</div>
+      <label class="toggle-row"><input type="checkbox" id="snap-toggle" checked><span>Snap to grid <kbd>G</kbd></span></label>
+      <label class="toggle-row"><input type="checkbox" id="label-toggle" checked><span>Show bed labels</span></label>
+    </div>
+    <div>
+      <div class="section-label">State</div>
+      <div class="stat-row"><span class="lbl">Active tool</span><span class="val" id="s-tool">Freehand</span></div>
+      <div class="stat-row"><span class="lbl">Beds drawn</span><span class="val" id="s-beds">0</span></div>
+      <div class="stat-row"><span class="lbl">Landmarks</span><span class="val" id="s-lm">0</span></div>
+    </div>
+    <div>
+      <div class="section-label">Landmarks</div>
+      <div id="landmark-list"><span class="empty">None yet — select Landmark tool and click.</span></div>
+    </div>
+  </div>
+  <div id="panel-foot">
+    <button class="act-btn primary" id="btn-svg">Export SVG</button>
+    <button class="act-btn" id="btn-undo">Undo <kbd>⌘Z</kbd></button>
+    <button class="act-btn danger" id="btn-clear">Clear canvas</button>
+  </div>
+</div>
+
+<div id="svg-modal">
+  <div id="svg-inner">
+    <h2>SVG Output</h2>
+    <p class="note">Stored per Bed. Konva.js (desktop) and PencilKit (iPad) both produce this format.</p>
+    <pre id="svg-code"></pre>
+    <button id="close-svg">Close</button>
+  </div>
+</div>
+
+<script>
+// ─── Constants ────────────────────────────────────────────────────────────────
+const CELL_PX      = 50;
+const BED_STROKE   = '#52b788';
+const BED_FILL     = 'rgba(82,183,136,0.14)';
+const HANDLE_COL   = '#52b788';
+const ANCHOR_COL   = '#2d6a4f';
+const CLOSE_RADIUS = 14;
+
+// ─── App state ────────────────────────────────────────────────────────────────
+const s = {
+  tool: 'freehand',
+  scaleFt: 2,
+  beds: [],
+  landmarks: [],
+  bedCounter: 0,
+  // draw state
+  drawing: false, curLine: null, startXY: null, preview: null,
+  // options
+  snapEnabled: true,
+  labelsVisible: true,
+};
+
+// ─── Pen state ────────────────────────────────────────────────────────────────
+const pen = {
+  pts: [], placing: false, dragStart: null, cursorPos: null, nearFirst: false,
+};
+
+// ─── Navigation state ─────────────────────────────────────────────────────────
+let spaceHeld = false, panning = false, panStart = null, panOrigin = null;
+
+// ─── Selection state ──────────────────────────────────────────────────────────
+let selectedBed = null;
+
+// ─── Anchor-edit state ────────────────────────────────────────────────────────
+let anchorBed   = null;
+let anchorNodes = [];
+
+// ─── Konva setup ──────────────────────────────────────────────────────────────
+const wrap  = document.getElementById('canvas-wrap');
+const stage = new Konva.Stage({ container: 'konva-mount', width: wrap.offsetWidth, height: window.innerHeight });
+const gridLayer    = new Konva.Layer();
+const bedsLayer    = new Konva.Layer();
+const lmLayer      = new Konva.Layer();
+const overlayLayer = new Konva.Layer(); // transformer + anchor overlays
+const previewLayer = new Konva.Layer();
+stage.add(gridLayer, bedsLayer, lmLayer, overlayLayer, previewLayer);
+
+const transformer = new Konva.Transformer({
+  rotationSnaps: [0, 45, 90, 135, 180, 225, 270, 315],
+  boundBoxFunc: (old, next) => (next.width < 10 || next.height < 10 ? old : next),
+  visible: false,
+});
+overlayLayer.add(transformer);
+
+// ─── Grid ─────────────────────────────────────────────────────────────────────
+function drawGrid() {
+  gridLayer.destroyChildren();
+  const w = stage.width(), h = stage.height();
+  for (let x = 0; x <= w; x += CELL_PX)
+    gridLayer.add(new Konva.Line({ points: [x,0,x,h], stroke: x%(CELL_PX*5)===0?'#c8dfc4':'#deeeda', strokeWidth: x%(CELL_PX*5)===0?1:0.5, listening: false }));
+  for (let y = 0; y <= h; y += CELL_PX)
+    gridLayer.add(new Konva.Line({ points: [0,y,w,y], stroke: y%(CELL_PX*5)===0?'#c8dfc4':'#deeeda', strokeWidth: y%(CELL_PX*5)===0?1:0.5, listening: false }));
+  // When snap is on, show a dot at every grid intersection so you can see where corners will lock.
+  if (s.snapEnabled) {
+    for (let x = 0; x <= w; x += CELL_PX)
+      for (let y = 0; y <= h; y += CELL_PX)
+        gridLayer.add(new Konva.Circle({ x, y, radius: 2.5, fill: '#b7e4c7', listening: false }));
+  }
+  const snapLabel = s.snapEnabled ? 'Snap ON — corners lock to dots' : 'Snap OFF — free positioning';
+  gridLayer.add(new Konva.Text({ x: w-310, y: h-22, text: `1 cell = ${s.scaleFt} ft  ·  ${CELL_PX}px/cell  ·  ${snapLabel}`, fontSize: 11, fill: '#b0b0b0', listening: false }));
+  gridLayer.batchDraw();
+}
+
+// ─── Snap ─────────────────────────────────────────────────────────────────────
+function snap(v) { return s.snapEnabled ? Math.round(v / CELL_PX) * CELL_PX : v; }
+function snapXY(x, y) { return { x: snap(x), y: snap(y) }; }
+
+// ─── Hint / cursor helpers ────────────────────────────────────────────────────
+const hintText = {
+  select:   'Click a bed to select — drag to move, handles to resize/rotate. Click empty space to deselect.',
+  anchor:   'Click a pen-drawn bed to edit its anchor points. Only works with Pen (P) shapes — draw one first, then switch here.',
+  freehand: 'Click and drag to trace a freehand outline. · Shift: no effect · Space+drag: pan · Ctrl/Cmd+scroll: zoom',
+  rect:     'Click and drag to draw a rectangular bed. · Hold Shift for a perfect square.',
+  oval:     'Click and drag to draw an oval bed. · Hold Shift for a perfect circle.',
+  pen:      'Click = corner · Click+drag = curve · Click ○ to close · Enter to close · Esc = commit open',
+  landmark: 'Click anywhere to place a named landmark (e.g. "fence post NE corner").',
+};
+const toolLabels = { select:'Select', anchor:'Anchor', freehand:'Freehand', rect:'Rectangle', oval:'Oval', pen:'Pen', landmark:'Landmark' };
+
+function setCursor() {
+  if (spaceHeld)               { wrap.style.cursor = panning ? 'grabbing' : 'grab'; return; }
+  if (s.tool === 'pen')        { wrap.style.cursor = pen.nearFirst ? 'pointer' : 'crosshair'; return; }
+  if (s.tool === 'select')     { wrap.style.cursor = 'default'; return; }
+  if (s.tool === 'anchor')     { wrap.style.cursor = 'crosshair'; return; }
+  wrap.style.cursor = 'crosshair';
+}
+
+function activateTool(tool) {
+  if (tool === 'anchor' && !s.beds.some(b => b.type==='pen'||b.type==='pen-open')) return;
+  if (s.tool === 'pen') penCancel();
+  clearSelection();
+  clearAnchors();
+  setBedsDraggable(tool === 'select');
+  s.tool = tool;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
+  document.getElementById('hint').textContent = hintText[tool];
+  document.getElementById('s-tool').textContent = toolLabels[tool];
+  setCursor();
+}
+
+document.querySelectorAll('.tool-btn').forEach(btn => btn.addEventListener('click', () => activateTool(btn.dataset.tool)));
+
+document.getElementById('scale-ft').addEventListener('input', e => {
+  const v = parseFloat(e.target.value);
+  if (v > 0) { s.scaleFt = v; drawGrid(); refreshLandmarks(); }
+});
+document.getElementById('snap-toggle').addEventListener('change', e => { s.snapEnabled = e.target.checked; drawGrid(); });
+document.getElementById('label-toggle').addEventListener('change', e => {
+  s.labelsVisible = e.target.checked;
+  s.beds.forEach(b => { if (b.labelNode) { b.labelNode.visible(s.labelsVisible); } });
+  bedsLayer.batchDraw();
+});
+
+// ─── Bed helpers ──────────────────────────────────────────────────────────────
+function getBedCenter(bed) {
+  const n = bed.shapeNode;
+  if (bed.type === 'rect')  return { x: n.x() + n.width()*n.scaleX()/2,  y: n.y() + n.height()*n.scaleY()/2 };
+  if (bed.type === 'oval')  return { x: n.x(), y: n.y() };
+  if (bed.type === 'freehand') {
+    const pts = n.points(); let sx=0, sy=0;
+    for (let i=0; i<pts.length; i+=2) { sx+=pts[i]; sy+=pts[i+1]; }
+    return { x: sx/(pts.length/2), y: sy/(pts.length/2) };
+  }
+  if (bed.pts) {
+    let sx=0, sy=0; bed.pts.forEach(p => { sx+=p.x; sy+=p.y; });
+    return { x: sx/bed.pts.length, y: sy/bed.pts.length };
+  }
+  return { x: 0, y: 0 };
+}
+
+function updateLabelPosition(bed) {
+  if (!bed.labelNode) return;
+  const c = getBedCenter(bed);
+  bed.labelNode.x(c.x); bed.labelNode.y(c.y);
+  bed.labelNode.offsetX(bed.labelNode.width()/2);
+  bed.labelNode.offsetY(bed.labelNode.height()/2);
+}
+
+function attachLabel(bed) {
+  s.bedCounter++;
+  bed.name = `Bed ${s.bedCounter}`;
+  const lbl = new Konva.Text({
+    x: 0, y: 0, text: bed.name,
+    fontSize: 12, fontStyle: 'bold', fill: '#1b4332',
+    visible: s.labelsVisible,
+  });
+  bedsLayer.add(lbl); // add first so text metrics are available
+  bed.labelNode = lbl;
+  updateLabelPosition(bed); // now center using real measured width/height
+}
+
+function setBedsDraggable(on) {
+  s.beds.forEach(b => {
+    b.shapeNode.draggable(on);
+    if (on) {
+      b.shapeNode.on('dragmove.select', () => {
+        if (s.snapEnabled) {
+          b.shapeNode.x(snap(b.shapeNode.x()));
+          b.shapeNode.y(snap(b.shapeNode.y()));
+        }
+        updateLabelPosition(b);
+        overlayLayer.batchDraw();
+        bedsLayer.batchDraw();
+      });
+      b.shapeNode.on('dragend.select', () => { updateLabelPosition(b); bedsLayer.batchDraw(); });
+      b.shapeNode.on('click.select', () => selectBed(b));
+    } else {
+      b.shapeNode.off('.select');
+    }
+  });
+}
+
+// ─── Selection (select tool) ──────────────────────────────────────────────────
+function selectBed(bed) {
+  clearAnchors();
+  selectedBed = bed;
+  transformer.nodes([bed.shapeNode]);
+  transformer.visible(true);
+  overlayLayer.batchDraw();
+}
+
+function clearSelection() {
+  selectedBed = null;
+  transformer.nodes([]);
+  transformer.visible(false);
+  overlayLayer.batchDraw();
+}
+
+transformer.on('transformend', () => {
+  if (selectedBed) { updateLabelPosition(selectedBed); bedsLayer.batchDraw(); }
+});
+
+// ─── Anchor editing (anchor tool) ─────────────────────────────────────────────
+function showAnchors(bed) {
+  clearAnchors();
+  if (!bed.pts) return;
+  anchorBed = bed;
+  const isClosed = bed.type === 'pen';
+
+  bed.pts.forEach((pt, i) => {
+    // Handle lines + dots for curve points
+    if (pt.cpOut) {
+      const cpIn = { x: 2*pt.x - pt.cpOut.x, y: 2*pt.y - pt.cpOut.y };
+
+      [pt.cpOut, cpIn].forEach((cp, side) => {
+        const arm = new Konva.Line({ points: [pt.x,pt.y,cp.x,cp.y], stroke:'#aaa', strokeWidth:1, dash:[3,3] });
+        overlayLayer.add(arm); anchorNodes.push(arm);
+
+        const dot = new Konva.Circle({ x:cp.x, y:cp.y, radius:5, fill:HANDLE_COL, stroke:'white', strokeWidth:1.5, draggable:true });
+        overlayLayer.add(dot); anchorNodes.push(dot);
+
+        dot.on('dragmove', () => {
+          if (side === 0) { // outgoing handle
+            bed.pts[i].cpOut = { x: dot.x(), y: dot.y() };
+          } else { // incoming = mirror → update cpOut via mirror
+            bed.pts[i].cpOut = { x: 2*pt.x - dot.x(), y: 2*pt.y - dot.y() };
+          }
+          bed.shapeNode.data(penBuildD(bed.pts, isClosed));
+          bedsLayer.batchDraw();
+        });
+        dot.on('dragend', () => showAnchors(bed));
+      });
+    }
+
+    // Anchor square
+    const sq = new Konva.Rect({ x:pt.x-5, y:pt.y-5, width:10, height:10, fill:'white', stroke: i===0?'#e63946':ANCHOR_COL, strokeWidth:2, draggable:true });
+    overlayLayer.add(sq); anchorNodes.push(sq);
+
+    sq.on('dragmove', () => {
+      const nx = snap(sq.x()+5), ny = snap(sq.y()+5);
+      const dx = nx - bed.pts[i].x, dy = ny - bed.pts[i].y;
+      bed.pts[i].x = nx; bed.pts[i].y = ny;
+      if (bed.pts[i].cpOut) { bed.pts[i].cpOut.x += dx; bed.pts[i].cpOut.y += dy; }
+      sq.x(nx-5); sq.y(ny-5);
+      bed.shapeNode.data(penBuildD(bed.pts, isClosed));
+      updateLabelPosition(bed);
+      bedsLayer.batchDraw();
+    });
+    sq.on('dragend', () => showAnchors(bed));
+  });
+
+  overlayLayer.batchDraw();
+}
+
+function clearAnchors() {
+  anchorNodes.forEach(n => n.destroy());
+  anchorNodes = []; anchorBed = null;
+  overlayLayer.batchDraw();
+}
+
+// ─── Pen helpers ──────────────────────────────────────────────────────────────
+function r(n) { return parseFloat(n.toFixed(1)); }
+
+function penBuildD(pts, close) {
+  if (!pts.length) return '';
+  let d = `M ${r(pts[0].x)} ${r(pts[0].y)}`;
+  for (let i=1; i<pts.length; i++) {
+    const prev = pts[i-1], curr = pts[i];
+    const cp1 = prev.cpOut || null;
+    const cp2 = curr.cpOut ? { x:2*curr.x-curr.cpOut.x, y:2*curr.y-curr.cpOut.y } : null;
+    if (!cp1 && !cp2) d += ` L ${r(curr.x)} ${r(curr.y)}`;
+    else d += ` C ${r((cp1||prev).x)} ${r((cp1||prev).y)} ${r((cp2||curr).x)} ${r((cp2||curr).y)} ${r(curr.x)} ${r(curr.y)}`;
+  }
+  if (close && pts.length > 1) {
+    const last=pts[pts.length-1], first=pts[0];
+    const cp1=last.cpOut||null, cp2=first.cpOut?{x:2*first.x-first.cpOut.x,y:2*first.y-first.cpOut.y}:null;
+    if (!cp1 && !cp2) d += ' Z';
+    else d += ` C ${r((cp1||last).x)} ${r((cp1||last).y)} ${r((cp2||first).x)} ${r((cp2||first).y)} ${r(first.x)} ${r(first.y)} Z`;
+  }
+  return d;
+}
+
+function penRedraw() {
+  previewLayer.destroyChildren();
+  const pts = pen.pts;
+  if (!pts.length) { previewLayer.batchDraw(); return; }
+
+  if (pts.length > 1)
+    previewLayer.add(new Konva.Path({ data:penBuildD(pts,false), stroke:BED_STROKE, strokeWidth:2.5, lineCap:'round', lineJoin:'round', fill:'transparent' }));
+
+  if (pen.cursorPos) {
+    const last = pts[pts.length-1];
+    if (last.cpOut) {
+      previewLayer.add(new Konva.Path({ data:`M ${r(last.x)} ${r(last.y)} C ${r(last.cpOut.x)} ${r(last.cpOut.y)} ${r(pen.cursorPos.x)} ${r(pen.cursorPos.y)} ${r(pen.cursorPos.x)} ${r(pen.cursorPos.y)}`, stroke:BED_STROKE, strokeWidth:1.5, dash:[5,4], opacity:0.55, fill:'transparent' }));
+    } else {
+      previewLayer.add(new Konva.Line({ points:[last.x,last.y,pen.cursorPos.x,pen.cursorPos.y], stroke:BED_STROKE, strokeWidth:1.5, dash:[5,4], opacity:0.55 }));
+    }
+  }
+
+  pts.forEach((pt, i) => {
+    if (pt.cpOut) {
+      const cpIn = { x:2*pt.x-pt.cpOut.x, y:2*pt.y-pt.cpOut.y };
+      previewLayer.add(new Konva.Line({ points:[pt.x,pt.y,pt.cpOut.x,pt.cpOut.y], stroke:'#aaa', strokeWidth:1, dash:[3,3] }));
+      previewLayer.add(new Konva.Circle({ x:pt.cpOut.x, y:pt.cpOut.y, radius:4, fill:HANDLE_COL, stroke:'white', strokeWidth:1.5 }));
+      previewLayer.add(new Konva.Line({ points:[pt.x,pt.y,cpIn.x,cpIn.y], stroke:'#aaa', strokeWidth:1, dash:[3,3] }));
+      previewLayer.add(new Konva.Circle({ x:cpIn.x, y:cpIn.y, radius:4, fill:HANDLE_COL, stroke:'white', strokeWidth:1.5 }));
+    }
+    if (i === 0) {
+      const near = pen.nearFirst && pts.length >= 3;
+      if (near) {
+        previewLayer.add(new Konva.Circle({ x:pt.x, y:pt.y, radius:CLOSE_RADIUS, stroke:ANCHOR_COL, strokeWidth:1.5, fill:'transparent', dash:[3,3] }));
+        previewLayer.add(new Konva.Circle({ x:pt.x, y:pt.y, radius:7, stroke:ANCHOR_COL, strokeWidth:2.5, fill:'#d8f3dc' }));
+      } else {
+        previewLayer.add(new Konva.Circle({ x:pt.x, y:pt.y, radius:5, stroke:ANCHOR_COL, strokeWidth:2, fill:'white' }));
+      }
+    } else {
+      previewLayer.add(new Konva.Rect({ x:pt.x-4, y:pt.y-4, width:8, height:8, stroke:ANCHOR_COL, strokeWidth:2, fill:'white' }));
+    }
+  });
+
+  if (pen.placing && pen.dragStart && pen.cursorPos && pts.length) {
+    const last=pts[pts.length-1], dx=pen.cursorPos.x-pen.dragStart.x, dy=pen.cursorPos.y-pen.dragStart.y;
+    if (Math.hypot(dx,dy) > 4) {
+      const cpOut={x:last.x+dx,y:last.y+dy}, cpIn={x:last.x-dx,y:last.y-dy};
+      previewLayer.add(new Konva.Line({ points:[cpIn.x,cpIn.y,cpOut.x,cpOut.y], stroke:'#aaa', strokeWidth:1 }));
+      previewLayer.add(new Konva.Circle({ x:cpOut.x, y:cpOut.y, radius:4, fill:HANDLE_COL, stroke:'white', strokeWidth:1.5 }));
+      previewLayer.add(new Konva.Circle({ x:cpIn.x,  y:cpIn.y,  radius:4, fill:HANDLE_COL, stroke:'white', strokeWidth:1.5 }));
+    }
+  }
+  previewLayer.batchDraw();
+}
+
+function penCommitNode(close) {
+  if (pen.pts.length < (close ? 3 : 2)) { penCancel(); return; }
+  const type = close ? 'pen' : 'pen-open';
+  const node = new Konva.Path({ data:penBuildD(pen.pts,close), stroke:BED_STROKE, strokeWidth:2.5, lineCap:'round', lineJoin:'round', fill: close ? BED_FILL : 'transparent' });
+  bedsLayer.add(node);
+  const bed = { type, shapeNode:node, pts:pen.pts.slice() };
+  attachLabel(bed);
+  s.beds.push(bed);
+  bedsLayer.batchDraw();
+  penCancel();
+  refreshStats();
+}
+function penClose()      { penCommitNode(true);  }
+function penCommitOpen() { penCommitNode(false); }
+function penCancel() {
+  pen.pts=[]; pen.placing=false; pen.dragStart=null; pen.cursorPos=null; pen.nearFirst=false;
+  previewLayer.destroyChildren(); previewLayer.batchDraw();
+}
+
+// ─── Mouse events ─────────────────────────────────────────────────────────────
+stage.on('mousedown', e => {
+  const pos = stage.getPointerPosition();
+
+  if (spaceHeld) { panning=true; panStart={x:e.evt.clientX,y:e.evt.clientY}; panOrigin={x:stage.x(),y:stage.y()}; setCursor(); return; }
+
+  // Select: click empty space = deselect
+  if (s.tool === 'select') { clearSelection(); return; }
+
+  // Anchor: click shape to enter anchor mode
+  if (s.tool === 'anchor') {
+    // clicking a shape is handled by shape-level click events set up in showAnchors
+    // clicking empty space clears
+    clearAnchors();
+    // Find if we clicked a pen bed
+    const hit = s.beds.find(b => (b.type==='pen'||b.type==='pen-open') && b.shapeNode.getClientRect && isInsidePath(b, pos));
+    if (hit) showAnchors(hit);
+    return;
+  }
+
+  if (s.tool === 'pen') {
+    if (pen.nearFirst && pen.pts.length >= 3) { penClose(); return; }
+    const snapped = snapXY(pos.x, pos.y);
+    pen.pts.push({ x:snapped.x, y:snapped.y, cpOut:null });
+    pen.placing=true; pen.dragStart={x:pos.x,y:pos.y};
+    penRedraw(); return;
+  }
+
+  if (s.tool === 'freehand') {
+    s.drawing=true;
+    const snapped = snapXY(pos.x, pos.y);
+    s.curLine = new Konva.Line({ points:[snapped.x,snapped.y], stroke:BED_STROKE, strokeWidth:2.5, lineCap:'round', lineJoin:'round', tension:0.4 });
+    previewLayer.add(s.curLine);
+  }
+
+  if (s.tool === 'rect' || s.tool === 'oval') {
+    s.drawing=true;
+    const snapped = snapXY(pos.x, pos.y);
+    s.startXY = snapped;
+    s.preview = s.tool==='rect'
+      ? new Konva.Rect({ x:snapped.x, y:snapped.y, width:0, height:0, stroke:BED_STROKE, strokeWidth:2.5, fill:BED_FILL })
+      : new Konva.Ellipse({ x:snapped.x, y:snapped.y, radiusX:0, radiusY:0, stroke:BED_STROKE, strokeWidth:2.5, fill:BED_FILL });
+    previewLayer.add(s.preview);
+  }
+
+  if (s.tool === 'landmark') {
+    const name = prompt('Landmark name:');
+    if (name && name.trim()) addLandmark(pos.x, pos.y, name.trim());
+  }
+});
+
+stage.on('mousemove', e => {
+  const pos = stage.getPointerPosition();
+  if (!pos) return;
+
+  if (panning && panStart) {
+    stage.position({ x:panOrigin.x+e.evt.clientX-panStart.x, y:panOrigin.y+e.evt.clientY-panStart.y });
+    stage.batchDraw(); return;
+  }
+
+  pen.cursorPos = pos;
+
+  if (s.tool === 'pen') {
+    if (pen.pts.length >= 3) {
+      const f=pen.pts[0]; pen.nearFirst = Math.hypot(pos.x-f.x,pos.y-f.y) < CLOSE_RADIUS;
+    } else { pen.nearFirst=false; }
+    setCursor();
+    if (pen.placing && pen.dragStart) {
+      const dx=pos.x-pen.dragStart.x, dy=pos.y-pen.dragStart.y;
+      if (Math.hypot(dx,dy) > 4) { const last=pen.pts[pen.pts.length-1]; last.cpOut={x:last.x+dx,y:last.y+dy}; }
+    }
+    penRedraw(); return;
+  }
+
+  if (!s.drawing) return;
+
+  if (s.tool === 'freehand' && s.curLine) {
+    s.curLine.points([...s.curLine.points(), pos.x, pos.y]);
+    previewLayer.batchDraw();
+  }
+
+  if (s.preview && s.startXY) {
+    let dx=pos.x-s.startXY.x, dy=pos.y-s.startXY.y;
+    if (e.evt.shiftKey) { const side=Math.min(Math.abs(dx),Math.abs(dy)); dx=dx<0?-side:side; dy=dy<0?-side:side; }
+    if (s.tool==='rect') {
+      s.preview.x(dx<0?s.startXY.x+dx:s.startXY.x); s.preview.y(dy<0?s.startXY.y+dy:s.startXY.y);
+      s.preview.width(Math.abs(dx)); s.preview.height(Math.abs(dy));
+    } else {
+      s.preview.x(s.startXY.x+dx/2); s.preview.y(s.startXY.y+dy/2);
+      s.preview.radiusX(Math.abs(dx)/2); s.preview.radiusY(Math.abs(dy)/2);
+    }
+    previewLayer.batchDraw();
+  }
+});
+
+stage.on('mouseup', () => {
+  if (panning) { panning=false; setCursor(); return; }
+
+  if (s.tool === 'pen') {
+    if (pen.placing && pen.dragStart) {
+      const pos=stage.getPointerPosition();
+      const dx=pos?pos.x-pen.dragStart.x:0, dy=pos?pos.y-pen.dragStart.y:0;
+      if (Math.hypot(dx,dy) <= 4) pen.pts[pen.pts.length-1].cpOut=null;
+    }
+    pen.placing=false; pen.dragStart=null; penRedraw(); return;
+  }
+
+  if (!s.drawing) return;
+  s.drawing=false;
+
+  if (s.tool === 'freehand' && s.curLine) {
+    const pts=s.curLine.points(); s.curLine.remove();
+    if (pts.length >= 6) {
+      const node = new Konva.Line({ points:pts, stroke:BED_STROKE, strokeWidth:2.5, lineCap:'round', lineJoin:'round', tension:0.4, closed:true, fill:BED_FILL });
+      bedsLayer.add(node);
+      const bed={type:'freehand',shapeNode:node};
+      attachLabel(bed); s.beds.push(bed); bedsLayer.batchDraw();
+    }
+    s.curLine=null; previewLayer.batchDraw();
+  }
+
+  if (s.preview) {
+    const big = s.tool==='rect' ? (s.preview.width()>8&&s.preview.height()>8) : (s.preview.radiusX()>5&&s.preview.radiusY()>5);
+    if (big) {
+      s.preview.remove();
+      const node=s.preview.clone(); bedsLayer.add(node);
+      const bed={type:s.tool,shapeNode:node};
+      attachLabel(bed); s.beds.push(bed); bedsLayer.batchDraw();
+    } else { s.preview.remove(); previewLayer.batchDraw(); }
+    s.preview=null; s.startXY=null;
+  }
+
+  refreshStats();
+});
+
+stage.on('dblclick', () => {
+  if (s.tool !== 'pen') return;
+  if (pen.pts.length > 0) pen.pts.pop();
+  penClose();
+});
+
+// Anchor tool: click a pen shape to enter anchor mode
+stage.on('click', e => {
+  if (s.tool !== 'anchor') return;
+  const target = e.target;
+  const bed = s.beds.find(b => b.shapeNode === target && (b.type==='pen'||b.type==='pen-open'));
+  if (bed) showAnchors(bed);
+});
+
+// Select tool: click a shape to select it
+stage.on('click', e => {
+  if (s.tool !== 'select') return;
+  const target = e.target;
+  if (target === stage) { clearSelection(); return; }
+  const bed = s.beds.find(b => b.shapeNode === target);
+  if (bed) selectBed(bed); else clearSelection();
+});
+
+// Zoom: Ctrl/Cmd + scroll
+stage.on('wheel', e => {
+  if (!e.evt.ctrlKey && !e.evt.metaKey) return;
+  e.evt.preventDefault();
+  const BY=1.12, old=stage.scaleX(), ptr=stage.getPointerPosition();
+  const origin={x:(ptr.x-stage.x())/old,y:(ptr.y-stage.y())/old};
+  const next=Math.min(Math.max(e.evt.deltaY<0?old*BY:old/BY,0.1),10);
+  stage.scale({x:next,y:next});
+  stage.position({x:ptr.x-origin.x*next,y:ptr.y-origin.y*next});
+  stage.batchDraw();
+});
+
+// ─── Keyboard ─────────────────────────────────────────────────────────────────
+window.addEventListener('keydown', e => {
+  if (e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+
+  if (e.key===' ') { e.preventDefault(); spaceHeld=true; setCursor(); return; }
+  if ((e.ctrlKey||e.metaKey) && !e.shiftKey && e.key==='z') { e.preventDefault(); triggerUndo(); return; }
+  if ((e.ctrlKey||e.metaKey) && e.key==='0') { e.preventDefault(); stage.scale({x:1,y:1}); stage.position({x:0,y:0}); stage.batchDraw(); return; }
+  if (e.ctrlKey||e.metaKey||e.altKey) return;
+
+  switch (e.key.toLowerCase()) {
+    case 'v': activateTool('select');   break;
+    case 'a': activateTool('anchor');   break;
+    case 'f': activateTool('freehand'); break;
+    case 'r': activateTool('rect');     break;
+    case 'o': activateTool('oval');     break;
+    case 'p': activateTool('pen');      break;
+    case 'l': activateTool('landmark'); break;
+    case 'g': {
+      const cb = document.getElementById('snap-toggle');
+      cb.checked = !cb.checked; s.snapEnabled = cb.checked;
+      drawGrid();
+      break;
+    }
+    case 'enter':   if (s.tool==='pen') penClose(); break;
+    case 'escape':  if (s.tool==='pen') pen.pts.length>=3?penCommitOpen():penCancel(); break;
+    case 'backspace': case 'delete': e.preventDefault(); triggerUndo(); break;
+  }
+});
+
+window.addEventListener('keyup', e => {
+  if (e.key===' ') { spaceHeld=false; panning=false; setCursor(); }
+});
+
+// ─── Undo ─────────────────────────────────────────────────────────────────────
+function triggerUndo() {
+  if (s.tool==='pen' && pen.pts.length>0) { pen.pts.pop(); penRedraw(); return; }
+  if (anchorBed) { clearAnchors(); return; }
+  const b=s.beds.pop();
+  if (!b) return;
+  b.shapeNode.destroy();
+  if (b.labelNode) b.labelNode.destroy();
+  s.bedCounter = Math.max(0, s.bedCounter-1);
+  bedsLayer.batchDraw(); clearSelection(); refreshStats();
+}
+
+document.getElementById('btn-undo').addEventListener('click', triggerUndo);
+
+// ─── Clear ────────────────────────────────────────────────────────────────────
+document.getElementById('btn-clear').addEventListener('click', () => {
+  if (!confirm('Clear all shapes and landmarks?')) return;
+  penCancel(); clearSelection(); clearAnchors();
+  s.beds.forEach(b => { b.shapeNode.destroy(); if (b.labelNode) b.labelNode.destroy(); });
+  s.beds=[]; s.bedCounter=0;
+  s.landmarks.forEach(l=>l.node.destroy()); s.landmarks=[];
+  bedsLayer.batchDraw(); lmLayer.batchDraw(); refreshStats(); refreshLandmarks();
+});
+
+// ─── Landmarks ────────────────────────────────────────────────────────────────
+function addLandmark(x, y, name) {
+  const g=new Konva.Group({x,y});
+  g.add(new Konva.Circle({radius:7,fill:'#e63946',stroke:'white',strokeWidth:2}));
+  g.add(new Konva.Text({x:11,y:-7,text:name,fontSize:12,fontStyle:'bold',fill:'#111'}));
+  lmLayer.add(g); lmLayer.batchDraw();
+  s.landmarks.push({name,x,y,node:g}); refreshStats(); refreshLandmarks();
+}
+
+function refreshLandmarks() {
+  const el=document.getElementById('landmark-list');
+  if (!s.landmarks.length) { el.innerHTML='<span class="empty">None yet.</span>'; return; }
+  el.innerHTML=s.landmarks.map(l => {
+    const xf=(l.x/CELL_PX*s.scaleFt).toFixed(1), yf=(l.y/CELL_PX*s.scaleFt).toFixed(1);
+    return `<div class="lm-entry"><div class="lm-dot"></div><div><div class="lm-name">${l.name}</div><div class="lm-pos">${xf} ft, ${yf} ft</div></div></div>`;
+  }).join('');
+}
+
+function refreshToolStates() {
+  const hasPenBed = s.beds.some(b => b.type === 'pen' || b.type === 'pen-open');
+  const btn = document.querySelector('[data-tool="anchor"]');
+  btn.disabled = !hasPenBed;
+  btn.style.opacity = hasPenBed ? '' : '0.35';
+  btn.title = hasPenBed ? '' : 'Draw a shape with the Pen tool (P) first';
+  if (!hasPenBed && s.tool === 'anchor') activateTool('freehand');
+}
+
+function refreshStats() {
+  document.getElementById('s-beds').textContent=s.beds.length;
+  document.getElementById('s-lm').textContent=s.landmarks.length;
+  refreshToolStates();
+}
+
+// ─── Anchor tool hit test (simple bounding box fallback) ──────────────────────
+function isInsidePath(bed, pos) {
+  // Use Konva's built-in hit detection via getIntersection
+  const shape = bed.shapeNode;
+  const hit = bedsLayer.getIntersection(pos);
+  return hit === shape;
+}
+
+// ─── SVG export ───────────────────────────────────────────────────────────────
+function buildSVG() {
+  const w=stage.width(), h=stage.height(), pxPerFt=(CELL_PX/s.scaleFt);
+  const lines=[
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">`,
+    `  <!-- px-per-ft="${pxPerFt.toFixed(4)}" grid-cell-px="${CELL_PX}" grid-cell-ft="${s.scaleFt}" -->`,
+    `  <g id="beds">`,
+  ];
+  s.beds.forEach((b,i) => {
+    const n=b.shapeNode, id=`bed-${i+1}`;
+    if (b.type==='freehand') {
+      const pts=n.points(); let d=`M ${r(pts[0])} ${r(pts[1])}`;
+      for (let j=2;j<pts.length;j+=2) d+=` L ${r(pts[j])} ${r(pts[j+1])}`; d+=' Z';
+      lines.push(`    <path id="${id}" d="${d}" fill="${BED_FILL}" stroke="${BED_STROKE}" stroke-width="2.5"/>`);
+    } else if (b.type==='rect') {
+      lines.push(`    <rect id="${id}" x="${r(n.x())}" y="${r(n.y())}" width="${r(n.width())}" height="${r(n.height())}" fill="${BED_FILL}" stroke="${BED_STROKE}" stroke-width="2.5"/>`);
+    } else if (b.type==='oval') {
+      lines.push(`    <ellipse id="${id}" cx="${r(n.x())}" cy="${r(n.y())}" rx="${r(n.radiusX())}" ry="${r(n.radiusY())}" fill="${BED_FILL}" stroke="${BED_STROKE}" stroke-width="2.5"/>`);
+    } else if (b.type==='pen'||b.type==='pen-open') {
+      lines.push(`    <path id="${id}" d="${penBuildD(b.pts,b.type==='pen')}" fill="${b.type==='pen'?BED_FILL:'transparent'}" stroke="${BED_STROKE}" stroke-width="2.5"/>`);
+    }
+    if (b.name) {
+      const c=getBedCenter(b);
+      lines.push(`    <text x="${r(c.x)}" y="${r(c.y)}" font-size="12" font-weight="bold" fill="#1b4332" text-anchor="middle" dominant-baseline="middle">${b.name}</text>`);
+    }
+  });
+  lines.push(`  </g>`,`  <g id="landmarks">`);
+  s.landmarks.forEach((l,i) => {
+    lines.push(
+      `    <circle id="lm-${i+1}" cx="${r(l.x)}" cy="${r(l.y)}" r="7" fill="#e63946" stroke="white" stroke-width="2"/>`,
+      `    <text x="${r(l.x+11)}" y="${r(l.y+4)}" font-size="12" font-weight="bold" fill="#111">${l.name}</text>`
+    );
+  });
+  lines.push(`  </g>`,`</svg>`);
+  return lines.join('\n');
+}
+
+document.getElementById('btn-svg').addEventListener('click', () => {
+  document.getElementById('svg-code').textContent=buildSVG();
+  document.getElementById('svg-modal').classList.add('open');
+});
+document.getElementById('close-svg').addEventListener('click', () => document.getElementById('svg-modal').classList.remove('open'));
+
+// ─── Resize ───────────────────────────────────────────────────────────────────
+window.addEventListener('resize', () => { stage.width(wrap.offsetWidth); stage.height(window.innerHeight); drawGrid(); });
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+drawGrid(); refreshStats();
+</script>
+</body>
+</html>
