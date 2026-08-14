@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted — 2026-08-13.
+Accepted — 2026-08-13. **Amended the same day**: the smoothing control was
+changed from an adjustable post-draw level to a binary pre-draw toggle, and
+the open question this ADR carried is now closed. See "Smoothing control".
 
 Validated by the throwaway prototypes `prototype/bed-editor/index.html` and
 `prototype/bed-editor/smooth-correct.html`. Neither is production code; extract
@@ -33,15 +35,24 @@ points**, not with spline tension alone:
 - Then run Chaikin corner-cutting passes over the decimated points.
 - Raw tension-based smoothing alone was tried first and was not sufficient.
 
-**Smoothing is an adjustable post-draw property, not a pre-draw mode.** The
-user draws, then dials the shape from `Original` through to `Blob` on a
-9-level scale. Higher levels increase both the decimation step and the number
-of Chaikin passes, so the shape gets progressively rounder.
+**Ship smoothing as a binary pre-draw toggle for the MVP.** Superseded the
+original post-draw framing on 2026-08-13 — see "Smoothing control" below.
+Freehand strokes are either smoothed at fixed strength (decimate to every 4th
+point, then 4 Chaikin passes) or left raw. This is the behaviour already in
+`prototype/bed-editor/index.html`.
+
+An adjustable post-draw level — dialling the shape from `Original` through to
+`Blob` on a 9-level scale, where higher levels increase both the decimation
+step and the Chaikin pass count — was prototyped and works, but is **deferred
+to a later drawing-experience phase**, not adopted.
 
 ## Consequences
 
-- Beds store a point list plus a smoothing level, so the original traced shape
-  is preserved and smoothing stays non-destructive and re-adjustable.
+- Beds store the raw traced point list plus a smoothing flag — never the
+  smoothed points alone. Smoothing stays non-destructive and is recomputed on
+  render. Storing the raw path is what keeps the deferred adjustable-level
+  work open: a boolean can widen to a 0–8 level later without a migration of
+  the geometry itself.
 - **Gotcha worth keeping:** the closed shape needs `tension: 0.5` on the Konva
   line. At lower tension the implicit closing join renders as a flat segment
   while every other edge is curved, which looks like a bug in the shape.
@@ -53,13 +64,23 @@ of Chaikin passes, so the shape gets progressively rounder.
 - The prototype used vanilla JS with no framework. That is not a commitment —
   the stack decision is still open.
 
-## Open
+## Smoothing control
 
-Which smoothing control UI to ship. `smooth-correct.html` explores three, and
-no verdict has been recorded:
+**Resolved 2026-08-13: none of the three post-draw variants ship.**
+
+`smooth-correct.html` prototyped three ways to expose an adjustable post-draw
+smoothing level:
 
 - **A** — slider in the side panel
 - **B** — floating pill near the shape
 - **C** — drag directly on the shape
 
-Pick one before building the real editor.
+All three were rejected on feel. The MVP keeps the original pre-draw toggle
+instead, and honing the drawing experience is deferred to its own phase.
+
+Worth knowing for whoever picks that phase up: the rejection was of these
+three *interactions*, not of adjustable smoothing as an idea, and not of the
+algorithm. The 9-level Chaikin scale in `smooth-correct.html` works and its
+level labels (`Original` → `Blob`) read well; what none of A/B/C got right was
+where the control lives and when it appears. Starting that phase by
+re-prototyping the same three patterns would repeat settled work.

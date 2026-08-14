@@ -17,8 +17,18 @@ A Planting with quantity 24 = one record for 24 specimens, not 24 records.
 
 ### Bed
 A drawn map area representing a physical garden section. Desktop-only
-creation. Has a name, drawn outline (freehand or shape-based), a grid scale
-(pixels-per-real-world-unit), and one or more Landmarks.
+creation. Has a name, a drawn outline stored as the raw traced point list
+(freehand or shape-based), a smoothing flag, a grid scale
+(pixels-per-real-world-unit), and zero or more Landmarks.
+
+The outline is stored raw and smoothed on render, never the other way round —
+see ADR-0001. Landmarks are optional: a Pin placed by rough tap needs none.
+
+*Open:* whether grid scale belongs on the Bed at all. When an aerial base
+layer is in use the scale is derived once from latitude and tile zoom
+(ADR-0002), so every Bed on that base shares it and a per-Bed scale could let
+two Beds disagree about the length of a foot. Per-Bed scale may still be
+right for the blank-canvas fallback path.
 
 ### Landmark
 A named reference point tagged within a Bed during creation (e.g. "fence
@@ -42,7 +52,9 @@ The scheduling mechanism for a care task template. Two types only:
 - **Seasonal-marker**: freeform reminder text, no computed date.
 
 ### Task completion
-A log entry (done or missed) per Planting per calendar year. Forms a
+A log entry (done or missed) keyed by Care task template, Planting, and
+calendar year. All three are needed: a Plant with three Care task templates
+produces three Task completions per year for each of its Plantings. Forms a
 reviewable care history per Planting.
 
 ### One-off todo
