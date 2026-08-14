@@ -35,16 +35,34 @@ The project is at the **pre-implementation** stage. Two commits exist:
 | Spec | `docs/plant-app-spec.md` | Full requirements, user stories, implementation & testing decisions, out-of-scope |
 | Domain glossary | `CONTEXT.md` | Canonical term definitions — use these names exactly (Plant vs Planting, Bed, Pin, Landmark, Bloom Window, etc.) |
 | Agent docs | `docs/agents/` | Issue tracker setup (`issue-tracker.md`), triage labels (`triage-labels.md`), domain context (`domain.md`) |
-| Prototype | `prototype/bed-editor/index.html` | **Throwaway** Konva.js bed-editor prototype answering "does Konva.js feel right for desktop bed drawing?" |
+| Decisions | `docs/adr/` | **Architecture Decision Records — read these first.** ADR-0001 (bed drawing + smoothing), ADR-0002 (aerial base layer, derived scale, lot boundaries) |
+| Prototype | `prototype/bed-editor/` | **Throwaway.** `index.html` — Konva bed editor. `smooth-correct.html` — post-draw smoothing UI variants |
+| Prototype | `prototype/satellite-base/index.html` | **Throwaway.** Aerial base layer, address → scaled map, lot boundaries |
 
-### What the prototype validated
+### What the prototypes validated
 
-`prototype/bed-editor/index.html` is a fully working single-file Konva.js canvas prototype. It confirmed:
+Full reasoning and the full list of constraints live in `docs/adr/`. In brief:
+
+**`prototype/bed-editor/`** (see ADR-0001)
 - Konva.js works for freehand, rect, oval, and bezier-pen bed drawing
 - Grid snapping, zoom/pan, landmark placement, SVG export all work
-- The visual language (green palette, labeled beds, landmark pins) feels right
+- Raw spline tension alone gives poor organic shapes; Chaikin corner-cutting over
+  decimated points is what produces usable bed blobs
+- Smoothing should be an adjustable **post-draw** level, not a pre-draw toggle
+- Open: which of the three smoothing-control UIs (panel slider / floating pill /
+  drag-on-shape) to ship
 
-The prototype is **explicitly throwaway** — do not build on it. Extract learnings only.
+**`prototype/satellite-base/`** (see ADR-0002)
+- An address can be turned into a correctly scaled aerial base with no API key
+- **The map scale is derived from latitude and tile zoom — the user never measures**
+- Precision 2.2–8.3 in/px, comfortably inside the ~1 ft target
+- Real lot boundaries are available where a jurisdiction publishes them; there is
+  no free national source, so the feature must degrade gracefully
+- The base layer must stay **optional** — tree canopy hides exactly the shade beds
+  most worth recording
+
+Both prototypes are **explicitly throwaway** — do not build on them. Extract
+learnings only.
 
 ---
 
@@ -52,7 +70,7 @@ The prototype is **explicitly throwaway** — do not build on it. Extract learni
 
 - **Desktop-only bed creation** — freehand/shape drawing of bed outlines is desktop only; touchscreen was rejected as impractical
 - **Phone + desktop pin placement** — placing Planting pins on the map works on both; rough tap or landmark-distance refinement, offered inline (not a separate guided mode)
-- **No GPS/photo-based mapping** — explicitly rejected (GPS ~10–16 ft accuracy, photo perspective distortion)
+- **No GPS pin positioning in the MVP** — deferred, *not* rejected permanently; revisit in a later phase (ADR-0002 records what would need to change). No user-taken ground photos as a base either. Top-down aerial imagery **is** in scope and is neither of those things.
 - **No per-Planting task overrides** — task timing is on the Plant and applies to all its Plantings uniformly
 - **Two task trigger types only** — (1) fixed calendar date range, (2) freeform seasonal-marker text; bloom-fade-relative triggers are out of scope
 - **One Planting = one record** — a cluster of 24 crocus bulbs is one Planting with quantity=24, not 24 records

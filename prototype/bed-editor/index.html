@@ -131,6 +131,8 @@ kbd {
       <div class="section-label">Canvas Options</div>
       <label class="toggle-row"><input type="checkbox" id="snap-toggle" checked><span>Snap to grid <kbd>G</kbd></span></label>
       <label class="toggle-row"><input type="checkbox" id="label-toggle" checked><span>Show bed labels</span></label>
+      <label class="toggle-row"><input type="checkbox" id="blob-toggle"><span>Blob smoothing <kbd>B</kbd></span></label>
+      <p style="font-size:11px;color:#888;margin-top:4px;line-height:1.4">When on, freehand strokes are rounded using Chaikin corner-cutting (4 passes) instead of raw tension smoothing.</p>
     </div>
     <div>
       <div class="section-label">State</div>
@@ -180,12 +182,16 @@ const s = {
   // options
   snapEnabled: true,
   labelsVisible: true,
+  blobSmoothing: false,
 };
 
 // ─── Pen state ────────────────────────────────────────────────────────────────
 const pen = {
   pts: [], placing: false, dragStart: null, cursorPos: null, nearFirst: false,
 };
+
+// ─── Freehand blob state ──────────────────────────────────────────────────────
+let fhRawPts = [];
 
 // ─── Navigation state ─────────────────────────────────────────────────────────
 let spaceHeld = false, panning = false, panStart = null, panOrigin = null;
@@ -241,7 +247,7 @@ function snapXY(x, y) { return { x: snap(x), y: snap(y) }; }
 const hintText = {
   select:   'Click a bed to select — drag to move, handles to resize/rotate. Click empty space to deselect.',
   anchor:   'Click a pen-drawn bed to edit its anchor points. Only works with Pen (P) shapes — draw one first, then switch here.',
-  freehand: 'Click and drag to trace a freehand outline. · Shift: no effect · Space+drag: pan · Ctrl/Cmd+scroll: zoom',
+  freehand: 'Click and drag to trace a freehand outline. · Toggle "Blob smoothing" in the panel to compare raw vs. smooth. · Space+drag: pan · Ctrl/Cmd+scroll: zoom',
   rect:     'Click and drag to draw a rectangular bed. · Hold Shift for a perfect square.',
   oval:     'Click and drag to draw an oval bed. · Hold Shift for a perfect circle.',
   pen:      'Click = corner · Click+drag = curve · Click ○ to close · Enter to close · Esc = commit open',
@@ -281,6 +287,9 @@ document.getElementById('label-toggle').addEventListener('change', e => {
   s.labelsVisible = e.target.checked;
   s.beds.forEach(b => { if (b.labelNode) { b.labelNode.visible(s.labelsVisible); } });
   bedsLayer.batchDraw();
+});
+document.getElementById('blob-toggle').addEventListener('change', e => {
+  s.blobSmoothing = e.target.checked;
 });
 
 // ─── Bed helpers ──────────────────────────────────────────────────────────────
@@ -420,6 +429,34 @@ function clearAnchors() {
   overlayLayer.batchDraw();
 }
 
+// ─── Blob smoothing ───────────────────────────────────────────────────────────
+// Keep every Nth point from a flat [x,y,...] array, always preserving the last.
+function decimatePts(pts, step) {
+  const out = [];
+  for (let i = 0; i < pts.length - 2; i += step * 2) out.push(pts[i], pts[i+1]);
+  out.push(pts[pts.length-2], pts[pts.length-1]);
+  return out;
+}
+
+// Chaikin corner-cutting: each iteration replaces every edge with two points
+// at 1/4 and 3/4 along it, pulling corners inward to produce smooth blobs.
+function chaikin(pts, iterations) {
+  let p = pts;
+  for (let it = 0; it < iterations; it++) {
+    const n = p.length / 2;
+    const q = [];
+    for (let i = 0; i < n; i++) {
+      const i2 = i * 2, j2 = ((i + 1) % n) * 2;
+      q.push(
+        0.75*p[i2]   + 0.25*p[j2],   0.75*p[i2+1] + 0.25*p[j2+1],
+        0.25*p[i2]   + 0.75*p[j2],   0.25*p[i2+1] + 0.75*p[j2+1]
+      );
+    }
+    p = q;
+  }
+  return p;
+}
+
 // ─── Pen helpers ──────────────────────────────────────────────────────────────
 function r(n) { return parseFloat(n.toFixed(1)); }
 
@@ -541,8 +578,12 @@ stage.on('mousedown', e => {
 
   if (s.tool === 'freehand') {
     s.drawing=true;
+    fhRawPts=[];
     const snapped = snapXY(pos.x, pos.y);
-    s.curLine = new Konva.Line({ points:[snapped.x,snapped.y], stroke:BED_STROKE, strokeWidth:2.5, lineCap:'round', lineJoin:'round', tension:0.4 });
+    fhRawPts.push(snapped.x, snapped.y);
+    // blob mode uses subsampled points + higher tension for real-time preview
+    const tension = s.blobSmoothing ? 0.6 : 0.4;
+    s.curLine = new Konva.Line({ points:[snapped.x,snapped.y], stroke:BED_STROKE, strokeWidth:2.5, lineCap:'round', lineJoin:'round', tension });
     previewLayer.add(s.curLine);
   }
 
@@ -588,6 +629,7 @@ stage.on('mousemove', e => {
   if (!s.drawing) return;
 
   if (s.tool === 'freehand' && s.curLine) {
+    fhRawPts.push(pos.x, pos.y);
     s.curLine.points([...s.curLine.points(), pos.x, pos.y]);
     previewLayer.batchDraw();
   }
@@ -622,14 +664,23 @@ stage.on('mouseup', () => {
   s.drawing=false;
 
   if (s.tool === 'freehand' && s.curLine) {
-    const pts=s.curLine.points(); s.curLine.remove();
+    s.curLine.remove();
+    let pts = fhRawPts;
     if (pts.length >= 6) {
-      const node = new Konva.Line({ points:pts, stroke:BED_STROKE, strokeWidth:2.5, lineCap:'round', lineJoin:'round', tension:0.4, closed:true, fill:BED_FILL });
+      let tension = 0.4;
+      if (s.blobSmoothing) {
+        // Decimate to ~every 4th point first so Chaikin works on structure, not jitter.
+        // Keep tension:0.5 so Konva's cardinal-spline interpolation applies to every
+        // vertex including the implicit closed join — otherwise that join is a flat segment.
+        pts = chaikin(decimatePts(pts, 4), 4);
+        tension = 0.5;
+      }
+      const node = new Konva.Line({ points:pts, stroke:BED_STROKE, strokeWidth:2.5, lineCap:'round', lineJoin:'round', tension, closed:true, fill:BED_FILL });
       bedsLayer.add(node);
       const bed={type:'freehand',shapeNode:node};
       attachLabel(bed); s.beds.push(bed); bedsLayer.batchDraw();
     }
-    s.curLine=null; previewLayer.batchDraw();
+    s.curLine=null; fhRawPts=[]; previewLayer.batchDraw();
   }
 
   if (s.preview) {
@@ -702,6 +753,11 @@ window.addEventListener('keydown', e => {
       const cb = document.getElementById('snap-toggle');
       cb.checked = !cb.checked; s.snapEnabled = cb.checked;
       drawGrid();
+      break;
+    }
+    case 'b': {
+      const bb = document.getElementById('blob-toggle');
+      bb.checked = !bb.checked; s.blobSmoothing = bb.checked;
       break;
     }
     case 'enter':   if (s.tool==='pen') penClose(); break;

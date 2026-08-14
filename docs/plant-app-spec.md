@@ -44,7 +44,7 @@ A personal garden registry app with two linked entities — a reusable **Plant**
 18. As a gardener, I want to attach a dated photo log to a Planting, so that I can see how that specific instance has changed or spread over the years.
 19. As a gardener, I want to draw a scaled grid map of a garden area on desktop, so that I have an accurate spatial representation of that area.
 20. As a gardener, I want to use freehand and shape-based tools on desktop to draw bed outlines, so that the map resembles the real shape of my beds.
-21. As a gardener, I want to tie the map's grid scale to a real-world measurement, so that distances on the map reflect real distances in the garden.
+21. As a gardener, I want to tie the map's grid scale to a real-world measurement, so that distances on the map reflect real distances in the garden. *(Largely superseded by ADR-0002: when an aerial base layer is used, the scale is derived from latitude and tile zoom, so no measurement is asked for. Keep this story only as the fallback path for maps drawn on a blank canvas.)*
 22. As a gardener, I want to tag one or more landmark points (e.g. fence post, house corner) within a bed during desktop creation, so that pin placement can be measured relative to something identifiable.
 23. As a gardener, I want to place a Planting pin on the map from my phone by tapping roughly where it is, so that I can quickly record location while walking the garden.
 24. As a gardener, I want the option to enter a distance from a tagged landmark when placing a pin, so that the pin's position is accurate to within about a foot.
@@ -71,7 +71,8 @@ A personal garden registry app with two linked entities — a reusable **Plant**
 - **Task completion**: logged per Planting per year with a done/missed status, forming a history the user can review.
 - **Map/bed creation**: desktop-only. Supports freehand tracing and shape-based tools (rectangle/oval), scaled against a real-world measurement the user provides (not derived from photos or GPS). Each bed must support tagging one or more landmark points during creation.
 - **Map/pin placement**: available on both desktop and phone. A pin can be placed by rough tap alone, or refined via an optional "distance from a tagged landmark" input, which is offered inline at the point of placing/editing a single pin — not as a separate guided or multi-step mode, and never triggered proactively/unprompted.
-- **No photo-based or GPS-based mapping.** This was evaluated and explicitly rejected: consumer GPS accuracy (~10–16 ft) doesn't meet the target accuracy (~1 ft), and photographing real garden terrain introduces perspective distortion that a single two-point calibration can't correct for across an entire bed, especially when only eye-level (non-elevated) photo angles are available.
+- **No GPS-based pin positioning, and no user-taken ground-level photos as a map base.** Evaluated and set aside: consumer GPS accuracy (~10–16 ft) doesn't meet the target accuracy (~1 ft), and photographing real garden terrain introduces perspective distortion that a single two-point calibration can't correct for across an entire bed, especially when only eye-level (non-elevated) photo angles are available. **GPS is deferred, not rejected permanently** — see ADR-0002 for the conditions under which it's worth reopening in a later phase.
+- **Top-down aerial imagery as an optional base layer IS in scope** (ADR-0002). This is neither of the above — no GPS is read and no user photo is taken. It also makes the map scale self-deriving; see the note on user story 21 below.
 - **No phone-based bed drawing.** Freehand/shape drawing of bed outlines is desktop-only; touchscreen freehand tracing was evaluated and rejected as impractical for precise outlines.
 - **Bloom timeline**: horizontal year-view visualization, one bar per Plant spanning its bloom window, filterable by garden area. A month-filtered list view is a secondary presentation of the same underlying bloom-window data (no separate data model needed).
 - **Registry view**: a filterable/searchable list over Plant fields (name, color, bloom month, sun/shade, etc.), with each entry linking to its associated Planting location(s) on the map.
@@ -91,7 +92,8 @@ A personal garden registry app with two linked entities — a reusable **Plant**
 - Per-Planting task timing overrides
 - Bloom-fade-relative task triggers and any "how do the blooms look now?" check-in/nudge mechanism
 - Logging the actual date of biological events (e.g. actual bloom-fade date) per year
-- Photo-based or GPS-based map creation
+- GPS-based pin positioning (deferred to a later phase, not rejected — ADR-0002)
+- User-taken ground-level photos as a map base
 - Phone-based freehand or shape-based bed/area drawing
 - Cloud sync vs. local-only storage decision (to be made later)
 

@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<!--
+  THROWAWAY PROTOTYPE — do not merge to main
+  Question: What interaction pattern for post-draw smoothing feels right for garden beds?
+  Three variants switchable via ?v=a / ?v=b / ?v=c and the bottom bar.
+    A — Panel slider: select shape → adjust slider in side panel → Apply
+    B — Pill button:  shape drawn → floating pill appears → click to add smooth passes
+    C — Drag on shape: drag the shape horizontally to blend from raw to smooth
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Post-draw Smoothing — THROWAWAY</title>
+<script src="https://unpkg.com/konva@9/konva.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  height: 100vh; overflow: hidden; background: #f5f3ee;
+  display: flex;
+}
+
+#canvas-wrap { flex: 1; position: relative; overflow: hidden; }
+
+#hint {
+  position: absolute; bottom: 56px; left: 16px;
+  background: white; padding: 8px 13px; border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.09); font-size: 12px; color: #666;
+  pointer-events: none; max-width: 440px; line-height: 1.5;
+}
+
+/* ── Variant A: right panel ── */
+#panel-a {
+  width: 240px; min-width: 240px; background: white;
+  border-left: 1px solid #e5e5e5;
+  display: flex; flex-direction: column; padding: 20px 16px; gap: 14px;
+}
+#panel-a.v-hidden { display: none; }
+.panel-section-label {
+  font-size: 10px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .08em; color: #bbb;
+}
+#panel-placeholder { font-size: 12px; color: #bbb; font-style: italic; line-height: 1.5; }
+#panel-controls { display: none; flex-direction: column; gap: 10px; }
+#smooth-slider { width: 100%; accent-color: #2d6a4f; }
+.slider-labels { display: flex; justify-content: space-between; font-size: 10px; color: #bbb; }
+#smooth-level-label { font-size: 13px; color: #333; font-weight: 600; text-align: center; }
+.panel-actions { display: flex; gap: 8px; }
+.panel-actions button {
+  flex: 1; padding: 8px; border: none; border-radius: 8px;
+  cursor: pointer; font-size: 13px; font-weight: 600;
+}
+#panel-apply { background: #2d6a4f; color: white; }
+#panel-apply:hover { background: #1b4332; }
+#panel-reset { background: #f0f0f0; color: #444; }
+#panel-reset:hover { background: #e5e5e5; }
+
+/* ── Variant B: floating pill ── */
+#pill-b {
+  position: absolute; pointer-events: all;
+  background: white; border-radius: 24px; padding: 8px 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.16);
+  display: flex; align-items: center; gap: 10px;
+  transform: translate(-50%, calc(-100% - 16px));
+  white-space: nowrap;
+}
+#pill-b.v-hidden { display: none; }
+#pill-level { font-size: 11px; color: #999; min-width: 64px; }
+#pill-smooth {
+  padding: 5px 12px; background: #2d6a4f; color: white;
+  border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 12px;
+}
+#pill-smooth:hover { background: #1b4332; }
+#pill-smooth:disabled { background: #b7e4c7; cursor: not-allowed; }
+#pill-reset {
+  background: none; border: none; color: #bbb; cursor: pointer; font-size: 11px;
+  text-decoration: underline;
+}
+#pill-reset:hover { color: #888; }
+
+/* ── Variant C: drag label ── */
+#drag-label {
+  position: absolute; pointer-events: none;
+  background: rgba(29,81,48,0.88); color: white;
+  border-radius: 8px; padding: 5px 11px; font-size: 12px; font-weight: 600;
+  transform: translate(-50%, calc(-100% - 12px));
+  white-space: nowrap;
+}
+#drag-label.v-hidden { display: none; }
+
+/* ── Prototype switcher ── */
+#switcher {
+  position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px;
+  background: #111; color: white; border-radius: 999px;
+  padding: 7px 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+  font-size: 12px; font-weight: 600; z-index: 200; white-space: nowrap;
+  user-select: none;
+}
+#switcher button {
+  background: none; border: none; color: white; cursor: pointer;
+  padding: 2px 6px; font-size: 15px; line-height: 1;
+  opacity: 0.7; border-radius: 4px;
+}
+#switcher button:hover { opacity: 1; background: rgba(255,255,255,0.12); }
+.throwaway-badge {
+  position: fixed; top: 12px; right: 12px;
+  background: #c0392b; color: white; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .06em; border-radius: 4px;
+  padding: 3px 8px; pointer-events: none; z-index: 200;
+}
+</style>
+</head>
+<body>
+
+<div id="canvas-wrap">
+  <div id="konva-mount"></div>
+  <div id="hint">Draw a bed shape. When you release, the smoothing option appears.</div>
+
+  <!-- Variant B: floating pill -->
+  <div id="pill-b" class="v-hidden">
+    <span id="pill-level">Original</span>
+    <button id="pill-smooth">✦ Smooth</button>
+    <button id="pill-reset">Reset</button>
+  </div>
+
+  <!-- Variant C: drag indicator -->
+  <div id="drag-label" class="v-hidden">⟷ drag to smooth</div>
+</div>
+
+<!-- Variant A: right panel -->
+<div id="panel-a" class="v-hidden">
+  <div class="panel-section-label">Correct shape</div>
+  <p id="panel-placeholder">Draw a freehand bed to see smoothing options.</p>
+  <div id="panel-controls">
+    <div class="slider-labels"><span>None</span><span>Blob</span></div>
+    <input type="range" id="smooth-slider" min="0" max="8" step="1" value="0">
+    <div id="smooth-level-label">Original shape</div>
+    <div class="panel-actions">
+      <button id="panel-apply">Apply</button>
+      <button id="panel-reset">Reset</button>
+    </div>
+  </div>
+</div>
+
+<div class="throwaway-badge">Prototype — throwaway</div>
+
+<div id="switcher">
+  <button id="sw-prev">←</button>
+  <span id="sw-label">A — Panel slider</span>
+  <button id="sw-next">→</button>
+</div>
+
+<script>
+// ─── Constants ────────────────────────────────────────────────────────────────
+const BED_STROKE   = '#52b788';
+const BED_FILL     = 'rgba(82,183,136,0.14)';
+const CELL_PX      = 50;
+const MAX_LEVEL    = 8;
+const LEVEL_LABELS = ['Original shape', 'Barely', 'Light', 'Moderate', 'Smooth', 'Very smooth', 'Puffy', 'Rounded', 'Blob'];
+const LEVEL_SHORT  = ['Original', 'Barely', 'Light', 'Moderate', 'Smooth', 'Very smooth', 'Puffy', 'Rounded', 'Blob'];
+
+// ─── Smoothing algorithms ─────────────────────────────────────────────────────
+function decimatePts(pts, step) {
+  const out = [];
+  for (let i = 0; i < pts.length - 2; i += step * 2) out.push(pts[i], pts[i+1]);
+  out.push(pts[pts.length-2], pts[pts.length-1]);
+  return out;
+}
+
+function chaikin(pts, iters) {
+  let p = pts;
+  for (let it = 0; it < iters; it++) {
+    const n = p.length / 2, q = [];
+    for (let i = 0; i < n; i++) {
+      const i2 = i*2, j2 = ((i+1)%n)*2;
+      q.push(0.75*p[i2]+0.25*p[j2],   0.75*p[i2+1]+0.25*p[j2+1],
+             0.25*p[i2]+0.75*p[j2],   0.25*p[i2+1]+0.75*p[j2+1]);
+    }
+    p = q;
+  }
+  return p;
+}
+
+function smooth(rawPts, level) {
+  if (level === 0) return { pts: rawPts, tension: 0.4 };
+  // Decimation step grows with level: fewer control points → much rounder blobs at high end.
+  // Chaikin passes are capped at 5 since extra iterations on few points yield diminishing returns.
+  const step  = level * 2;               // 2, 4, 6, 8, 10, 12, 14, 16
+  const iters = Math.min(level, 5);
+  return { pts: chaikin(decimatePts(rawPts, step), iters), tension: 0.5 };
+}
+
+function centroid(pts) {
+  let sx = 0, sy = 0;
+  for (let i = 0; i < pts.length; i += 2) { sx += pts[i]; sy += pts[i+1]; }
+  return { x: sx / (pts.length/2), y: sy / (pts.length/2) };
+}
+
+// ─── Konva setup ──────────────────────────────────────────────────────────────
+const canvasWrap = document.getElementById('canvas-wrap');
+const stage = new Konva.Stage({
+  container: 'konva-mount',
+  width: canvasWrap.offsetWidth,
+  height: window.innerHeight,
+});
+const gridLayer    = new Konva.Layer();
+const bedsLayer    = new Konva.Layer();
+const previewLayer = new Konva.Layer();
+stage.add(gridLayer, bedsLayer, previewLayer);
+
+function drawGrid() {
+  gridLayer.destroyChildren();
+  const w = stage.width(), h = stage.height();
+  for (let x = 0; x <= w; x += CELL_PX)
+    gridLayer.add(new Konva.Line({ points:[x,0,x,h], stroke: x%(CELL_PX*5)===0?'#c8dfc4':'#deeeda', strokeWidth: x%(CELL_PX*5)===0?1:0.5, listening:false }));
+  for (let y = 0; y <= h; y += CELL_PX)
+    gridLayer.add(new Konva.Line({ points:[0,y,w,y], stroke: y%(CELL_PX*5)===0?'#c8dfc4':'#deeeda', strokeWidth: y%(CELL_PX*5)===0?1:0.5, listening:false }));
+  gridLayer.batchDraw();
+}
+
+// ─── App state ────────────────────────────────────────────────────────────────
+const state = {
+  variant:  new URLSearchParams(location.search).get('v') || 'a',
+  drawing:  false,
+  curLine:  null,
+  rawPts:   [],
+  // The most recently drawn shape, awaiting smooth decision
+  pending: null, // { shapeNode, rawPts, smoothLevel }
+  // Variant C drag
+  drag: null,    // { startX, startLevel }
+};
+
+// ─── Drawing ──────────────────────────────────────────────────────────────────
+function startDraw(pos) {
+  if (state.pending) commitPending();
+  state.drawing = true;
+  state.rawPts  = [pos.x, pos.y];
+  state.curLine = new Konva.Line({
+    points: [pos.x, pos.y], stroke: BED_STROKE,
+    strokeWidth: 2.5, lineCap: 'round', lineJoin: 'round', tension: 0.4,
+  });
+  previewLayer.add(state.curLine);
+}
+
+function continueDraw(pos) {
+  if (!state.drawing || !state.curLine) return;
+  state.rawPts.push(pos.x, pos.y);
+  state.curLine.points([...state.curLine.points(), pos.x, pos.y]);
+  previewLayer.batchDraw();
+}
+
+function endDraw() {
+  if (!state.drawing) return;
+  state.drawing = false;
+  state.curLine.remove();
+  state.curLine = null;
+  previewLayer.batchDraw();
+
+  const pts = state.rawPts;
+  if (pts.length < 6) return;
+
+  const shapeNode = new Konva.Line({
+    points: pts, stroke: BED_STROKE, strokeWidth: 2.5,
+    lineCap: 'round', lineJoin: 'round', tension: 0.4,
+    closed: true, fill: BED_FILL,
+  });
+  bedsLayer.add(shapeNode);
+  bedsLayer.batchDraw();
+
+  state.pending = { shapeNode, rawPts: pts.slice(), smoothLevel: 0 };
+  showVariantUI();
+}
+
+function commitPending() {
+  state.pending = null;
+  clearVariantUI();
+}
+
+function applyLevel(level) {
+  if (!state.pending) return;
+  level = Math.max(0, Math.min(MAX_LEVEL, level));
+  state.pending.smoothLevel = level;
+  const { pts, tension } = smooth(state.pending.rawPts, level);
+  state.pending.shapeNode.points(pts);
+  state.pending.shapeNode.tension(tension);
+  bedsLayer.batchDraw();
+}
+
+// ─── Stage events ─────────────────────────────────────────────────────────────
+stage.on('mousedown', e => {
+  const pos = stage.getPointerPosition();
+
+  // Variant C: mousedown on pending shape starts drag-smoothing
+  if (state.variant === 'c' && state.pending && !state.drawing) {
+    const hit = bedsLayer.getIntersection(pos);
+    if (hit === state.pending.shapeNode) {
+      state.drag = { startX: e.evt.clientX, startLevel: state.pending.smoothLevel };
+      canvasWrap.style.cursor = 'ew-resize';
+      return;
+    }
+    // Clicked empty space: commit and fall through to start new draw
+    commitPending();
+  }
+
+  startDraw(pos);
+});
+
+stage.on('mousemove', e => {
+  const pos = stage.getPointerPosition();
+
+  // Variant C: update cursor when hovering pending shape
+  if (state.variant === 'c' && state.pending && !state.drawing && !state.drag) {
+    const hit = bedsLayer.getIntersection(pos);
+    canvasWrap.style.cursor = hit === state.pending.shapeNode ? 'ew-resize' : '';
+  }
+
+  if (state.drag) {
+    const dx = e.evt.clientX - state.drag.startX;
+    applyLevel(state.drag.startLevel + Math.round(dx / 35));
+    updateDragLabel();
+    return;
+  }
+
+  continueDraw(pos);
+});
+
+stage.on('mouseup', () => {
+  if (state.drag) {
+    state.drag = null;
+    canvasWrap.style.cursor = '';
+    updateDragLabel();
+    return;
+  }
+  endDraw();
+});
+
+// ─── Variant UI ───────────────────────────────────────────────────────────────
+function showVariantUI() {
+  if (state.variant === 'a') showPanelA();
+  if (state.variant === 'b') showPillB();
+  if (state.variant === 'c') showDragC();
+}
+
+function clearVariantUI() {
+  hidePanelControls();
+  document.getElementById('pill-b').classList.add('v-hidden');
+  document.getElementById('drag-label').classList.add('v-hidden');
+  canvasWrap.style.cursor = '';
+}
+
+// ── Variant A ─────────────────────────────────────────────────────────────────
+function showPanelA() {
+  document.getElementById('panel-placeholder').style.display = 'none';
+  const ctrl = document.getElementById('panel-controls');
+  ctrl.style.display = 'flex';
+  document.getElementById('smooth-slider').value = 0;
+  document.getElementById('smooth-level-label').textContent = LEVEL_LABELS[0];
+}
+function hidePanelControls() {
+  document.getElementById('panel-placeholder').style.display = '';
+  document.getElementById('panel-controls').style.display = 'none';
+}
+
+document.getElementById('smooth-slider').addEventListener('input', e => {
+  const level = parseInt(e.target.value);
+  applyLevel(level);
+  document.getElementById('smooth-level-label').textContent = LEVEL_LABELS[level];
+});
+document.getElementById('panel-apply').addEventListener('click', () => commitPending());
+document.getElementById('panel-reset').addEventListener('click', () => {
+  applyLevel(0);
+  document.getElementById('smooth-slider').value = 0;
+  document.getElementById('smooth-level-label').textContent = LEVEL_LABELS[0];
+});
+
+// ── Variant B ─────────────────────────────────────────────────────────────────
+function pillScreenPos() {
+  if (!state.pending) return { x: 0, y: 0 };
+  const c = centroid(state.pending.rawPts);
+  const t = stage.getAbsoluteTransform();
+  return t.point(c);
+}
+
+function showPillB() {
+  const { x, y } = pillScreenPos();
+  const pill = document.getElementById('pill-b');
+  pill.style.left = x + 'px';
+  pill.style.top  = y + 'px';
+  pill.classList.remove('v-hidden');
+  document.getElementById('pill-level').textContent  = 'Original';
+  document.getElementById('pill-smooth').textContent = '✦ Smooth';
+  document.getElementById('pill-smooth').disabled    = false;
+}
+
+document.getElementById('pill-smooth').addEventListener('click', () => {
+  if (!state.pending) return;
+  const next = Math.min(state.pending.smoothLevel + 1, MAX_LEVEL);
+  applyLevel(next);
+  document.getElementById('pill-level').textContent = LEVEL_SHORT[next];
+  const btn = document.getElementById('pill-smooth');
+  btn.textContent = next >= MAX_LEVEL ? '✦ Max' : '✦ Smooth more';
+  btn.disabled    = next >= MAX_LEVEL;
+});
+document.getElementById('pill-reset').addEventListener('click', () => {
+  applyLevel(0);
+  document.getElementById('pill-level').textContent  = 'Original';
+  document.getElementById('pill-smooth').textContent = '✦ Smooth';
+  document.getElementById('pill-smooth').disabled    = false;
+});
+
+// ── Variant C ─────────────────────────────────────────────────────────────────
+function showDragC() {
+  updateDragLabel();
+  document.getElementById('drag-label').classList.remove('v-hidden');
+}
+
+function updateDragLabel() {
+  if (!state.pending) return;
+  const lvl = state.pending.smoothLevel;
+  const label = document.getElementById('drag-label');
+  label.textContent = lvl === 0
+    ? '⟷ drag to smooth'
+    : `${LEVEL_LABELS[lvl]} — drag to adjust`;
+  // Position label at shape centroid
+  const c = centroid(state.pending.shapeNode.points());
+  const t = stage.getAbsoluteTransform();
+  const sc = t.point(c);
+  label.style.left = sc.x + 'px';
+  label.style.top  = sc.y + 'px';
+}
+
+// ─── Variant switcher ─────────────────────────────────────────────────────────
+const VARIANTS = [
+  { key: 'a', label: 'A — Panel slider' },
+  { key: 'b', label: 'B — Floating pill' },
+  { key: 'c', label: 'C — Drag on shape' },
+];
+
+const HINTS = {
+  a: 'Draw a bed outline. Use the panel slider to smooth it, then Apply. · Draw again to start a new bed.',
+  b: 'Draw a bed outline. A pill will appear — click "Smooth" to add passes, or "Reset" to go back. · Draw again to start a new bed.',
+  c: 'Draw a bed outline. Then drag the shape left/right to control smoothness. · Click empty canvas to commit and draw another.',
+};
+
+let vIdx = VARIANTS.findIndex(v => v.key === state.variant);
+if (vIdx < 0) vIdx = 0;
+
+function setVariant(idx) {
+  vIdx = ((idx % VARIANTS.length) + VARIANTS.length) % VARIANTS.length;
+  const v = VARIANTS[vIdx];
+  state.variant = v.key;
+  document.getElementById('sw-label').textContent = v.label;
+  history.replaceState(null, '', '?v=' + v.key);
+
+  // Panel A is only visible for variant A
+  document.getElementById('panel-a').classList.toggle('v-hidden', v.key !== 'a');
+  // Resize canvas to fill available width
+  stage.width(canvasWrap.offsetWidth);
+  drawGrid();
+
+  clearVariantUI();
+  if (state.pending) showVariantUI();
+  document.getElementById('hint').textContent = HINTS[v.key];
+}
+
+document.getElementById('sw-prev').addEventListener('click', () => setVariant(vIdx - 1));
+document.getElementById('sw-next').addEventListener('click', () => setVariant(vIdx + 1));
+
+window.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (e.key === 'ArrowLeft')  setVariant(vIdx - 1);
+    if (e.key === 'ArrowRight') setVariant(vIdx + 1);
+    if (e.key === 'Escape' && state.pending) commitPending();
+  }
+});
+
+window.addEventListener('resize', () => {
+  stage.width(canvasWrap.offsetWidth);
+  stage.height(window.innerHeight);
+  drawGrid();
+});
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+drawGrid();
+setVariant(vIdx);
+</script>
+</body>
+</html>

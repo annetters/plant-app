@@ -1,0 +1,1402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Satellite Base Prototype — THROWAWAY</title>
+<script src="https://unpkg.com/konva@9/konva.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  display: flex; height: 100vh; overflow: hidden; background: #f5f3ee;
+}
+
+/* ── Canvas ── */
+#canvas-wrap { flex: 1; position: relative; overflow: hidden; }
+
+#toolbar {
+  position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 4px; background: white; padding: 7px 9px;
+  border-radius: 12px; box-shadow: 0 2px 14px rgba(0,0,0,0.13); z-index: 10;
+  white-space: nowrap;
+}
+.tool-sep { width: 1px; background: #eee; margin: 0 3px; }
+.tool-btn {
+  padding: 6px 11px; border: 2px solid transparent; border-radius: 7px;
+  background: none; cursor: pointer; font-size: 12.5px; font-weight: 600;
+  color: #555; transition: all 0.12s;
+}
+.tool-btn:hover { background: #f0f0f0; color: #222; }
+.tool-btn.active { border-color: #2d6a4f; background: #d8f3dc; color: #1b4332; }
+kbd {
+  display: inline-block; margin-left: 3px; padding: 1px 4px;
+  font-family: inherit; font-size: 10px; font-weight: 700;
+  background: #f0f0f0; border: 1px solid #ccc; border-radius: 3px;
+  color: #888; vertical-align: middle; line-height: 1.4;
+}
+.tool-btn.active kbd { background: #b7e4c7; border-color: #74c69d; color: #1b4332; }
+
+#hint {
+  position: absolute; bottom: 16px; left: 16px; background: white;
+  padding: 8px 13px; border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.09); font-size: 12px; color: #666;
+  max-width: 520px; line-height: 1.5;
+}
+#nav-legend {
+  position: absolute; top: 16px; left: 16px; background: white;
+  padding: 9px 11px; border-radius: 9px; box-shadow: 0 2px 10px rgba(0,0,0,0.10);
+  font-size: 11px; color: #777; display: flex; flex-direction: column; gap: 3px; z-index: 9;
+}
+#nav-legend b { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: #bbb; font-weight: 700; margin-bottom: 2px; }
+#nav-legend kbd { margin-left: 0; }
+#btn-recentre {
+  margin-top: 5px; padding: 4px 8px; border: 1px solid #ddd; border-radius: 6px;
+  background: #fafafa; cursor: pointer; font-size: 11px; font-weight: 600;
+  color: #2d6a4f; font-family: inherit;
+}
+#btn-recentre:hover { background: #d8f3dc; border-color: #74c69d; }
+
+#attrib {
+  position: absolute; bottom: 4px; right: 8px; font-size: 9.5px;
+  color: #888; background: rgba(255,255,255,0.75); padding: 2px 6px; border-radius: 4px;
+}
+#loading {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  background: white; padding: 14px 22px; border-radius: 10px; display: none;
+  box-shadow: 0 3px 18px rgba(0,0,0,0.16); font-size: 13px; font-weight: 600; color: #2d6a4f;
+}
+#loading.on { display: block; }
+
+/* ── Panel ── */
+#panel { width: 310px; background: white; border-left: 1px solid #e5e5e5; display: flex; flex-direction: column; }
+#panel-head { padding: 16px 20px 12px; border-bottom: 1px solid #efefef; }
+#panel-head h1 { font-size: 15px; font-weight: 700; color: #111; margin-bottom: 2px; }
+#panel-head .q { font-size: 11px; color: #888; line-height: 1.45; }
+.throwaway {
+  font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  color: #c0392b; background: #fdf0ee; padding: 2px 6px;
+  border-radius: 4px; display: inline-block;
+}
+#panel-body { flex: 1; overflow-y: auto; padding: 14px 16px; display: flex; flex-direction: column; gap: 16px; }
+.section-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #bbb; margin-bottom: 6px; }
+.stat-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; padding: 2px 0; gap: 10px; }
+.stat-row .lbl { color: #777; flex-shrink: 0; }
+.stat-row .val { font-weight: 700; color: #111; text-align: right; }
+.val.good { color: #2d6a4f; }
+.val.warn { color: #b7791f; }
+.val.bad  { color: #c0392b; }
+.empty { font-size: 12px; color: #bbb; font-style: italic; }
+
+input[type="text"], select {
+  width: 100%; padding: 6px 9px; border: 1.5px solid #ddd; border-radius: 7px;
+  font-size: 12.5px; font-family: inherit; background: white;
+}
+input[type="text"]:focus, select:focus { outline: none; border-color: #2d6a4f; }
+.row { display: flex; gap: 6px; align-items: center; }
+.scale-row { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: #444; }
+.scale-row input[type="number"] {
+  width: 54px; padding: 4px 7px; border: 1.5px solid #ddd; border-radius: 6px; font-size: 12.5px; text-align: center;
+}
+.toggle-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: #444; cursor: pointer; padding: 2px 0; }
+.toggle-row input[type="checkbox"] { width: 15px; height: 15px; accent-color: #2d6a4f; cursor: pointer; flex-shrink: 0; }
+input[type="range"] { width: 100%; accent-color: #2d6a4f; }
+.preset-btn {
+  padding: 4px 8px; border: 1px solid #e2e2e2; border-radius: 6px; background: #fafafa;
+  cursor: pointer; font-size: 11px; color: #555; font-family: inherit;
+}
+.preset-btn:hover { background: #f0f0f0; color: #111; }
+.help { font-size: 11px; color: #999; line-height: 1.45; margin-top: 5px; }
+
+/* ── Tabs / walkthroughs ── */
+#tabs { display: flex; flex-wrap: wrap; gap: 3px; margin-bottom: 9px; }
+.tab {
+  padding: 4px 8px; border: 1px solid #e6e6e6; border-radius: 6px; background: white;
+  cursor: pointer; font-size: 11px; font-weight: 600; color: #777; font-family: inherit;
+}
+.tab:hover { background: #f5f5f5; }
+.tab.active { background: #d8f3dc; border-color: #74c69d; color: #1b4332; }
+#scenario-desc { font-size: 11.5px; color: #666; line-height: 1.5; margin-bottom: 9px; }
+#steps { display: flex; flex-direction: column; gap: 5px; }
+.step {
+  display: flex; align-items: flex-start; gap: 7px; padding: 7px 9px;
+  border: 1.5px solid #eee; border-radius: 7px; background: white;
+  cursor: pointer; font-size: 11.5px; color: #333; text-align: left;
+  font-family: inherit; line-height: 1.4; transition: all 0.12s;
+}
+.step:hover:not(:disabled) { border-color: #74c69d; background: #f6fdf8; }
+.step .n {
+  flex-shrink: 0; width: 16px; height: 16px; border-radius: 50%; background: #eee;
+  color: #888; font-size: 9.5px; font-weight: 700; display: flex;
+  align-items: center; justify-content: center; margin-top: 1px;
+}
+.step.next { border-color: #2d6a4f; background: #f0faf3; }
+.step.next .n { background: #2d6a4f; color: white; }
+.step.done { opacity: 0.5; }
+.step.done .n { background: #b7e4c7; color: #1b4332; }
+.step:disabled { cursor: default; }
+
+#findings { display: flex; flex-direction: column; gap: 7px; }
+.finding { font-size: 11.5px; line-height: 1.45; display: flex; gap: 6px; align-items: flex-start; }
+.finding .mark { flex-shrink: 0; font-weight: 700; }
+.finding.yes .mark { color: #2d6a4f; }
+.finding.no  .mark { color: #c0392b; }
+.finding.risk .mark { color: #b7791f; }
+.finding .txt { color: #555; }
+.finding .txt b { color: #111; font-weight: 700; }
+
+#panel-foot { padding: 12px 14px; border-top: 1px solid #efefef; display: flex; flex-direction: column; gap: 7px; }
+.act-btn {
+  padding: 8px 12px; border: 1.5px solid #ddd; border-radius: 8px; background: white;
+  cursor: pointer; font-size: 13px; font-weight: 600; color: #333; text-align: center;
+  transition: all 0.12s; font-family: inherit;
+}
+.act-btn:hover { background: #f5f5f5; }
+.act-btn.primary { background: #2d6a4f; color: white; border-color: #2d6a4f; }
+.act-btn.primary:hover { background: #1b4332; }
+.act-btn.danger { color: #c0392b; border-color: #f5c6c6; }
+.act-btn.danger:hover { background: #fff5f4; }
+
+#modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 100; align-items: center; justify-content: center; }
+#modal.open { display: flex; }
+#modal-inner { background: white; border-radius: 14px; padding: 22px; max-width: 640px; width: 92%; max-height: 82vh; display: flex; flex-direction: column; gap: 11px; }
+#modal-inner h2 { font-size: 15px; font-weight: 700; }
+#modal-body { font-size: 12.5px; color: #555; line-height: 1.6; overflow: auto; }
+#modal-body code { font-family: 'Menlo','Courier New',monospace; font-size: 11.5px; background: #f6f6f6; padding: 1px 4px; border-radius: 3px; }
+#close-modal { align-self: flex-start; padding: 7px 16px; background: #f0f0f0; border: none; border-radius: 7px; cursor: pointer; font-size: 13px; font-weight: 600; font-family: inherit; }
+</style>
+</head>
+<body>
+
+<div id="canvas-wrap">
+  <div id="toolbar">
+    <button class="tool-btn" data-tool="pan">✥ Pan <kbd>H</kbd></button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn active" data-tool="freehand">✏ Freehand <kbd>F</kbd></button>
+    <button class="tool-btn" data-tool="rect">▭ Rect <kbd>R</kbd></button>
+    <div class="tool-sep"></div>
+    <button class="tool-btn" data-tool="landmark">⊕ Landmark <kbd>L</kbd></button>
+    <button class="tool-btn" data-tool="measure">⟺ Measure <kbd>M</kbd></button>
+  </div>
+  <div id="konva-mount"></div>
+  <div id="loading">Loading imagery…</div>
+  <div id="nav-legend">
+    <b>Move around</b>
+    <span>Scroll / two-finger swipe</span>
+    <span>Middle-mouse drag</span>
+    <span><kbd>Space</kbd> + drag</span>
+    <span><kbd>⌘</kbd>/<kbd>Ctrl</kbd> + scroll to zoom</span>
+    <button id="btn-recentre">Recentre</button>
+  </div>
+  <div id="hint">Load an address in the panel to fetch a satellite base, then trace a bed over it.</div>
+  <div id="attrib">Imagery © Esri, Maxar, Earthstar Geographics · Geocoding © OpenStreetMap contributors</div>
+</div>
+
+<div id="panel">
+  <div id="panel-head">
+    <div class="throwaway">Prototype — throwaway</div>
+    <h1 style="margin-top:7px">Satellite Base Layer</h1>
+    <p class="q">Can we fetch a property's real dimensions from its address — a correctly
+    scaled aerial base plus whatever boundary geometry exists — and draw Beds on top of it,
+    with no API key and no measuring step? (Visible beds are a bonus, not the goal.)</p>
+  </div>
+
+  <div id="panel-body">
+
+    <div>
+      <div class="section-label">1 · Address</div>
+      <input type="text" id="addr" placeholder="e.g. 1600 Pennsylvania Ave NW, Washington DC">
+      <div class="row" style="margin-top:6px">
+        <button class="act-btn primary" id="btn-find" style="flex:1;padding:6px">Find &amp; load imagery</button>
+      </div>
+      <div class="row" style="margin-top:6px;flex-wrap:wrap">
+        <button class="preset-btn" data-lat="42.3782" data-lon="-71.1266" data-label="Cambridge MA (suburban yards)">Cambridge MA</button>
+        <button class="preset-btn" data-lat="51.4816" data-lon="-0.1691" data-label="Chelsea, London (walled gardens)">Chelsea, London</button>
+        <button class="preset-btn" data-lat="45.5231" data-lon="-122.6414" data-label="Portland OR (large lots)">Portland OR</button>
+      </div>
+      <p class="help">Presets skip the geocoder and jump straight to a known lat/lon —
+      useful if the geocoder is rate-limiting you.</p>
+    </div>
+
+    <div>
+      <div class="section-label">2 · Property geometry</div>
+      <button class="act-btn" id="btn-prop" style="width:100%;padding:7px">Fetch property outline</button>
+      <div class="stat-row" style="margin-top:6px"><span class="lbl">Buildings found</span><span class="val" id="s-bldg">—</span></div>
+      <div class="stat-row"><span class="lbl">Largest building</span><span class="val" id="s-house">—</span></div>
+      <p class="help">Building footprints from OpenStreetMap — free, no key. Independent of the
+      imagery, so if the outlines land on the roofs, scale <i>and</i> registration are both confirmed.</p>
+
+      <div class="section-label" style="margin-top:13px">Lot boundary <span style="color:#d0d0d0">· MA only</span></div>
+      <button class="act-btn" id="btn-parcel" style="width:100%;padding:7px">Fetch lot boundary</button>
+      <button class="act-btn" id="btn-fitlot" style="width:100%;padding:6px;margin-top:5px" disabled>Fit to lot</button>
+      <div class="stat-row" style="margin-top:6px"><span class="lbl">Lot dimensions</span><span class="val" id="s-lotdim">—</span></div>
+      <div class="stat-row"><span class="lbl">Lot area</span><span class="val" id="s-lotarea">—</span></div>
+      <div class="stat-row"><span class="lbl">Recorded vs computed</span><span class="val" id="s-lotcheck">—</span></div>
+      <p class="help">The real assessor lot line, from MassGIS — free, no key.
+      Only geometry and lot size are requested; owner and address fields are never fetched.</p>
+    </div>
+
+    <div>
+      <div class="section-label">3 · Imagery detail</div>
+      <select id="zoom-sel">
+        <option value="18">Zoom 18 — wide, coarse</option>
+        <option value="19">Zoom 19 — whole yard</option>
+        <option value="20">Zoom 20 — beds visible</option>
+        <option value="21" selected>Zoom 21 — maximum detail</option>
+      </select>
+      <div style="margin-top:9px">
+        <div class="scale-row" style="justify-content:space-between">
+          <span>Base opacity</span><span id="op-val" style="font-weight:700">100%</span>
+        </div>
+        <input type="range" id="opacity" min="0" max="100" value="100">
+      </div>
+      <label class="toggle-row" style="margin-top:5px"><input type="checkbox" id="grid-toggle" checked><span>Show scale grid</span></label>
+      <div class="scale-row" style="margin-top:5px"><span>1 cell =</span>
+        <input type="number" id="grid-ft" value="5" min="1" max="50" step="1"><span>feet</span>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Derived scale — the payoff</div>
+      <div class="stat-row"><span class="lbl">Location</span><span class="val" id="s-loc">—</span></div>
+      <div class="stat-row"><span class="lbl">Latitude</span><span class="val" id="s-lat">—</span></div>
+      <div class="stat-row"><span class="lbl">Imagery available to</span><span class="val" id="s-maxz">—</span></div>
+      <div class="stat-row"><span class="lbl">Ground resolution</span><span class="val" id="s-res">—</span></div>
+      <div class="stat-row"><span class="lbl">Canvas scale</span><span class="val" id="s-ppf">—</span></div>
+      <div class="stat-row"><span class="lbl">vs. spec target (~1 ft)</span><span class="val" id="s-verdict">—</span></div>
+      <p class="help">This is the point of the whole exercise: because we know the latitude and
+      the tile zoom, pixels-per-foot is <i>computed</i>. The user never measures anything.</p>
+    </div>
+
+    <div>
+      <div class="section-label">State</div>
+      <div class="stat-row"><span class="lbl">Active tool</span><span class="val" id="s-tool">Freehand</span></div>
+      <div class="stat-row"><span class="lbl">Tiles loaded</span><span class="val" id="s-tiles">0</span></div>
+      <div class="stat-row"><span class="lbl">Beds traced</span><span class="val" id="s-beds">0</span></div>
+      <div class="stat-row"><span class="lbl">Landmarks</span><span class="val" id="s-lm">0</span></div>
+      <div class="stat-row"><span class="lbl">Last measurement</span><span class="val" id="s-measure">—</span></div>
+      <div class="stat-row"><span class="lbl">Canvas export</span><span class="val" id="s-export">not tested</span></div>
+    </div>
+
+    <div>
+      <div class="section-label">Guided walkthroughs</div>
+      <div id="tabs"></div>
+      <div id="scenario-desc"></div>
+      <div id="steps"></div>
+    </div>
+
+    <div>
+      <div class="section-label">Findings so far</div>
+      <div id="findings"></div>
+    </div>
+
+  </div>
+
+  <div id="panel-foot">
+    <button class="act-btn primary" id="btn-export">Test export (CORS check)</button>
+    <button class="act-btn" id="btn-spec">How this sits with the spec</button>
+    <button class="act-btn danger" id="btn-clear">Clear drawings</button>
+  </div>
+</div>
+
+<div id="modal">
+  <div id="modal-inner">
+    <h2 id="modal-title"></h2>
+    <div id="modal-body"></div>
+    <button id="close-modal">Close</button>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════════
+//  PURE MODULE — this is the bit worth keeping.
+//
+//  Web Mercator tile math + scale derivation. No DOM, no Konva, no fetch.
+//  Everything the question hinges on lives here and lifts straight into the
+//  real map module once the question is answered.
+// ═══════════════════════════════════════════════════════════════════════════════
+const GeoBase = (() => {
+  const TILE = 256;
+  const EARTH_CIRCUM_M = 40075016.686;
+  const M_PER_FT = 0.3048;
+
+  // Esri World Imagery — public, no API key, sends Access-Control-Allow-Origin: *
+  // (the CORS header is what keeps the canvas untainted, so export still works).
+  const tileUrl = (z, x, y) =>
+    `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`;
+
+  const geocodeUrl = (address) =>
+    `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
+
+  /**
+   * Availability probe. Missing imagery is served as a grey placeholder with
+   * HTTP 200 — you cannot detect a gap from the status code. This endpoint
+   * reports which tiles genuinely exist. Note the path order: {z}/{row}/{col},
+   * i.e. y before x, the opposite of the tile URL's own convention.
+   */
+  const tilemapUrl = (z, x, y, w = 2, h = 2) =>
+    `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tilemap/${z}/${y}/${x}/${w}/${h}`;
+
+  // ── Property geometry (OpenStreetMap via Overpass) ──────────────────────────
+  // Free, no API key, sends CORS headers. Returns building footprints as real
+  // polygons. It does NOT return legal parcel boundaries — see propertyNote().
+  /**
+   * GET, not POST — a cross-origin POST from a file:// page fails CORS preflight.
+   *
+   * Several endpoints, tried in order: the main overpass-api.de host load-sheds
+   * heavily (observed 504s and 406s on identical requests seconds apart), so a
+   * single-endpoint client looks broken at random. All listed hosts send
+   * Access-Control-Allow-Origin: *.
+   */
+  const OVERPASS_HOSTS = [
+    'https://overpass.private.coffee/api/interpreter',
+    'https://overpass-api.de/api/interpreter'
+  ];
+
+  const overpassUrls = (query) =>
+    OVERPASS_HOSTS.map(h => `${h}?data=${encodeURIComponent(query)}`);
+
+  function propertyQuery(lat, lon, radiusM = 90) {
+    return `[out:json][timeout:25];(` +
+      `way["building"](around:${radiusM},${lat},${lon});` +
+      `way["barrier"](around:${radiusM},${lat},${lon});` +
+      `way["landuse"](around:${radiusM},${lat},${lon});` +
+      `);out geom;`;
+  }
+
+  const propertyNote = () =>
+    'OSM reliably has building footprints. Legal parcel/lot boundaries are ' +
+    'not in OSM for most residential addresses — those live in county GIS ' +
+    'portals (patchy, per-jurisdiction) or paid parcel APIs.';
+
+  /** lat/lon -> canvas coords in the drawing space */
+  function lonLatToRefPx(lat, lon, refZoom, originRefX, originRefY) {
+    const p = lonLatToWorldPx(lat, lon, refZoom);
+    return { x: p.x - originRefX, y: p.y - originRefY };
+  }
+
+  /** Shoelace area of a ref-px polygon, converted to square feet. */
+  function polygonAreaSqFt(pts, lat, refZoom) {
+    let a = 0;
+    for (let i = 0, n = pts.length / 2; i < n; i++) {
+      const j = (i + 1) % n;
+      a += pts[i * 2] * pts[j * 2 + 1] - pts[j * 2] * pts[i * 2 + 1];
+    }
+    const ftPx = feetPerPixel(lat, refZoom);
+    return Math.abs(a / 2) * ftPx * ftPx;
+  }
+
+  /** Bounding box of a ref-px polygon, in feet. */
+  function polygonExtentFt(pts, lat, refZoom) {
+    const xs = pts.filter((_, i) => i % 2 === 0);
+    const ys = pts.filter((_, i) => i % 2 === 1);
+    const ftPx = feetPerPixel(lat, refZoom);
+    return {
+      widthFt:  (Math.max(...xs) - Math.min(...xs)) * ftPx,
+      heightFt: (Math.max(...ys) - Math.min(...ys)) * ftPx
+    };
+  }
+
+  // ── Lot boundaries (MassGIS parcels) ────────────────────────────────────────
+  // MASSACHUSETTS ONLY. This is the one source found that returns a real legal
+  // lot line for free with no API key and CORS enabled. There is no national
+  // equivalent — other states each publish their own service, or none at all.
+  const MA_PARCEL_SERVICE =
+    'https://services1.arcgis.com/hGdibHYSPO59RG1h/arcgis/rest/services/' +
+    'Massachusetts_Property_Tax_Parcels/FeatureServer/0/query';
+
+  const SQFT_PER_ACRE = 43560;
+
+  /**
+   * Point-in-parcel query.
+   *
+   * outFields is deliberately restricted to LOT_SIZE,LOT_UNITS and must never
+   * become '*'. The service also carries the owner's name, their mailing
+   * address, sale history and valuations. Requesting only these two fields
+   * means that data is never fetched at all, rather than fetched and then
+   * filtered out somewhere downstream.
+   */
+  function parcelQueryUrl(lat, lon) {
+    const p = new URLSearchParams({
+      geometry: `${lon},${lat}`,
+      geometryType: 'esriGeometryPoint',
+      inSR: '4326',
+      spatialRel: 'esriSpatialRelIntersects',
+      outFields: 'LOT_SIZE,LOT_UNITS',
+      returnGeometry: 'true',
+      outSR: '4326',
+      f: 'geojson'
+    });
+    return `${MA_PARCEL_SERVICE}?${p}`;
+  }
+
+  /** Recorded lot size -> square feet. Null stays null (public land has none). */
+  function lotSizeToSqFt(value, units) {
+    if (value === null || value === undefined || value === '') return null;
+    const n = Number(value);
+    if (!isFinite(n)) return null;
+    return units === 'Acres' ? n * SQFT_PER_ACRE : n;
+  }
+
+  /**
+   * Cross-check our computed area against the recorded one. Recorded values are
+   * rounded to 2-3 decimals of an acre, so a small lot can legitimately differ
+   * by several percent. This is looking for gross errors — wrong projection,
+   * wrong units — not for precision.
+   */
+  function areaAgreement(computedSqFt, recordedSqFt) {
+    if (!recordedSqFt) return { deltaPct: null, agrees: null };
+    const deltaPct = Math.abs(computedSqFt - recordedSqFt) / recordedSqFt * 100;
+    return { deltaPct, agrees: deltaPct <= 10 };
+  }
+
+  /**
+   * Guard before querying. Without it an out-of-state address queries MassGIS
+   * quite happily, gets zero features back, and the UI reports "no parcel
+   * mapped here" when the truth is "wrong state".
+   */
+  function isInMassachusetts(lat, lon) {
+    return lat >= 41.2 && lat <= 42.9 && lon >= -73.5 && lon <= -69.9;
+  }
+
+  /** lon/lat -> tile indices at zoom z */
+  function lonLatToTile(lat, lon, z) {
+    const p = lonLatToWorldPx(lat, lon, z);
+    return { x: Math.floor(p.x / TILE), y: Math.floor(p.y / TILE) };
+  }
+
+  /** Highest zoom that actually has imagery, given probe results. */
+  function pickBestZoom(results) {
+    const ok = results.filter(r => r.available).map(r => r.z);
+    return ok.length ? Math.max(...ok) : null;
+  }
+
+  /** lon/lat -> absolute pixel coords in the Web Mercator pyramid at zoom z */
+  function lonLatToWorldPx(lat, lon, z) {
+    const n = TILE * Math.pow(2, z);
+    const x = (lon + 180) / 360 * n;
+    const latRad = lat * Math.PI / 180;
+    const y = (1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n;
+    return { x, y };
+  }
+
+  /**
+   * THE KEY FUNCTION. Ground distance covered by one pixel at a given latitude
+   * and zoom. Mercator stretches with latitude, so this is cos(lat)-corrected —
+   * skip that and every distance is wrong by ~25% at UK/New England latitudes.
+   */
+  function metersPerPixel(lat, z) {
+    return EARTH_CIRCUM_M * Math.cos(lat * Math.PI / 180) / (TILE * Math.pow(2, z));
+  }
+
+  const feetPerPixel  = (lat, z) => metersPerPixel(lat, z) / M_PER_FT;
+  const pixelsPerFoot = (lat, z) => 1 / feetPerPixel(lat, z);
+  const inchesPerPixel = (lat, z) => feetPerPixel(lat, z) * 12;
+
+  /**
+   * Which tiles cover a viewport, expressed in a fixed reference zoom's pixel
+   * space. Drawings live at refZoom forever, so changing imagery detail swaps
+   * the texture without moving a single traced point.
+   */
+  function tilesCovering({ originRefX, originRefY, width, height, refZoom, imgZoom }) {
+    const f = Math.pow(2, refZoom - imgZoom); // ref px per imagery px
+    const tileRefSize = TILE * f;
+    const x0 = Math.floor(originRefX / tileRefSize);
+    const x1 = Math.floor((originRefX + width) / tileRefSize);
+    const y0 = Math.floor(originRefY / tileRefSize);
+    const y1 = Math.floor((originRefY + height) / tileRefSize);
+    const out = [];
+    for (let x = x0; x <= x1; x++) {
+      for (let y = y0; y <= y1; y++) {
+        out.push({
+          z: imgZoom, x, y,
+          url: tileUrl(imgZoom, x, y),
+          left: x * tileRefSize - originRefX,
+          top:  y * tileRefSize - originRefY,
+          size: tileRefSize
+        });
+      }
+    }
+    return out;
+  }
+
+  /** Straight-line ground distance between two points in refZoom pixel space. */
+  function distanceFeet(ax, ay, bx, by, lat, refZoom) {
+    return Math.hypot(bx - ax, by - ay) * feetPerPixel(lat, refZoom);
+  }
+
+  /**
+   * Does imagery at this zoom/latitude meet the spec's ~1 ft placement target?
+   * One pixel is the floor on how precisely anything can be traced or pinned.
+   */
+  function precisionVerdict(lat, z, targetFt = 1) {
+    const ftPx = feetPerPixel(lat, z);
+    return {
+      feetPerPixel: ftPx,
+      inchesPerPixel: ftPx * 12,
+      meetsTarget: ftPx <= targetFt,
+      // comfortable = a foot is several pixels, not a fraction of one
+      comfortable: ftPx <= targetFt / 2
+    };
+  }
+
+  return {
+    TILE, tileUrl, geocodeUrl, tilemapUrl, lonLatToWorldPx, lonLatToTile,
+    pickBestZoom, metersPerPixel, feetPerPixel, pixelsPerFoot, inchesPerPixel,
+    tilesCovering, distanceFeet, precisionVerdict,
+    OVERPASS_HOSTS, overpassUrls, propertyQuery, propertyNote, lonLatToRefPx,
+    polygonAreaSqFt, polygonExtentFt,
+    MA_PARCEL_SERVICE, SQFT_PER_ACRE, parcelQueryUrl, lotSizeToSqFt,
+    areaAgreement, isInMassachusetts
+  };
+})();
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  THROWAWAY SHELL — page wiring below. Nothing here is meant to survive.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const REF_ZOOM = 21;          // drawing coordinate space, fixed for the session
+const EXTENT   = 1600;        // ref px of world we fetch around the address
+const BED_STROKE = '#ffd166';
+const BED_FILL   = 'rgba(255,209,102,0.22)';
+
+const s = {
+  tool: 'freehand',
+  lat: null, lon: null, label: null,
+  imgZoom: 21,
+  available: [],
+  originRefX: 0, originRefY: 0,
+  tilesLoaded: 0, tilesExpected: 0,
+  beds: [], landmarks: [],
+  property: [], houseSummary: null,
+  parcel: null,
+  lastMeasure: null,
+  exportStatus: 'not tested',
+  findings: []
+};
+
+const wrap  = document.getElementById('canvas-wrap');
+const stage = new Konva.Stage({
+  container: 'konva-mount',
+  width: wrap.offsetWidth,
+  height: window.innerHeight
+});
+const baseLayer    = new Konva.Layer({ listening: false });
+const gridLayer    = new Konva.Layer({ listening: false });
+// own layer, not merged into propLayer — loadProperty() destroys that one's
+// children, which would wipe the lot boundary depending on click order
+const parcelLayer  = new Konva.Layer({ listening: false });
+const propLayer    = new Konva.Layer({ listening: false });
+const bedsLayer    = new Konva.Layer();
+const overlayLayer = new Konva.Layer();
+stage.add(baseLayer, gridLayer, parcelLayer, propLayer, bedsLayer, overlayLayer);
+
+// ── Imagery ───────────────────────────────────────────────────────────────────
+
+/**
+ * Ask the tile service which zoom levels actually have imagery here, then use
+ * the best one. Without this the app silently shows grey squares — the tile
+ * server answers 200 OK for imagery it does not have.
+ */
+async function probeZooms(lat, lon) {
+  const results = await Promise.all([18, 19, 20, 21].map(async z => {
+    const t = GeoBase.lonLatToTile(lat, lon, z);
+    try {
+      const r = await fetch(GeoBase.tilemapUrl(z, t.x, t.y));
+      const j = await r.json();
+      return { z, available: Array.isArray(j.data) && j.data.some(v => v === 1) };
+    } catch { return { z, available: false }; }
+  }));
+  s.available = results;
+
+  // grey out zoom levels with no imagery
+  document.querySelectorAll('#zoom-sel option').forEach(o => {
+    const hit = results.find(r => r.z === parseInt(o.value, 10));
+    const has = hit && hit.available;
+    o.disabled = !has;
+    o.textContent = o.textContent.replace(/ — no imagery here$/, '') + (has ? '' : ' — no imagery here');
+  });
+
+  const best = GeoBase.pickBestZoom(results);
+  if (best === null) {
+    note('no', `<b>No imagery at any zoom</b> for this location. The satellite base can't be offered here at all.`);
+    return null;
+  }
+  const maxOffered = 21;
+  if (best < maxOffered) {
+    note('risk', `Best imagery here is <b>zoom ${best}</b>, not ${maxOffered}. Max detail <b>varies by location</b> — and missing tiles come back <code>200 OK</code> as grey placeholders, so this has to be probed, never assumed.`);
+  }
+  return best;
+}
+
+async function loadLocation(lat, lon, label) {
+  s.lat = lat; s.lon = lon; s.label = label;
+
+  const best = await probeZooms(lat, lon);
+  if (best !== null) {
+    s.imgZoom = best;
+    document.getElementById('zoom-sel').value = String(best);
+  }
+
+  const c = GeoBase.lonLatToWorldPx(lat, lon, REF_ZOOM);
+  s.originRefX = c.x - EXTENT / 2;
+  s.originRefY = c.y - EXTENT / 2;
+
+  // centre the view and pick a comfortable drawing scale (~1 ft ≈ 11 screen px)
+  const ppf = GeoBase.pixelsPerFoot(lat, REF_ZOOM);
+  const scale = Math.max(0.5, Math.min(4, 11 / ppf));
+  stage.scale({ x: scale, y: scale });
+  stage.position({
+    x: stage.width()  / 2 - (EXTENT / 2) * scale,
+    y: stage.height() / 2 - (EXTENT / 2) * scale
+  });
+
+  loadTiles();
+  drawGrid();
+  render();
+}
+
+function loadTiles() {
+  if (s.lat === null) return;
+  baseLayer.destroyChildren();
+  s.tilesLoaded = 0;
+
+  const tiles = GeoBase.tilesCovering({
+    originRefX: s.originRefX, originRefY: s.originRefY,
+    width: EXTENT, height: EXTENT,
+    refZoom: REF_ZOOM, imgZoom: s.imgZoom
+  });
+  s.tilesExpected = tiles.length;
+  document.getElementById('loading').classList.add('on');
+
+  tiles.forEach(t => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';   // ← keeps the canvas untainted, so export works
+    img.onload = () => {
+      baseLayer.add(new Konva.Image({
+        image: img, x: t.left, y: t.top, width: t.size, height: t.size, listening: false
+      }));
+      baseLayer.batchDraw();
+      s.tilesLoaded++;
+      if (s.tilesLoaded >= s.tilesExpected) {
+        document.getElementById('loading').classList.remove('on');
+        note('yes', `Fetched <b>${s.tilesExpected} tiles</b> with no API key and no server.`);
+      }
+      render();
+    };
+    img.onerror = () => {
+      s.tilesLoaded++;
+      if (s.tilesLoaded >= s.tilesExpected) document.getElementById('loading').classList.remove('on');
+      render();
+    };
+    img.src = t.url;
+  });
+  baseLayer.opacity(document.getElementById('opacity').value / 100);
+}
+
+async function geocode(address) {
+  document.getElementById('loading').classList.add('on');
+  try {
+    const res = await fetch(GeoBase.geocodeUrl(address));
+    const json = await res.json();
+    if (!json.length) {
+      alert('No match for that address. Try a preset, or a simpler form of the address.');
+      document.getElementById('loading').classList.remove('on');
+      return;
+    }
+    const hit = json[0];
+    note('yes', `Geocoded from the browser — <b>Nominatim sends CORS headers</b>, so this works straight from a <code>file://</code> page.`);
+    loadLocation(parseFloat(hit.lat), parseFloat(hit.lon), hit.display_name.split(',').slice(0, 2).join(','));
+  } catch (e) {
+    document.getElementById('loading').classList.remove('on');
+    note('no', `Geocoding failed: ${e.message}. Nominatim rate-limits hard — use a preset.`);
+    alert('Geocoding failed (likely rate-limited). Use one of the preset locations.');
+  }
+}
+
+// ── Property geometry ─────────────────────────────────────────────────────────
+
+/** Try each Overpass mirror until one actually answers with JSON. */
+async function fetchOverpass(query) {
+  const urls = GeoBase.overpassUrls(query);
+  let lastErr = null;
+  for (let i = 0; i < urls.length; i++) {
+    try {
+      const res = await fetch(urls[i]);
+      if (!res.ok) { lastErr = new Error(`HTTP ${res.status}`); continue; }
+      const json = await res.json();
+      if (i > 0) note('risk', `Primary Overpass endpoint failed; fell back to mirror ${i + 1}. <b>Public Overpass mirrors are not dependable</b> — production needs its own or a cached extract.`);
+      return json;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('all Overpass endpoints failed');
+}
+
+async function loadProperty() {
+  if (s.lat === null) { alert('Load a location first.'); return; }
+  document.getElementById('loading').classList.add('on');
+  propLayer.destroyChildren();
+  s.property = [];
+
+  try {
+    const json = await fetchOverpass(GeoBase.propertyQuery(s.lat, s.lon, 90));
+    const kinds = { building: 0, barrier: 0, landuse: 0 };
+
+    (json.elements || []).forEach(el => {
+      if (!el.geometry || el.geometry.length < 3) return;
+      const tags = el.tags || {};
+      const kind = tags.building ? 'building' : tags.barrier ? 'barrier' : tags.landuse ? 'landuse' : null;
+      if (!kind) return;
+      kinds[kind]++;
+
+      const pts = [];
+      el.geometry.forEach(g => {
+        const p = GeoBase.lonLatToRefPx(g.lat, g.lon, REF_ZOOM, s.originRefX, s.originRefY);
+        pts.push(p.x, p.y);
+      });
+
+      const style = {
+        building: { stroke: '#4cc9f0', fill: 'rgba(76,201,240,0.20)' },
+        barrier:  { stroke: '#f72585', fill: 'transparent' },
+        landuse:  { stroke: '#b5179e', fill: 'rgba(181,23,158,0.10)' }
+      }[kind];
+
+      propLayer.add(new Konva.Line({
+        points: pts, closed: kind !== 'barrier',
+        stroke: style.stroke, strokeWidth: 1.6 / stage.scaleX(),
+        fill: style.fill, listening: false
+      }));
+
+      s.property.push({ kind, pts, tags });
+    });
+
+    propLayer.batchDraw();
+    document.getElementById('loading').classList.remove('on');
+
+    if (!s.property.length) {
+      note('no', `<b>No property geometry mapped here.</b> OSM coverage is uneven — the lot has to be traced by hand from the imagery.`);
+    } else {
+      note('yes', `Fetched <b>${kinds.building} building footprints</b> as real polygons from OpenStreetMap — free, no API key. These are <b>independent</b> of the Esri imagery, so if they line up, the scale and registration are both confirmed.`);
+      if (!kinds.landuse && !kinds.barrier) {
+        note('risk', `<b>OSM gives buildings only, no lot boundary.</b> ${GeoBase.propertyNote()} In Massachusetts the lot line comes from MassGIS instead — use "Fetch lot boundary".`);
+      }
+      // biggest building = probably the house; report its real dimensions
+      const b = s.property.filter(p => p.kind === 'building')
+        .map(p => ({ p, a: GeoBase.polygonAreaSqFt(p.pts, s.lat, REF_ZOOM) }))
+        .sort((x, y) => y.a - x.a)[0];
+      if (b) {
+        const e = GeoBase.polygonExtentFt(b.p.pts, s.lat, REF_ZOOM);
+        s.houseSummary = `${Math.round(e.widthFt)} × ${Math.round(e.heightFt)} ft · ${Math.round(b.a)} sq ft`;
+        note('yes', `Largest building measures <b>${s.houseSummary}</b> straight from the fetched geometry. Sanity-check that against the real house — if it's right, every other distance on this canvas is too.`);
+      }
+    }
+  } catch (e) {
+    document.getElementById('loading').classList.remove('on');
+    note('no', `Property fetch failed: ${e.message}. Overpass rate-limits under load.`);
+  }
+  render();
+}
+
+// ── Lot boundary (MassGIS) ────────────────────────────────────────────────────
+
+const PARCEL_STROKE = '#f72585';
+
+async function loadParcel() {
+  if (s.lat === null) { alert('Load a location first.'); return; }
+
+  if (!GeoBase.isInMassachusetts(s.lat, s.lon)) {
+    note('risk', `<b>Lot boundaries are Massachusetts-only here.</b> This location is outside MA, so the MassGIS parcel service doesn't cover it. Other states publish their own services; there is no national one.`);
+    alert('Lot boundary lookup only covers Massachusetts in this prototype.');
+    return;
+  }
+
+  document.getElementById('loading').classList.add('on');
+  parcelLayer.destroyChildren();
+  s.parcel = null;
+
+  try {
+    const res = await fetch(GeoBase.parcelQueryUrl(s.lat, s.lon));
+    const json = await res.json();
+    const feats = json.features || [];
+
+    if (!feats.length) {
+      document.getElementById('loading').classList.remove('on');
+      note('risk', `<b>No parcel mapped at this point</b> — it's likely water, a road, or unmapped land. The lot line has to be traced by eye here.`);
+      render();
+      return;
+    }
+
+    const f = feats[0];
+    const g = f.geometry;
+    const props = f.properties || {};
+    // GeoJSON: Polygon => [ring][pt], MultiPolygon => [poly][ring][pt]
+    const polys = g.type === 'MultiPolygon' ? g.coordinates : [g.coordinates];
+
+    let allPts = [];
+    polys.forEach(rings => rings.forEach((ring, ri) => {
+      const pts = [];
+      ring.forEach(([lon, lat]) => {
+        const p = GeoBase.lonLatToRefPx(lat, lon, REF_ZOOM, s.originRefX, s.originRefY);
+        pts.push(p.x, p.y);
+      });
+      parcelLayer.add(new Konva.Line({
+        points: pts, closed: true,
+        stroke: PARCEL_STROKE, strokeWidth: 2.4 / stage.scaleX(),
+        dash: [9 / stage.scaleX(), 5 / stage.scaleX()],
+        fill: ri === 0 ? 'rgba(247,37,133,0.07)' : 'transparent',
+        listening: false
+      }));
+      if (ri === 0) allPts = allPts.concat(pts);
+    }));
+    parcelLayer.batchDraw();
+
+    const areaSqFt  = GeoBase.polygonAreaSqFt(allPts, s.lat, REF_ZOOM);
+    const extent    = GeoBase.polygonExtentFt(allPts, s.lat, REF_ZOOM);
+    const recorded  = GeoBase.lotSizeToSqFt(props.LOT_SIZE, props.LOT_UNITS);
+    const agreement = GeoBase.areaAgreement(areaSqFt, recorded);
+
+    s.parcel = { pts: allPts, areaSqFt, extent, recorded, agreement,
+                 vertices: polys[0][0].length - 1 };
+
+    document.getElementById('loading').classList.remove('on');
+
+    note('yes', `<b>Real lot boundary fetched</b> — ${s.parcel.vertices} vertices, <b>${Math.round(extent.widthFt)} × ${Math.round(extent.heightFt)} ft</b>, ${Math.round(areaSqFt).toLocaleString()} sq ft (${(areaSqFt / GeoBase.SQFT_PER_ACRE).toFixed(2)} ac). Free, no API key. <b>This closes the gap this prototype originally reported.</b>`);
+
+    if (recorded && agreement.agrees) {
+      note('yes', `Computed area <b>${Math.round(areaSqFt).toLocaleString()} sf</b> vs the assessor's recorded <b>${Math.round(recorded).toLocaleString()} sf</b> — <b>${agreement.deltaPct.toFixed(1)}% apart</b>. Two independent numbers agreeing confirms the projection and units are right.`);
+    } else if (recorded) {
+      note('risk', `Computed area is <b>${agreement.deltaPct.toFixed(1)}%</b> off the recorded value — large enough to suspect a projection or units error rather than rounding.`);
+    } else {
+      note('risk', `This parcel has <b>no recorded lot size</b> (typical of public land), so the computed area can't be cross-checked here.`);
+    }
+
+    const maxFt = EXTENT / GeoBase.pixelsPerFoot(s.lat, REF_ZOOM);
+    if (extent.widthFt > maxFt || extent.heightFt > maxFt) {
+      note('risk', `Lot is larger than the fetched imagery window (~${Math.round(maxFt)} ft), so part of it falls outside the loaded tiles.`);
+    }
+  } catch (e) {
+    document.getElementById('loading').classList.remove('on');
+    note('no', `Lot boundary fetch failed: ${e.message}`);
+  }
+  render();
+}
+
+/** Frame the lot — the payoff for "show me my property dimensions". */
+function fitToLot() {
+  if (!s.parcel) return;
+  const xs = s.parcel.pts.filter((_, i) => i % 2 === 0);
+  const ys = s.parcel.pts.filter((_, i) => i % 2 === 1);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const w = maxX - minX, h = maxY - minY;
+  const sc = Math.max(0.25, Math.min(12,
+    0.8 * Math.min(stage.width() / w, stage.height() / h)));
+  stage.scale({ x: sc, y: sc });
+  stage.position({
+    x: stage.width()  / 2 - (minX + w / 2) * sc,
+    y: stage.height() / 2 - (minY + h / 2) * sc
+  });
+  stage.batchDraw();
+}
+
+// ── Grid at true scale ────────────────────────────────────────────────────────
+
+function drawGrid() {
+  gridLayer.destroyChildren();
+  if (!document.getElementById('grid-toggle').checked || s.lat === null) {
+    gridLayer.batchDraw(); return;
+  }
+  const ft = parseFloat(document.getElementById('grid-ft').value) || 5;
+  const cell = ft * GeoBase.pixelsPerFoot(s.lat, REF_ZOOM);
+  for (let x = 0; x <= EXTENT; x += cell) {
+    gridLayer.add(new Konva.Line({ points: [x, 0, x, EXTENT], stroke: 'rgba(255,255,255,0.34)', strokeWidth: 0.7, listening: false }));
+  }
+  for (let y = 0; y <= EXTENT; y += cell) {
+    gridLayer.add(new Konva.Line({ points: [0, y, EXTENT, y], stroke: 'rgba(255,255,255,0.34)', strokeWidth: 0.7, listening: false }));
+  }
+  gridLayer.batchDraw();
+}
+
+// ── Drawing ───────────────────────────────────────────────────────────────────
+
+let drawing = null;
+const pos = () => {
+  const p = stage.getPointerPosition();
+  const sc = stage.scaleX();
+  return { x: (p.x - stage.x()) / sc, y: (p.y - stage.y()) / sc };
+};
+
+stage.on('mousedown', (e) => {
+  if (s.lat === null) return;
+  if (s.tool === 'pan' || spaceDown) return;      // pan handler owns this gesture
+  if (e && e.evt && e.evt.button !== 0) return;   // middle/right drag = pan, not draw
+  const p = pos();
+
+  if (s.tool === 'freehand') {
+    const line = new Konva.Line({
+      points: [p.x, p.y], stroke: BED_STROKE, strokeWidth: 2 / stage.scaleX(),
+      lineCap: 'round', lineJoin: 'round', tension: 0.4, closed: false, fill: BED_FILL
+    });
+    bedsLayer.add(line);
+    drawing = { type: 'freehand', node: line, pts: [p.x, p.y] };
+
+  } else if (s.tool === 'rect') {
+    const r = new Konva.Rect({
+      x: p.x, y: p.y, width: 0, height: 0, stroke: BED_STROKE,
+      strokeWidth: 2 / stage.scaleX(), fill: BED_FILL
+    });
+    bedsLayer.add(r);
+    drawing = { type: 'rect', node: r, ox: p.x, oy: p.y };
+
+  } else if (s.tool === 'landmark') {
+    const name = prompt('Landmark name (e.g. "fence post NE corner")');
+    if (!name) return;
+    const g = new Konva.Group({ x: p.x, y: p.y });
+    g.add(new Konva.Circle({ radius: 5 / stage.scaleX(), fill: '#e63946', stroke: 'white', strokeWidth: 1.5 / stage.scaleX() }));
+    g.add(new Konva.Text({
+      text: name, x: 8 / stage.scaleX(), y: -5 / stage.scaleX(),
+      fontSize: 11 / stage.scaleX(), fill: 'white',
+      shadowColor: 'black', shadowBlur: 4, shadowOpacity: 0.9
+    }));
+    overlayLayer.add(g);
+    s.landmarks.push({ name, x: p.x, y: p.y });
+    overlayLayer.batchDraw();
+    render();
+
+  } else if (s.tool === 'measure') {
+    const line = new Konva.Line({
+      points: [p.x, p.y, p.x, p.y], stroke: '#4cc9f0',
+      strokeWidth: 2 / stage.scaleX(), dash: [6 / stage.scaleX(), 4 / stage.scaleX()]
+    });
+    const lbl = new Konva.Text({
+      x: p.x, y: p.y, text: '', fontSize: 12 / stage.scaleX(), fill: '#4cc9f0',
+      fontStyle: 'bold', shadowColor: 'black', shadowBlur: 4, shadowOpacity: 0.9
+    });
+    overlayLayer.add(line, lbl);
+    drawing = { type: 'measure', node: line, label: lbl, ox: p.x, oy: p.y };
+  }
+});
+
+stage.on('mousemove', () => {
+  if (!drawing) return;
+  const p = pos();
+
+  if (drawing.type === 'freehand') {
+    drawing.pts.push(p.x, p.y);
+    drawing.node.points(drawing.pts);
+    bedsLayer.batchDraw();
+
+  } else if (drawing.type === 'rect') {
+    drawing.node.x(Math.min(p.x, drawing.ox));
+    drawing.node.y(Math.min(p.y, drawing.oy));
+    drawing.node.width(Math.abs(p.x - drawing.ox));
+    drawing.node.height(Math.abs(p.y - drawing.oy));
+    bedsLayer.batchDraw();
+
+  } else if (drawing.type === 'measure') {
+    drawing.node.points([drawing.ox, drawing.oy, p.x, p.y]);
+    const ft = GeoBase.distanceFeet(drawing.ox, drawing.oy, p.x, p.y, s.lat, REF_ZOOM);
+    drawing.label.text(ft.toFixed(1) + ' ft');
+    drawing.label.position({ x: (drawing.ox + p.x) / 2 + 6 / stage.scaleX(), y: (drawing.oy + p.y) / 2 });
+    s.lastMeasure = ft;
+    overlayLayer.batchDraw();
+    render();
+  }
+});
+
+stage.on('mouseup', () => {
+  if (!drawing) return;
+  if (drawing.type === 'freehand') { drawing.node.closed(true); bedsLayer.batchDraw(); s.beds.push(drawing.node); }
+  if (drawing.type === 'rect')     { s.beds.push(drawing.node); }
+  if (drawing.type === 'measure' && s.lastMeasure !== null) {
+    note('yes', `Measured <b>${s.lastMeasure.toFixed(1)} ft</b> off the imagery with no user-supplied scale.`);
+  }
+  drawing = null;
+  render();
+});
+
+// ── Pan + zoom ────────────────────────────────────────────────────────────────
+// Panning is bound to raw DOM events on the container rather than Konva's stage
+// events, so a drag that leaves the canvas (or ends over the side panel) still
+// tracks and still releases. Four ways in, because this is the thing you do most:
+//   · two-finger scroll / mouse wheel   · middle-mouse drag
+//   · Space + drag (from any tool)      · the Pan tool + drag
+let panning = false, panOrigin = null;
+
+function startPan(clientX, clientY) {
+  panning = true;
+  panOrigin = { cx: clientX, cy: clientY, pos: stage.position() };
+  drawing = null;
+  wrap.style.cursor = 'grabbing';
+}
+function movePan(clientX, clientY) {
+  if (!panning) return;
+  stage.position({
+    x: panOrigin.pos.x + (clientX - panOrigin.cx),
+    y: panOrigin.pos.y + (clientY - panOrigin.cy)
+  });
+  stage.batchDraw();
+}
+function endPan() {
+  if (!panning) return;
+  panning = false;
+  wrap.style.cursor = s.tool === 'pan' ? 'grab' : '';
+}
+
+wrap.addEventListener('mousedown', (e) => {
+  const wantsPan = e.button === 1 || s.tool === 'pan' || spaceDown;
+  if (!wantsPan) return;
+  e.preventDefault();          // stop middle-click autoscroll
+  startPan(e.clientX, e.clientY);
+});
+// on window, so releasing off-canvas doesn't leave the stage stuck in a drag
+window.addEventListener('mousemove', (e) => movePan(e.clientX, e.clientY));
+window.addEventListener('mouseup', endPan);
+window.addEventListener('blur', endPan);
+
+// Scroll pans; ctrl/cmd+scroll (and trackpad pinch, which reports ctrlKey) zooms.
+// This is the Figma / Google Maps convention — plain scroll zooming is what made
+// the canvas feel stuck.
+wrap.addEventListener('wheel', (e) => {
+  e.preventDefault();
+
+  if (e.ctrlKey || e.metaKey) {
+    const old = stage.scaleX();
+    const p = stage.getPointerPosition() || { x: stage.width() / 2, y: stage.height() / 2 };
+    const to = { x: (p.x - stage.x()) / old, y: (p.y - stage.y()) / old };
+    const next = Math.max(0.25, Math.min(12, old * (e.deltaY > 0 ? 0.92 : 1.08)));
+    stage.scale({ x: next, y: next });
+    stage.position({ x: p.x - to.x * next, y: p.y - to.y * next });
+  } else {
+    stage.position({ x: stage.x() - e.deltaX, y: stage.y() - e.deltaY });
+  }
+  stage.batchDraw();
+}, { passive: false });
+
+// Recentre — the escape hatch when you pan off into blank space.
+function recentre() {
+  if (s.lat === null) return;
+  const sc = stage.scaleX();
+  stage.position({
+    x: stage.width()  / 2 - (EXTENT / 2) * sc,
+    y: stage.height() / 2 - (EXTENT / 2) * sc
+  });
+  stage.batchDraw();
+}
+
+let spaceDown = false;
+
+// Never hijack keys while the user is typing. Space is a pan modifier on the
+// canvas, but preventDefault()ing it unconditionally also eats spaces typed
+// into the address field.
+const isTyping = (el) => !!el && (
+  el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' ||
+  el.tagName === 'SELECT' || el.isContentEditable
+);
+
+window.addEventListener('keydown', (e) => {
+  if (isTyping(document.activeElement)) return;
+  if (e.code === 'Space') { spaceDown = true; e.preventDefault(); }
+  const map = { KeyH: 'pan', KeyF: 'freehand', KeyR: 'rect', KeyL: 'landmark', KeyM: 'measure' };
+  if (map[e.code]) activateTool(map[e.code]);
+});
+window.addEventListener('keyup', (e) => { if (e.code === 'Space') spaceDown = false; });
+
+// ── Panel wiring ──────────────────────────────────────────────────────────────
+
+const hints = {
+  pan:       'Drag to move around. · Scroll or two-finger swipe also pans · Ctrl/⌘+scroll zooms',
+  freehand:  'Drag to trace a bed outline over the imagery — follow the edge you can see.',
+  rect:      'Drag to draw a rectangular bed.',
+  landmark:  'Click a feature you can identify on the ground — a fence post, a corner, a downspout.',
+  measure:   'Drag between two points to read the real-world distance. Try a car (~15 ft) or a driveway to sanity-check the scale.'
+};
+
+function activateTool(t) {
+  s.tool = t;
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.toggle('active', b.dataset.tool === t));
+  document.getElementById('hint').textContent = hints[t];
+  wrap.style.cursor = t === 'pan' ? 'grab' : (t === 'select' ? '' : 'crosshair');
+  render();
+}
+document.querySelectorAll('.tool-btn').forEach(b => b.onclick = () => activateTool(b.dataset.tool));
+
+document.getElementById('btn-find').onclick = () => {
+  const a = document.getElementById('addr').value.trim();
+  if (a) geocode(a);
+};
+document.getElementById('addr').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btn-find').click();
+});
+document.querySelectorAll('.preset-btn').forEach(b => {
+  b.onclick = () => loadLocation(parseFloat(b.dataset.lat), parseFloat(b.dataset.lon), b.dataset.label);
+});
+document.getElementById('zoom-sel').onchange = (e) => {
+  s.imgZoom = parseInt(e.target.value, 10);
+  loadTiles(); render();
+};
+document.getElementById('opacity').oninput = (e) => {
+  baseLayer.opacity(e.target.value / 100);
+  document.getElementById('op-val').textContent = e.target.value + '%';
+  baseLayer.batchDraw();
+};
+document.getElementById('btn-recentre').onclick = recentre;
+document.getElementById('btn-prop').onclick = loadProperty;
+document.getElementById('btn-parcel').onclick = loadParcel;
+document.getElementById('btn-fitlot').onclick = fitToLot;
+document.getElementById('grid-toggle').onchange = drawGrid;
+document.getElementById('grid-ft').oninput = drawGrid;
+
+document.getElementById('btn-clear').onclick = () => {
+  bedsLayer.destroyChildren(); overlayLayer.destroyChildren();
+  propLayer.destroyChildren(); parcelLayer.destroyChildren();
+  s.beds = []; s.landmarks = []; s.lastMeasure = null;
+  s.property = []; s.houseSummary = null; s.parcel = null;
+  bedsLayer.batchDraw(); overlayLayer.batchDraw();
+  propLayer.batchDraw(); parcelLayer.batchDraw(); render();
+};
+
+document.getElementById('btn-export').onclick = () => {
+  if (s.lat === null) { alert('Load imagery first.'); return; }
+  try {
+    const url = stage.toDataURL({ pixelRatio: 1 });
+    const kb = Math.round(url.length * 0.75 / 1024);
+    s.exportStatus = `PASS · ${kb} KB PNG`;
+    note('yes', `Canvas exported to PNG (<b>${kb} KB</b>) — the tile server's CORS header keeps the canvas <b>untainted</b>. A tainted canvas would have thrown here and killed SVG/PNG export entirely.`);
+    openModal('Export test passed', `
+      <p><code>stage.toDataURL()</code> returned a <b>${kb} KB</b> PNG without throwing.</p>
+      <p>This matters more than it looks. Drawing a cross-origin image onto a canvas normally
+      <i>taints</i> it, and every later <code>toDataURL()</code> throws a SecurityError — which
+      would silently break bed export in the real app.</p>
+      <p>It works only because the tile server sends
+      <code>Access-Control-Allow-Origin: *</code> and we set <code>img.crossOrigin = 'anonymous'</code>.
+      Both halves are required. <b>Any imagery source picked later must be re-checked for this.</b></p>
+    `);
+  } catch (err) {
+    s.exportStatus = 'FAIL · canvas tainted';
+    note('no', `Canvas is <b>tainted</b> — export threw <code>${err.name}</code>. Bed export would be broken.`);
+    openModal('Export test failed', `<p>Canvas tainted: <code>${err.message}</code></p>`);
+  }
+  render();
+};
+
+document.getElementById('btn-spec').onclick = () => openModal('How this sits with the spec', `
+  <p>The spec (<code>docs/plant-app-spec.md</code>) explicitly rejects
+  <b>"photo-based or GPS-based map creation"</b>. This prototype is deliberately
+  <i>not</i> a challenge to that decision — it's a distinction the spec doesn't currently draw.</p>
+  <p><b>What the spec rejected, and why it still stands:</b></p>
+  <ul style="margin:8px 0 8px 18px">
+    <li><b>GPS for pin placement</b> — consumer GPS is ~10–16 ft accurate against a ~1 ft target. Nothing here changes that. Pins are still placed by tap or landmark distance.</li>
+    <li><b>Eye-level photos as a base</b> — perspective distortion can't be corrected by a two-point calibration. Also unchanged.</li>
+  </ul>
+  <p><b>What this is instead:</b> fetching the <i>property's dimensions</i> — a top-down
+  orthorectified tile plus public vector geometry — as a correctly scaled canvas to draw
+  Beds onto. No GPS is read. No user photo is taken. The user still draws every outline
+  by hand; they just draw into a real footprint instead of onto blank graph paper.</p>
+  <p><b>The bonus nobody asked for:</b> the spec has the user supply a grid scale by
+  measuring something real (user story 21). Because latitude and tile zoom are known,
+  that scale is <i>derived</i> — the measuring step can disappear entirely.</p>
+  <p><b>Lot boundaries:</b> in Massachusetts the real assessor lot line is available free
+  from MassGIS, and the prototype draws it. Only the geometry and lot size are requested —
+  the owner and address fields the service also carries are never fetched.</p>
+  <p><b>What it still can't do:</b> that part doesn't generalise. There is no free national
+  parcel source; each state publishes its own service, or none. Outside MA this falls back
+  to a scaled aerial base plus the OSM house outline, with the lot edge traced by eye.
+  Recorded boundaries and what's actually fenced also routinely differ by a few feet, so
+  the polygon is a strong starting guess rather than ground truth.</p>
+  <p>If adopted, the spec's "Out of Scope" line needs narrowing to say
+  <b>GPS positioning and user-taken photos</b> specifically, not all imagery.</p>
+`);
+
+function openModal(title, html) {
+  document.getElementById('modal-title').textContent = title;
+  document.getElementById('modal-body').innerHTML = html;
+  document.getElementById('modal').classList.add('open');
+}
+document.getElementById('close-modal').onclick = () => document.getElementById('modal').classList.remove('open');
+
+// ── Findings log ──────────────────────────────────────────────────────────────
+
+function note(kind, html) {
+  if (s.findings.some(f => f.html === html)) return;
+  s.findings.push({ kind, html });
+  render();
+}
+
+// Known-up-front risks, seeded so they're visible before anyone clicks anything.
+s.findings.push(
+  { kind: 'risk', html: `<b>Max detail varies by location.</b> Verified: Cambridge MA reaches zoom 21, Portland OR 20, Chelsea London and rural Wyoming only 19. Missing tiles return <code>200 OK</code> with a grey placeholder, so availability must be probed via the tilemap endpoint — never assumed.` },
+  { kind: 'risk', html: `<b>Lot boundaries are per-jurisdiction.</b> OSM has buildings, not parcels. Massachusetts publishes a free statewide parcel service (used here); most states publish their own and some publish none. There is <b>no national free source</b> — so this part does not generalise.` },
+  { kind: 'risk', html: `<b>Imagery is stale</b> — tiles can be 1–4 years old. Low impact for property dimensions (buildings and lot lines don't move), high impact if you were relying on seeing current beds.` },
+  { kind: 'risk', html: `<b>Tree canopy occludes ground.</b> Again low impact for property extent, but it hides the beds under mature trees — the ones a shade gardener most wants.` },
+  { kind: 'risk', html: `<b>Registration offset.</b> Tiles can sit a few feet off true position. Fine for tracing shapes, not for absolute coordinates.` },
+  { kind: 'risk', html: `<b>Nominatim is not licensed for production volume.</b> Fine for a prototype; the real app needs its own geocoder or a self-hosted instance.` }
+);
+
+// ── Walkthroughs ──────────────────────────────────────────────────────────────
+
+const scenarios = [
+  {
+    name: 'Property dimensions',
+    desc: 'The actual goal: get the property\'s real size and shape from an address, without measuring anything. Two independent sources are fetched — building footprints and the assessor lot line — and both are checked against the imagery.',
+    steps: [
+      { label: 'Load a Cambridge MA address', run: () => loadLocation(42.3782, -71.1266, 'Cambridge MA (suburban yards)') },
+      { label: 'Fetch the lot boundary', run: () => loadParcel() },
+      { label: 'Fit the view to the lot', run: () => fitToLot() },
+      { label: 'Check recorded vs computed area →', run: () => document.getElementById('hint').textContent = 'The panel shows the assessor\'s recorded lot size next to the area computed from the polygon. Close agreement means the projection and units are right.' },
+      { label: 'Fetch the building footprints too', run: () => loadProperty() },
+      { label: 'Fade imagery to see geometry alone', run: () => { const o = document.getElementById('opacity'); o.value = 30; o.oninput({ target: o }); } },
+      { label: 'Measure the house to confirm', run: () => { activateTool('measure'); document.getElementById('hint').textContent = 'Drag across the house. Compare with the "Largest building" figure in the panel — and with what you know the real house to be.'; } }
+    ]
+  },
+  {
+    name: 'Load a base',
+    desc: 'The core question, end to end: address in, satellite base under the canvas, no API key anywhere.',
+    steps: [
+      { label: 'Jump to a Cambridge MA yard', run: () => loadLocation(42.3782, -71.1266, 'Cambridge MA (suburban yards)') },
+      { label: 'Zoom in to maximum detail', run: () => { document.getElementById('zoom-sel').value = '21'; s.imgZoom = 21; loadTiles(); } },
+      { label: 'Read the derived scale →', run: () => note('yes', `Scale was <b>derived, not measured</b> — user story 21 (“tie the grid to a real-world measurement”) may be unnecessary.`) }
+    ]
+  },
+  {
+    name: 'Scale is free',
+    desc: 'The interesting find. Latitude + zoom give pixels-per-foot outright, so the user never measures anything. Check it against something you know the size of.',
+    steps: [
+      { label: 'Load Portland OR (big lots)', run: () => loadLocation(45.5231, -122.6414, 'Portland OR (large lots)') },
+      { label: 'Switch to the Measure tool', run: () => activateTool('measure') },
+      { label: 'Now drag across a car or driveway', run: () => document.getElementById('hint').textContent = 'Drag across a parked car — should read ~15 ft. A single-car driveway ~10 ft. If those numbers land, the derived scale is right.' }
+    ]
+  },
+  {
+    name: 'Trace a bed',
+    desc: 'Does tracing over imagery actually feel better than drawing a bed from memory? Fade the base afterwards to see the outline on its own.',
+    steps: [
+      { label: 'Load Chelsea, London', run: () => loadLocation(51.4816, -0.1691, 'Chelsea, London (walled gardens)') },
+      { label: 'Switch to Freehand', run: () => activateTool('freehand') },
+      { label: 'Trace a bed edge you can see', run: () => document.getElementById('hint').textContent = 'Drag along a visible bed or lawn edge. Note how much easier this is than a blank grid.' },
+      { label: 'Fade the base to 25%', run: () => { const o = document.getElementById('opacity'); o.value = 25; o.oninput({ target: o }); } },
+      { label: 'Add a landmark on a hard edge', run: () => activateTool('landmark') }
+    ]
+  },
+  {
+    name: 'Export still works',
+    desc: 'The quiet failure mode. Cross-origin imagery normally taints the canvas and breaks export forever. Proves it does not here — and why.',
+    steps: [
+      { label: 'Make sure imagery is loaded', run: () => { if (s.lat === null) loadLocation(42.3782, -71.1266, 'Cambridge MA (suburban yards)'); } },
+      { label: 'Run the export test', run: () => document.getElementById('btn-export').click() }
+    ]
+  },
+  {
+    name: 'Where it breaks',
+    desc: 'The honest half. Coverage is not uniform — max detail varies by location, and the tile server returns grey placeholders with 200 OK rather than an error. Watch the "Imagery available to" row change as you move around.',
+    steps: [
+      { label: 'Cambridge MA — best case (zoom 21)', run: () => loadLocation(42.3782, -71.1266, 'Cambridge MA (suburban yards)') },
+      { label: 'Chelsea, London — only zoom 19', run: () => loadLocation(51.4816, -0.1691, 'Chelsea, London (walled gardens)') },
+      { label: 'Rural Wyoming — thin coverage', run: () => loadLocation(44.9, -110.6, 'Rural Wyoming — sparse coverage') },
+      { label: 'Force zoom 18 to see coarse imagery', run: () => { const sel = document.getElementById('zoom-sel'); sel.value = '18'; s.imgZoom = 18; loadTiles(); note('risk', `At zoom 18 resolution is ~17 in/px — <b>worse than the ~1 ft target</b>. Below zoom 19 the base stops being trustworthy for tracing.`); } },
+      { label: 'Note what tree cover hides', run: () => note('risk', `Confirmed by eye: dense canopy makes beds untraceable. Needs a blank-canvas fallback — the satellite base must stay <b>optional</b>.`) }
+    ]
+  }
+];
+
+let activeScenario = 0, stepIndex = 0;
+
+function renderTabs() {
+  const tabs = document.getElementById('tabs');
+  tabs.innerHTML = '';
+  scenarios.forEach((sc, i) => {
+    const b = document.createElement('button');
+    b.className = 'tab' + (i === activeScenario ? ' active' : '');
+    b.textContent = sc.name;
+    b.onclick = () => { activeScenario = i; stepIndex = 0; renderScenario(); };
+    tabs.appendChild(b);
+  });
+}
+
+function renderScenario() {
+  renderTabs();
+  const sc = scenarios[activeScenario];
+  document.getElementById('scenario-desc').textContent = sc.desc;
+  const host = document.getElementById('steps');
+  host.innerHTML = '';
+  sc.steps.forEach((st, i) => {
+    const b = document.createElement('button');
+    b.className = 'step' + (i < stepIndex ? ' done' : i === stepIndex ? ' next' : '');
+    b.innerHTML = `<span class="n">${i + 1}</span><span>${st.label}</span>`;
+    b.onclick = () => { st.run(); stepIndex = Math.max(stepIndex, i + 1); renderScenario(); };
+    host.appendChild(b);
+  });
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+
+function render() {
+  const $ = id => document.getElementById(id);
+  const toolNames = { pan: 'Pan', freehand: 'Freehand', rect: 'Rectangle', landmark: 'Landmark', measure: 'Measure' };
+  $('s-tool').textContent = toolNames[s.tool];
+  $('s-tiles').textContent = s.tilesExpected ? `${s.tilesLoaded} / ${s.tilesExpected}` : '0';
+  $('s-beds').textContent = s.beds.length;
+  $('s-lm').textContent = s.landmarks.length;
+  $('s-measure').textContent = s.lastMeasure === null ? '—' : s.lastMeasure.toFixed(1) + ' ft';
+
+  const bldgs = s.property.filter(p => p.kind === 'building').length;
+  $('s-bldg').textContent  = s.property.length ? bldgs : '—';
+  $('s-house').textContent = s.houseSummary || '—';
+
+  const pc = s.parcel;
+  $('btn-fitlot').disabled = !pc;
+  if (!pc) {
+    ['s-lotdim', 's-lotarea', 's-lotcheck'].forEach(id => {
+      $(id).textContent = '—'; $(id).className = 'val';
+    });
+  } else {
+    $('s-lotdim').textContent  = `${Math.round(pc.extent.widthFt)} × ${Math.round(pc.extent.heightFt)} ft`;
+    $('s-lotarea').textContent = `${Math.round(pc.areaSqFt).toLocaleString()} sf · ${(pc.areaSqFt / GeoBase.SQFT_PER_ACRE).toFixed(2)} ac`;
+    if (pc.recorded === null) {
+      $('s-lotcheck').textContent = 'not recorded';
+      $('s-lotcheck').className = 'val warn';
+    } else {
+      $('s-lotcheck').textContent = `${Math.round(pc.recorded).toLocaleString()} vs ${Math.round(pc.areaSqFt).toLocaleString()} sf · ${pc.agreement.deltaPct.toFixed(1)}%`;
+      $('s-lotcheck').className = 'val ' + (pc.agreement.agrees ? 'good' : 'bad');
+    }
+  }
+  $('s-export').textContent = s.exportStatus;
+  $('s-export').className = 'val ' + (s.exportStatus.startsWith('PASS') ? 'good' : s.exportStatus.startsWith('FAIL') ? 'bad' : '');
+
+  if (s.lat === null) {
+    ['s-loc', 's-lat', 's-maxz', 's-res', 's-ppf', 's-verdict'].forEach(id => $(id).textContent = '—');
+  } else {
+    const v = GeoBase.precisionVerdict(s.lat, s.imgZoom, 1);
+    const best = GeoBase.pickBestZoom(s.available);
+    $('s-maxz').textContent = best === null ? 'none' : 'zoom ' + best;
+    $('s-maxz').className = 'val ' + (best === null ? 'bad' : best >= 20 ? 'good' : 'warn');
+    $('s-loc').textContent = s.label.length > 26 ? s.label.slice(0, 26) + '…' : s.label;
+    $('s-lat').textContent = s.lat.toFixed(4) + '°';
+    $('s-res').textContent = v.inchesPerPixel.toFixed(1) + ' in / px';
+    $('s-ppf').textContent = GeoBase.pixelsPerFoot(s.lat, REF_ZOOM).toFixed(2) + ' px / ft';
+    $('s-verdict').textContent = v.comfortable ? 'comfortably met' : v.meetsTarget ? 'just met' : 'NOT met';
+    $('s-verdict').className = 'val ' + (v.comfortable ? 'good' : v.meetsTarget ? 'warn' : 'bad');
+  }
+
+  const f = $('findings');
+  f.innerHTML = '';
+  s.findings.forEach(x => {
+    const d = document.createElement('div');
+    d.className = 'finding ' + x.kind;
+    const mark = x.kind === 'yes' ? '✓' : x.kind === 'no' ? '✕' : '!';
+    d.innerHTML = `<span class="mark">${mark}</span><span class="txt">${x.html}</span>`;
+    f.appendChild(d);
+  });
+}
+
+window.addEventListener('resize', () => {
+  stage.width(wrap.offsetWidth);
+  stage.height(window.innerHeight);
+});
+
+activateTool('freehand');
+renderScenario();
+render();
+</script>
+</body>
+</html>
