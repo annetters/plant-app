@@ -30,12 +30,6 @@ yet, in any language. Four commits, all of them documents and prototypes:
 3697144 Init files
 ```
 
-> **Ignore the `prototype/satellite-base` branch.** Its name promises the
-> satellite prototype and it does not contain it — the branch tip is `492266b`,
-> one commit behind `main`, and the only prototype file in its tree is
-> `prototype/bed-editor/index.html`. Everything, both prototypes included, is on
-> `main`. The branch is a leftover label and can be deleted.
-
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
 > No GPS is read and no user photo is taken — that is exactly why the work was
 > in scope when GPS positioning was not. See ADR-0002.
