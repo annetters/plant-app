@@ -152,7 +152,7 @@ A manual, non-recurring reminder outside the care task template system.
 ### Registry
 The searchable, filterable Plant list. Filter axes: name, flower color,
 bloom month, sun/shade, and other Plant fields. Each entry links to its
-Planting location(s) on the map.
+Planting location(s) on the Property's map.
 
 ### Bloom Timeline
 Year-view bar chart of Plant bloom windows, filterable by Bed. A

@@ -1,29 +1,64 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-13  
+**Date:** 2026-08-18
 **Repo:** `annetters/plant-app` · branch `main`
+
+---
+
+## What to do next
+
+**Go straight to `/to-tickets`.**
+
+Platform, persistence, and the full domain model are decided. One question
+remains genuinely open — which OCR mechanism Tag Scan uses — but it's
+explicitly non-blocking; see "Open, but not blocking" below. Nothing else is
+blocking ticket-writing. The full spec lives at
+**[GitHub issue #1](https://github.com/annetters/plant-app/issues/1)** — read
+that first, it's the actual source of truth, not this file.
+
+**Before you start**, three files are modified but not committed:
+`CONTEXT.md`, `docs/adr/0003-web-desktop-native-mobile-cloud-backend.md`,
+`docs/plant-app-spec.md`. Run `git status` and commit them (or check whether a
+prior session already did and this note is stale).
 
 ---
 
 ## What this project is
 
-A personal garden registry app for a gardener with 50–100 plantings who loses track of what's planted (especially in winter). The app has two linked core entities and four main views:
+A personal garden registry app for a gardener with 50–100 plantings who loses
+track of what's planted (especially in winter). Core entities:
 
-- **Plant** — species/variety-level record (common name, scientific name, cultivar, bloom window, flower color, sun/shade, mature size, hardiness zone, care task templates, reference photos)
-- **Planting** — one placement decision referencing a Plant (quantity, bed + pin coordinates, year acquired, source, dated photo log)
-- **Views:** Map (garden beds with pinned plantings), Registry (searchable/filterable plant list), Bloom Timeline (year-view bar chart), Dashboard (home screen)
+- **Plant** — species/variety-level record (common name, scientific name,
+  cultivar, bloom window, flower color, sun/shade, mature size, hardiness
+  zone, care task templates, reference photos)
+- **Planting** — one placement decision referencing a Plant (quantity, Bed +
+  Pin coordinates, year acquired, source, dated photo log)
+- **Property** — the user's whole garden; owns one real-world scale shared by
+  every Bed drawn within it
+- **Bed** — a drawn map area within a Property, desktop-only creation
+- **Pin** — a Planting's location within a Bed, placed by dragging — no
+  landmark math, no manual numbers
+- **Tag Scan** — an optional way to create/enrich a Plant record by
+  photographing a nursery tag; OCR is a convenience layer only, manual entry
+  always works
+- **Views:** Map, Registry, Bloom Timeline (two presentations — chart and
+  list, both on every platform), Dashboard — full native feature parity on
+  phone except drawing
 
-Full spec: `docs/plant-app-spec.md`  
+Full spec (source of truth): **GitHub issue #1**
 Domain glossary: `CONTEXT.md`
 
 ---
 
 ## Current state
 
-The project is at the **pre-implementation** stage — no application code exists
-yet, in any language. Four commits, all of them documents and prototypes:
+Seven commits, plus three files modified and not yet committed (see "What to
+do next" above):
 
 ```
+eaf1f32 Add ADR-0003: web desktop + native mobile, cloud BaaS backend
+86f3772 Design Property, Scale Reference, and Tag Scan; correct base-layer purpose
+85fcd4c Resolve ADR-0001 smoothing question, reconcile spec and glossary
 14957a9 Second prototype added to explore GPS
 492266b Added handoff document
 5f9fbc7 Gitignore added
@@ -38,162 +73,158 @@ yet, in any language. Four commits, all of them documents and prototypes:
 
 | Artifact | Path | Purpose |
 |---|---|---|
-| Spec | `docs/plant-app-spec.md` | Full requirements, user stories, implementation & testing decisions, out-of-scope |
-| Domain glossary | `CONTEXT.md` | Canonical term definitions — use these names exactly (Plant vs Planting, Bed, Pin, Landmark, Bloom Window, etc.) |
-| Agent docs | `docs/agents/` | Issue tracker setup (`issue-tracker.md`), triage labels (`triage-labels.md`), domain context (`domain.md`) |
-| Decisions | `docs/adr/` | **Architecture Decision Records — read these first.** ADR-0001 (bed drawing + smoothing), ADR-0002 (aerial base layer, derived scale, lot boundaries) |
-| Prototype | `prototype/bed-editor/` | **Throwaway.** `index.html` — Konva bed editor; its pre-draw smoothing toggle is the behaviour the MVP ships. `smooth-correct.html` — three post-draw smoothing UIs, all rejected |
-| Prototype | `prototype/satellite-base/index.html` | **Throwaway.** Aerial base layer, address → scaled map, lot boundaries |
+| **Spec (current)** | [GitHub issue #1](https://github.com/annetters/plant-app/issues/1) | The real spec. 53 user stories, full implementation/testing decisions. Labeled `ready-for-agent`. |
+| Spec (superseded) | `docs/plant-app-spec.md` | The original file-based spec, written before this repo had an issue tracker. Kept for history; has a banner pointing to issue #1. Do not implement against it. |
+| Domain glossary | `CONTEXT.md` | Canonical term definitions — Plant, Planting, Property, Scale Reference, Bed, Landmark (deferred), Pin, Tag Scan, Task model, Registry, Bloom Timeline, Dashboard |
+| Agent docs | `docs/agents/` | Issue tracker setup, triage labels, domain context |
+| Decisions | `docs/adr/` | **Read these — they're normative, and win over the spec where they disagree.** ADR-0001 (bed drawing + smoothing), ADR-0002 (base layer, Property, Scale Reference — amended), ADR-0003 (platform, persistence, native app scope, domain-logic execution — amended) |
+| Research | `docs/research/plant-data-source-cultivar-level-evaluation.md` | Which external plant databases were checked for Tag Scan, and why. USDA PLANTS adopted; IPNI ruled out; Proven Winners / Missouri Botanical Garden / NC State logged as unresearched future candidates. |
+| Prototype | `prototype/bed-editor/` | **Throwaway.** `index.html` — Konva bed editor; pre-draw smoothing toggle is what ships. `smooth-correct.html` — three post-draw smoothing UIs, all rejected. |
+| Prototype | `prototype/satellite-base/index.html` | **Throwaway.** Aerial base layer, address → scaled map, lot boundaries. |
 
-### What the prototypes validated
-
-Full reasoning and the full list of constraints live in `docs/adr/`. In brief:
-
-**`prototype/bed-editor/`** (see ADR-0001)
-- Konva.js works for freehand, rect, oval, and bezier-pen bed drawing
-- Grid snapping, zoom/pan, landmark placement, SVG export all work
-- Raw spline tension alone gives poor organic shapes; Chaikin corner-cutting over
-  decimated points is what produces usable bed blobs
-- Smoothing ships as a binary **pre-draw** toggle at fixed strength. An
-  adjustable post-draw level was prototyped and rejected on feel; all three of
-  its candidate UIs (panel slider / floating pill / drag-on-shape) were turned
-  down. Honing the drawing experience is deferred to its own phase.
-
-**`prototype/satellite-base/`** (see ADR-0002)
-- An address can be turned into a correctly scaled aerial base with no API key
-- **The map scale is derived from latitude and tile zoom — the user never measures**
-- Precision 2.2–8.3 in/px, comfortably inside the ~1 ft target
-- Real lot boundaries are available where a jurisdiction publishes them; there is
-  no free national source, so the feature must degrade gracefully
-- The base layer must stay **optional** — tree canopy hides exactly the shade beds
-  most worth recording
-
-Both prototypes are **explicitly throwaway** — do not build on them. Extract
-learnings only.
+Both prototypes are explicitly throwaway — do not build on them, extract
+learnings only. Full reasoning lives in `docs/adr/`.
 
 ---
 
-## Key decisions from the spec (don't re-litigate these)
+## The full decision set (don't re-litigate these)
 
-- **Desktop-only bed creation** — freehand/shape drawing of bed outlines is desktop only; touchscreen was rejected as impractical
-- **Phone + desktop pin placement** — placing Planting pins on the map works on both; rough tap or landmark-distance refinement, offered inline (not a separate guided mode)
-- **No GPS pin positioning in the MVP** — deferred, *not* rejected permanently; revisit in a later phase (ADR-0002 records what would need to change). No user-taken ground photos as a base either. Top-down aerial imagery **is** in scope and is neither of those things.
-- **No per-Planting task overrides** — task timing is on the Plant and applies to all its Plantings uniformly
-- **Two task trigger types only** — (1) fixed calendar date range, (2) freeform seasonal-marker text; bloom-fade-relative triggers are out of scope
-- **One Planting = one record** — a cluster of 24 crocus bulbs is one Planting with quantity=24, not 24 records
-- **Bed smoothing is a binary pre-draw toggle** — adjustable post-draw smoothing was built and rejected; don't rebuild it (ADR-0001). Beds store the *raw* traced points plus a flag, never the smoothed points, so the deferred adjustable version stays possible without a geometry migration.
-- **Data persistence deferred** — local vs. cloud-sync not decided yet; don't design around either
+**Platform & persistence (ADR-0003):**
+- Desktop is a browser-based web app, reusing ADR-0001's Konva editor.
+- Phone is a native app, React Native (iPhone first, Android later at low
+  cost — chosen over Flutter specifically to share TypeScript with the web
+  app).
+- Full native feature parity **except drawing** — Bed outlines and a
+  Property's drawn-in-app base map stay desktop-only; Scale Reference
+  calibration (tapping two points) is *not* bundled into that exception and
+  works fine on phone.
+- Cloud-hosted backend-as-a-service, Postgres-based (e.g. Supabase), with
+  accounts — local-only was ruled out, not deprioritized, since two devices
+  need to see the same data.
+- Domain logic touching an external adapter credential (USDA, geocoder, tile
+  server, parcel service) runs server-side (Edge Functions) — not optional,
+  an API key can't ship in a client. Everything else runs in a shared
+  TypeScript package imported by both frontends — this is *the* domain-logic
+  test seam. **This split was recorded with lower confidence than the rest
+  of the ADR** — see ADR-0003's explicit reconsider-if condition before
+  treating it as settled forever. **OCR is deliberately not in either list**
+  — see "Open, but not blocking" below.
+
+**Property, Bed, and the map (ADR-0002, amended):**
+- Property owns one scale, shared by every Bed within it — never per-Bed.
+  One Property per account for MVP; schema allows more later without a
+  migration.
+- Three base-map sources: aerial image (auto-scaled from latitude/zoom),
+  a photographed plot plan/survey/sketch, or a plan drawn in-app. **The base
+  map is a structural reference layer** (property boundary, driveways,
+  hardscaping, house footprint) — **not a stencil Beds are traced from.**
+  Beds are always hand-drawn on top of it. One base-map source per Property;
+  no mixing.
+- The two non-aerial sources need Scale Reference to establish scale: two
+  points plus a real-world distance, either a known measurement or a
+  measured object (prefer long, fixed, permanent references).
+- Bed geometry is stored in real-world units, not pixels — survives a later
+  base-image swap.
+- Parcel-service boundary fetching is **best-effort only**, not depended on
+  — no free national source, unresolved data-licensing question. The
+  photographed plot-plan path covers the same need more reliably.
+- GPS-assisted pin placement: deferred, not rejected. LiDAR/AR scanning:
+  considered and set aside (see ADR-0002 for both, including reopening
+  conditions).
+
+**Pins and Landmark:**
+- Pins are placed by **dragging** directly onto the map. No manual numbers,
+  identical on desktop and phone.
+- **Landmark (distance-based pin refinement) is deferred, not required for
+  MVP** — superseded once the map itself became trustworthy. May return
+  later as an optional precision-assist suggestion.
+
+**Tag Scan:**
+- Photograph a nursery tag → OCR extracts candidates → human always confirms.
+  **OCR is a convenience layer; manual Plant entry always works as a
+  complete fallback** if OCR fails, is unavailable, or misreads something.
+- Matching resolves to genus, species, *and* cultivar — never just a common
+  name (one common name can span multiple species; one species can span a
+  straight form and named cultivars). Ambiguous matches surface candidates
+  and tell the user to check the physical tag, never guess.
+- Checks for an existing matching Plant before creating a new one, to avoid
+  the registry fragmenting across repeat purchases from different nurseries.
+- Species-level trait suggestions (hardiness, size, sun/shade) come from
+  USDA PLANTS. **Never bloom window** — it's climate/location-dependent, not
+  a fixed species fact, regardless of source.
+- Tag photos are kept separate from Plant reference photos, never mixed;
+  kept by default (a setting, not a per-scan prompt), deletable like any
+  photo.
+- **Recommended before full build**: a `/prototype` pass on OCR (real tags)
+  and the USDA data pull — unlike the other three adapters, these have had
+  zero hands-on validation.
+
+**Everything else (unchanged from the original spec):**
+- One Planting = one record, `quantity` field, never one record per specimen
+- No per-Planting task overrides; task timing lives on Plant only
+- Two task trigger types only: fixed date-range, freeform seasonal-marker
+- Task completion keyed by template + Planting + year (all three needed)
+- Bezier-pen is in scope for the bed editor, alongside freehand and
+  rectangle/oval — all three validated in the ADR-0001 prototype
+
+### Open, but not blocking
+
+- **Which OCR: on-device or a cloud API?** Raised, never answered. This
+  isn't a minor detail — ADR-0003's domain-logic-execution split assumed
+  OCR needs server-side treatment like the other adapters, which is only
+  true if it turns out to be a cloud API with a credential to protect. If
+  it's on-device (e.g. Apple's Vision framework — plausible, given
+  iPhone-first: free, offline, no credential at all), it could run in the
+  shared client package instead. **Don't build OCR integration assuming
+  either answer.** Resolve this as part of the Tag Scan prototype pass
+  above — testing on-device OCR against real nursery tags is exactly how
+  you'd find out whether it's accurate enough to skip the cloud option.
 
 ---
 
 ## Issue tracker
 
-Issues live as GitHub issues in `annetters/plant-app`, managed via the `gh` CLI.  
-See `docs/agents/issue-tracker.md` for the full workflow.
+Issues live as GitHub issues in `annetters/plant-app`, managed via the `gh`
+CLI. See `docs/agents/issue-tracker.md` for the full workflow.
 
-Triage labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`  
-See `docs/agents/triage-labels.md`.
+Triage labels: `needs-triage`, `needs-info`, `ready-for-agent`,
+`ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
 
-**The labels are configured, but there are currently zero issues.** Nothing has
-been broken down into tickets yet — see below.
-
----
-
-## What to do next
-
-The thinking phase is essentially done: the spec is complete, the glossary is
-clean, both design questions that needed runnable answers have been prototyped
-and written up as ADRs, and ADR-0001's open question is now closed.
-
-**One decision blocks everything else.**
-
-### 1. Choose a tech stack, and decide persistence alongside it
-
-The spec is deliberately stack-agnostic, and ADR-0001 is explicit that the
-prototype's vanilla-JS/Konva choice **is not a commitment**. Decide: web app
-(React/Vue + Konva?), native mobile (Swift/Kotlin?), or cross-platform (React
-Native/Flutter?).
-
-Take the deferred **local vs. cloud-sync** persistence question (spec line 80)
-in the same session — the two interact, and answering them apart risks
-answering them inconsistently.
-
-This gates ticket-writing, not just coding: nearly every ticket's shape depends
-on it. "Desktop-only bed creation, pin placement on both" means structurally
-different things in a responsive web app versus two native clients.
-
-Record the outcome as **ADR-0003**.
-
-**Settle one more thing in that session: does grid scale belong on the Bed?**
-`CONTEXT.md` currently puts it there. But when the aerial base layer is in use,
-scale is derived once from latitude and tile zoom, so every Bed on that base
-shares it — and a per-Bed scale would let two Beds on one image disagree about
-the length of a foot. Per-Bed scale may still be correct for the blank-canvas
-fallback. It's a schema question, it interacts with persistence, and it is
-flagged as *Open* in `CONTEXT.md` under **Bed**.
-
-### Open, but not blocking
-
-- **Is the bezier-pen tool in scope?** ADR-0001 lists it as validated in the
-  prototype; the spec's tool list is only freehand plus rectangle/oval. Decide
-  when the bed editor ticket is written, not before.
-
-### 2. Break the spec into tickets
-
-Once the stack is settled, go straight to ticket-writing — **do not re-derive a
-spec first**, `docs/plant-app-spec.md` already is one. Tickets go to GitHub
-issues with blocking edges between them, so any ticket whose blockers are done
-can be picked up.
-
-Likely early tickets, blockers-first:
-
-- **Data model** — the Plant/Planting schema. Core invariants to test: (a) one
-  Planting per placement decision regardless of quantity, (b) Plant task
-  templates are inherited by every Planting of that Plant.
-- **Bed editor (desktop)** — the prototype answered "does Konva.js work?" (yes).
-  Build the real editor as a proper module. Pre-draw smoothing toggle only.
-- **Aerial base layer** — optional, with a blank-canvas fallback that is
-  *required*, not a nice-to-have (ADR-0002).
-- **Pin placement** — desktop and mobile; rough tap plus optional
-  landmark-distance refinement, offered inline.
-
-### 3. Implement, one ticket per context window
-
-Each ticket is self-contained, so clear context between them.
+**One issue exists**: #1, the spec, labeled `ready-for-agent`. Nothing has
+been broken into tickets yet — that's the next step.
 
 ---
 
 ## Suggested skills
 
-This project has been run using the Matt Pocock skill set. If you have it
-installed, the next three steps map onto it directly:
+- **`/to-tickets`** — the immediate next step. Splits issue #1 into
+  tracer-bullet tickets with blocking edges, so any ticket whose blockers
+  are done can be picked up. Don't run `/to-spec` again — the spec is
+  already published and current.
+- **`/implement`** — per ticket, once `/to-tickets` runs. Clear context
+  between tickets; each is self-contained. Drives `/tdd` internally, closes
+  with `/code-review`.
+- **`/prototype`** — recommended specifically for Tag Scan's OCR and USDA
+  data pull before building them for real (see Tag Scan section above).
+- **`/codebase-design`** — for module structure once ticket-writing starts,
+  particularly the shared-TypeScript-package boundary from ADR-0003.
+- **`/domain-modeling`** — if any term in `CONTEXT.md` needs sharpening
+  during implementation.
 
-- **`/grill-with-docs`** — for step 1, the stack + persistence decision. It's
-  stateful, so it updates `CONTEXT.md` and writes ADR-0003 as it goes.
-- **`/to-tickets`** — for step 2. Skip `/to-spec`; the spec already exists.
-- **`/implement`** — for step 3, once per ticket, clearing context between each.
-  It drives `/tdd` internally and closes with `/code-review`.
-
-Keep steps 1 and 2 in one unbroken context window so the decision and the
-tickets build on the same thinking.
-
-Also relevant:
-
-- **`/codebase-design`** — for module structure once the stack is known
-- **`/tdd`** — the spec has explicit testing decisions; use it for the data model
-- **`/prototype`** — if another UX question needs a runnable answer (mobile pin
-  placement flow and bloom timeline interactions are the untested ones)
-- **`/domain-modeling`** — if the Plant/Planting or task vocabulary needs
-  sharpening; it's what keeps `CONTEXT.md` clean
-
-If you don't have these skills, the steps above stand on their own — they just
-describe the ordinary flow of decide → break down → build.
+If you don't have these skills installed, the flow still stands on its own:
+break the spec into tickets with explicit dependencies, then build one at a
+time.
 
 ---
 
 ## Notes
 
-- Use the exact terminology from `CONTEXT.md` — "Plant" and "Planting" are distinct; never use "plant" to mean both.
-- The spec was produced via an extended interview session; several decisions reversed mid-session. The final decisions in the spec supersede any earlier framing.
-- **Where the ADRs and the spec disagree, the ADRs win** — they're newer and both say so explicitly. ADR-0002 narrows the spec's over-broad "no photo-based mapping" wording, and largely retires user story 21 (the user no longer measures anything, since scale is derived).
-- GitHub issues are the source of truth for work tracking — check `gh issue list` before starting new work to avoid duplication.
+- Use the exact terminology from `CONTEXT.md` throughout — Plant vs.
+  Planting, Property, Scale Reference, Bed, Landmark (deferred), Pin, Tag
+  Scan. Don't drift to synonyms.
+- **Where ADRs and the spec disagree, the ADRs win** — they're newer and
+  both say so explicitly.
+- **The spec issue (#1) is the source of truth**, not `docs/plant-app-spec.md`
+  — that file is explicitly superseded and says so at the top.
+- GitHub issues are the source of truth for work tracking — run
+  `gh issue list` before starting new work to avoid duplication.

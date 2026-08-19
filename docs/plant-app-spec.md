@@ -1,5 +1,13 @@
 # Spec: Personal Garden Plant Registry
 
+> **Superseded.** This file was written before the repo had an issue
+> tracker. The current spec lives at
+> [GitHub issue #1](https://github.com/annetters/plant-app/issues/1),
+> which folds in everything decided since — Property, Scale Reference,
+> Tag Scan, drag-to-position Pins, the platform/persistence decision
+> (ADR-0003), and the corrected base-layer purpose (ADR-0002 amendment).
+> Kept here for history; do not implement against this file.
+
 ## Problem Statement
 
 The user maintains a home garden with 50–100 plantings and repeatedly loses track of what they've planted, especially after winter dormancy erases visual and memory cues. Specifically, they:
@@ -69,7 +77,7 @@ A personal garden registry app with two linked entities — a reusable **Plant**
 - **No per-Planting task overrides**: task timing is defined once on the Plant and applies uniformly to all its Plantings. This was explicitly evaluated and rejected as not worth the added complexity.
 - **Task model**: task templates belong to Plant. Two trigger types are in scope: (1) fixed calendar date range, (2) freeform seasonal-marker text (a reminder note with no computed date). Bloom-fade-relative triggers (a task scheduled relative to a biological event like "after blooms fade") and any check-in/nudge mechanism to log that event are explicitly out of scope for this spec.
 - **Task completion**: logged per care task template, per Planting, per calendar year, with a done/missed status — forming a history the user can review. All three dimensions are needed: a Plant with three care task templates produces three completion records per year for each of its Plantings, not one.
-- **Map/bed creation**: desktop-only. Supports freehand tracing and shape-based tools (rectangle/oval). **Scale is derived, not asked for** — when the optional aerial base layer is in use it is computed from latitude and tile zoom (ADR-0002), and the user measures nothing. Asking the user for a real-world measurement survives only as the fallback for beds drawn on a blank canvas. Neither path reads GPS or uses a user-taken ground-level photo. Each bed must support tagging landmark points during creation.
+- **Map/bed creation**: desktop-only. Supports freehand tracing, shape-based tools (rectangle/oval), and a bezier-pen tool — all validated in the ADR-0001 prototype. **Scale is derived, not asked for** — when the optional aerial base layer is in use it is computed from latitude and tile zoom (ADR-0002), and the user measures nothing. Asking the user for a real-world measurement survives only as the fallback for beds drawn on a blank canvas. Neither path reads GPS or uses a user-taken ground-level photo. Each bed must support tagging landmark points during creation.
 - **Map/pin placement**: available on both desktop and phone. A pin can be placed by rough tap alone, or refined via an optional "distance from a tagged landmark" input, which is offered inline at the point of placing/editing a single pin — not as a separate guided or multi-step mode, and never triggered proactively/unprompted.
 - **No GPS-based pin positioning, and no user-taken ground-level photos as a map base.** Evaluated and set aside: consumer GPS accuracy (~10–16 ft) doesn't meet the target accuracy (~1 ft), and photographing real garden terrain introduces perspective distortion that a single two-point calibration can't correct for across an entire bed, especially when only eye-level (non-elevated) photo angles are available. **GPS is deferred, not rejected permanently** — see ADR-0002 for the conditions under which it's worth reopening in a later phase.
 - **Top-down aerial imagery as an optional base layer IS in scope** (ADR-0002). This is neither of the above — no GPS is read and no user photo is taken. It also makes the map scale self-deriving; see the note on user story 21 below.

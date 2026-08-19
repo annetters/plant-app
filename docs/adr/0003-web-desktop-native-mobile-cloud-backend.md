@@ -5,6 +5,10 @@
 Accepted — 2026-08-18. Resolves the tech-stack and persistence decision
 `plant-app-handoff.md` flagged as the one thing blocking ticket-writing.
 
+**Amended the same day**: adds where the shared domain logic executes — see
+"Domain logic execution", flagged there as **held with lower confidence**
+than the rest of this ADR.
+
 ## Context
 
 The spec is deliberately stack-agnostic. ADR-0001's prototype used vanilla
@@ -76,6 +80,56 @@ needs to contain.
   neither is a phone-only fallback for the other. The horizontal-scroll
   experience must be fluid and pleasant to use, not merely technically
   functional.
+
+### Domain logic execution
+
+Split by whether the logic touches an external adapter credential.
+
+- **Anything calling an external adapter with a secret — USDA lookup,
+  geocoder, tile server, parcel service — runs server-side**, as Supabase
+  Edge Functions. This is not a judgment call: an API key cannot ship inside
+  a client bundle or mobile binary, full stop, independent of anything else
+  in this section.
+- **OCR is not settled onto either side yet, and doesn't automatically
+  belong in the list above.** The "must run server-side" reasoning only
+  applies if OCR turns out to be a cloud API with a credential to protect.
+  If it's on-device instead (e.g. Apple's Vision framework — plausible
+  given iPhone-first is already decided: free, works offline, no credential
+  at all), there's nothing to protect and no reason it couldn't run in the
+  shared client package below instead. **Which one it is has never been
+  decided.** Resolve this as part of the recommended Tag Scan prototype
+  pass (see the spec's Further Notes) — testing on-device OCR against real
+  nursery tags is exactly how you'd find out whether it's even accurate
+  enough to skip the cloud option. Until resolved, don't build OCR
+  integration assuming either side of this split.
+- **Everything else — task-template cascading, Bloom Timeline bar math,
+  Scale Reference's two-point-plus-distance calculation, real-world-unit Bed
+  geometry, Tag Scan's matching/de-dup logic once an OCR or USDA result is
+  already in hand — runs in a shared TypeScript package**, imported directly
+  by both the web app and the React Native app. Neither client re-implements
+  its own copy. This is the concrete payoff of choosing React Native over
+  Flutter above specifically for sharing a language with the web app — a
+  shared package is what actually cashes that reasoning in, rather than the
+  two codebases merely happening to use the same language. This package is
+  also the domain-logic seam the spec's testing plan targets directly.
+- **Baseline, regardless of the above**: ordinary Postgres schema
+  constraints — foreign keys, `NOT NULL`, cheap `CHECK`s like quantity > 0 —
+  stay in place no matter what. This isn't the richer enforcement layer
+  discussed below; it's standard relational hygiene that costs nothing extra
+  in a BaaS and catches gross corruption even if the shared package has a
+  bug.
+
+**Held with lower confidence than the rest of this ADR.** The alternative —
+enforcing the non-adapter logic server-side too, so a buggy or compromised
+client can never write data that violates a business rule — is the more
+defensible choice for a multi-tenant product with an adversarial threat
+model. This is a single-user personal app without that threat model, which
+is why the lighter approach was chosen here — but that argument rests on a
+risk-profile judgment, not on security expertise this ADR doesn't have.
+**Reconsider server-side enforcement of the full rule set if**: the app ever
+gains multi-user or shared-access features, or enough data accumulates
+(years of task history, 50-100+ plantings) that a corruption caused by a
+client-side bug becomes expensive to unwind by hand.
 
 ## Consequences
 
