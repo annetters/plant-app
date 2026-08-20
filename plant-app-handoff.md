@@ -11,21 +11,18 @@
 project** (sign up, log in, land on the Dashboard shell, session survives
 reload), **and closed on GitHub** — see commit `2668f2c`.
 
-**#3 (Plant record CRUD) is implemented, committed, and manually verified
-against a real Supabase project** — create/view/edit/delete, reference
-photo upload/remove, and every domain-validation error case all passed.
-**Not yet closed on GitHub** — that's a deliberate loose end, not an
-oversight; nobody's told the agent to close it yet. Before picking it up
-as "done":
+**#3 (Plant record CRUD) is implemented, committed, manually verified
+against a real Supabase project** (create/view/edit/delete, reference
+photo upload/remove, every domain-validation error case all passed), **and
+closed on GitHub** — see commit `9018f33` and the follow-up fix commits
+below.
 
-- Close #3 (`gh issue close 3 --comment ...`) once you're satisfied —
-  this also flips #4 (Care task templates) onto the frontier, since #4's
-  only blocker is #3.
 - Four lower-priority manual QA items were identified but deliberately
   deferred, not run (see "Deferred QA" below) — direct-URL access to
   another account's plant, direct-URL access to a nonexistent plant,
   photo-thumbnail persistence across a page reload, and Registry sort
-  order with multiple plants.
+  order with multiple plants. None are blocking; worth running before/
+  during #4 or #10 (Registry view), whichever lands first.
 - Along the way, real bugs surfaced by manual testing (not caught by the
   automated suite, which mocks Supabase entirely) got fixed in-branch:
   a `42501 permission denied` 403 on save (newer Supabase projects don't
@@ -45,15 +42,12 @@ edges wired between them — see "Issue tracker" below for the full map.
 **The frontier right now** (open tickets with zero open blockers — safe to
 start immediately):
 
-- **#3** — Plant record CRUD (manual entry) — implemented and verified (see
-  above); still technically "on the frontier" only because it hasn't been
-  closed yet. Don't re-implement it.
-- **#5** — Property + aerial base map — independent of #3, map/base-layer work
+- **#4** — Care task templates on Plant — newly unblocked now that #3 is
+  closed
+- **#5** — Property + aerial base map — independent, map/base-layer work
 - **#13** — React Native app scaffold + auth — mirrors #2 for mobile
 - **#19** — Tag Scan prototype: OCR placement + USDA data pull — unchanged
   since last update
-
-Once #3 is closed, #4 (Care task templates on Plant) joins the frontier too.
 
 Run `/implement` in a **fresh session**, pointed at whichever ticket number
 you pick — that's the context-hygiene pattern the flow expects (grilling →
@@ -281,7 +275,7 @@ Ticket map (dependency order; title abbreviated):
 | # | Ticket | Blocked by |
 |---|---|---|
 | 2 | Repo scaffold, Supabase backend, web auth skeleton | — (built, `2668f2c`, closed) |
-| 3 | Plant record CRUD (manual entry) | 2 |
+| 3 | Plant record CRUD (manual entry) — built, `9018f33`, closed | 2 |
 | 4 | Care task templates on Plant | 3 |
 | 5 | Property + aerial base map | 2 |
 | 6 | Property: photographed/in-app-drawn base map + Scale Reference | 5 |
@@ -301,10 +295,8 @@ Ticket map (dependency order; title abbreviated):
 | 20 | Tag Scan build | 3, 13, 19 |
 
 **Frontier query**: open issues with `issue_dependencies_summary.blocked_by
-== 0` and no assignee. #2 is closed. Right now that's **#3, #5, #13, #19** —
-but #3 is implemented and verified, just not yet closed (see "What to do
-next" above); treat #5, #13, #19 as the actual next picks. Closing #3 also
-flips #4 onto the frontier.
+== 0` and no assignee. #2 and #3 are closed. Right now that's
+**#4, #5, #13, #19** — see "What to do next" above.
 
 ---
 
