@@ -11,3 +11,7 @@ Default label vocabulary (`needs-triage`, `needs-info`, `ready-for-agent`, `read
 ### Domain docs
 
 Single-context layout (one `CONTEXT.md` + `docs/adr/` at the repo root). See `docs/agents/domain.md`.
+
+## Working with the user
+
+When the user asks to check in, confirm, or see a plan before work starts (e.g. "check with me first," "tell me the plan before starting"), stop and wait for an explicit go-ahead before making any changes — do not post the plan and continue into edits in the same turn. This holds even under an auto/no-questions mode; an explicit request to check first overrides the general bias toward proceeding without stopping.
