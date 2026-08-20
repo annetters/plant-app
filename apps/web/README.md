@@ -20,10 +20,24 @@ human can do:
 
 `.env.local` is gitignored — never commit it.
 
+## One-time setup: database schema
+
+SQL migrations live in `supabase/migrations/` at the repo root. There's no
+Supabase CLI in this repo yet, so apply them by hand against your project's
+SQL editor (Supabase dashboard → SQL Editor → paste the file → Run), in
+filename order:
+
+- `0001_plants.sql` — the `plants` table (ticket #3: Plant record CRUD),
+  its row-level security policies, and the private `plant-reference-photos`
+  storage bucket + policies reference photos are uploaded to.
+
+Re-running an already-applied migration is safe — every statement is
+idempotent (`if not exists` / `on conflict do nothing` / `create or
+replace`).
+
 ## Baseline schema conventions
 
-No tables exist yet (Plant/Planting land in later tickets), but every table
-added from here on follows the baseline conventions ADR-0003 calls out as
+Every table follows the baseline conventions ADR-0003 calls out as
 non-negotiable regardless of where the rest of the domain logic runs:
 foreign keys, `NOT NULL` on required columns, and cheap `CHECK`s (e.g.
 `quantity > 0`). See `docs/adr/0003-web-desktop-native-mobile-cloud-backend.md`,
