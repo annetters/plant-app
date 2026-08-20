@@ -81,15 +81,12 @@ open pending a final pass rather than closed prematurely.
   type is now `PlantInput.hardinessZoneRange: { min: number; max: number }`
   in `packages/domain/src/plant.ts`; the UI is two "Min zone"/"Max zone"
   selects.
-- **⚠️ Action needed**: migration `0005_plant_hardiness_zone_range.sql`
-  **drops the old `hardiness_zone` text column** and adds
-  `hardiness_zone_min`/`hardiness_zone_max` — this has **not** been
-  pushed to the linked Supabase project yet (unlike #4's migrations,
-  which were pushed mid-session). If any real Plant row already has a
-  `hardiness_zone` value set, pushing this migration discards it — there
-  is no backfill, since this is a personal single-user app and none of
-  the manual QA so far saved one. Confirm that's still true (or export
-  the value first) before running `npm run db:push`.
+- Migration `0005_plant_hardiness_zone_range.sql` **drops the old
+  `hardiness_zone` text column** and adds `hardiness_zone_min`/
+  `hardiness_zone_max` — no backfill, since this is a personal
+  single-user app and no real Plant row had a `hardiness_zone` value set.
+  **Pushed** to the linked Supabase project (verify with
+  `npx supabase migration list`, which should show `0005` live).
 - Added a divider between the Plant edit page's post-form sections
   (Reference photos, Care task templates, Delete) and restored a bulleted
   list for the Registry's saved-plants list (scoped so Dashboard/other
@@ -194,6 +191,7 @@ Working tree clean (`git status` verified 2026-08-20). Most recent commits
 first:
 
 ```
+91fac04 Update handoff doc for the Plant-form fixes batch
 9b74934 Add Plant field validation, hardiness zone range, and layout fixes
 ffb3e93 Update handoff doc for ticket #4
 8ce7a48 Implementation of Issue 4
@@ -223,14 +221,15 @@ eaf1f32 Add ADR-0003: web desktop + native mobile, cloud BaaS backend
 ```
 
 `2668f2c` (#2), `9018f33`–`1d20b8e` (#3, plus fixes found during manual
-QA), and `4eea9e7`–`9b74934` (#4, plus fixes found during manual QA,
+QA), and `4eea9e7`–`91fac04` (#4, plus fixes found during manual QA,
 including the hardiness-zone-range rework in `9b74934`) are the build
 work so far. #3 is closed on GitHub. #4 is implemented and partially
 verified but **not yet closed on GitHub** — see "What to do next" above
-and "Deferred QA (ticket #4)". `9b74934`'s migration (`0005`) is **not
-yet pushed** — see the "⚠️ Action needed" note above before running
-`npm run db:push`. The remaining 16 tickets (#5–#20) are still unbuilt;
-#21 (filed during #4's QA) is `needs-triage`, not yet scoped for build.
+and "Deferred QA (ticket #4)". All commits, including `9b74934`'s
+migration (`0005`), are pushed — both `git push` and `npm run db:push`
+are done as of this update. The remaining 16 tickets (#5–#20) are still
+unbuilt; #21 (filed during #4's QA) is `needs-triage`, not yet scoped
+for build.
 
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
 > No GPS is read and no user photo is taken — that is exactly why the work was
@@ -241,7 +240,7 @@ yet pushed** — see the "⚠️ Action needed" note above before running
 | Artifact | Path | Purpose |
 |---|---|---|
 | **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output (npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app, Supabase auth, auth-gated Dashboard shell) plus ticket #3's output (`Plant`/`PlantInput` types + `validatePlantInput` in `packages/domain/src/plant.ts`; Registry list + create/view/edit/delete + reference-photo upload in `apps/web/src/routes/Plants*.tsx` and `apps/web/src/plants/`) plus ticket #4's output (`TaskTrigger`/`CareTaskTemplate` types + `validateCareTaskTemplateInput` + `computeTriggerDateRange`/`dateRangeWraps` in `packages/domain/src/careTaskTemplate.ts`; add/list/remove UI in the "Care task templates" section of `apps/web/src/routes/PlantFormPage.tsx`, repository methods on `PlantsRepository`). See `apps/web/README.md` for the one-time Supabase project setup. Not throwaway — build on this. |
-| **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). `0003_care_task_templates.sql` — the `care_task_templates` table, owned by a `plant_id` FK with RLS via a join to `plants` (not a direct `user_id` column). `0004_grant_care_task_templates_table.sql` — the same follow-up GRANT `0002` needed, for the new table. `0001`–`0004` are live on the linked project (verify with `npx supabase migration list`). `0005_plant_hardiness_zone_range.sql` — drops `hardiness_zone`, adds `hardiness_zone_min`/`hardiness_zone_max` (a plant's hardiness rating is a whole-zone range, not a single value — see "What to do next"). **Not yet pushed** — read the "⚠️ Action needed" note before running `npm run db:push`. Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
+| **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). `0003_care_task_templates.sql` — the `care_task_templates` table, owned by a `plant_id` FK with RLS via a join to `plants` (not a direct `user_id` column). `0004_grant_care_task_templates_table.sql` — the same follow-up GRANT `0002` needed, for the new table. `0005_plant_hardiness_zone_range.sql` — drops `hardiness_zone`, adds `hardiness_zone_min`/`hardiness_zone_max` (a plant's hardiness rating is a whole-zone range, not a single value — see "What to do next"). All five (`0001`–`0005`) are live on the linked project as of this update (verify with `npx supabase migration list`). Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
 | **Spec (current)** | [GitHub issue #1](https://github.com/annetters/plant-app/issues/1) | The real spec. 53 user stories, full implementation/testing decisions. Labeled `ready-for-agent`. |
 | Spec (superseded) | `docs/plant-app-spec.md` | The original file-based spec, written before this repo had an issue tracker. Kept for history; has a banner pointing to issue #1. Do not implement against it. |
 | Domain glossary | `CONTEXT.md` | Canonical term definitions — Plant, Planting, Property, Scale Reference, Bed, Landmark (deferred), Pin, Tag Scan, Task model, Registry, Bloom Timeline, Dashboard |
