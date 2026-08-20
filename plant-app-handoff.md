@@ -11,6 +11,30 @@
 project** (sign up, log in, land on the Dashboard shell, session survives
 reload), **and closed on GitHub** — see commit `2668f2c`.
 
+**#3 (Plant record CRUD) is implemented, committed, and manually verified
+against a real Supabase project** — create/view/edit/delete, reference
+photo upload/remove, and every domain-validation error case all passed.
+**Not yet closed on GitHub** — that's a deliberate loose end, not an
+oversight; nobody's told the agent to close it yet. Before picking it up
+as "done":
+
+- Close #3 (`gh issue close 3 --comment ...`) once you're satisfied —
+  this also flips #4 (Care task templates) onto the frontier, since #4's
+  only blocker is #3.
+- Four lower-priority manual QA items were identified but deliberately
+  deferred, not run (see "Deferred QA" below) — direct-URL access to
+  another account's plant, direct-URL access to a nonexistent plant,
+  photo-thumbnail persistence across a page reload, and Registry sort
+  order with multiple plants.
+- Along the way, real bugs surfaced by manual testing (not caught by the
+  automated suite, which mocks Supabase entirely) got fixed in-branch:
+  a `42501 permission denied` 403 on save (newer Supabase projects don't
+  auto-GRANT new public-schema tables to API roles — see
+  `supabase/migrations/0002_grant_plants_table.sql`), missing
+  required-field indicators, unstyled/bunched form layout, no
+  save-confirmation feedback, and unstyled Registry/Dashboard lists. All
+  fixed and committed — see "Current state" below for the commit list.
+
 **Go straight to `/implement`, picking a ticket off the frontier.**
 
 `/to-tickets` has already run against issue #1. Nineteen tickets are
@@ -21,12 +45,15 @@ edges wired between them — see "Issue tracker" below for the full map.
 **The frontier right now** (open tickets with zero open blockers — safe to
 start immediately):
 
-- **#3** — Plant record CRUD (manual entry) — highest-leverage pick, unblocks
-  the most downstream work (#4, #8, and everything past it)
+- **#3** — Plant record CRUD (manual entry) — implemented and verified (see
+  above); still technically "on the frontier" only because it hasn't been
+  closed yet. Don't re-implement it.
 - **#5** — Property + aerial base map — independent of #3, map/base-layer work
 - **#13** — React Native app scaffold + auth — mirrors #2 for mobile
 - **#19** — Tag Scan prototype: OCR placement + USDA data pull — unchanged
   since last update
+
+Once #3 is closed, #4 (Care task templates on Plant) joins the frontier too.
 
 Run `/implement` in a **fresh session**, pointed at whichever ticket number
 you pick — that's the context-hygiene pattern the flow expects (grilling →
@@ -36,6 +63,21 @@ the ticket alone). As each ticket closes, re-run the frontier query (see
 
 Nothing here is stale-checked for you the way the old "three uncommitted
 files" note used to be — `git status` was clean as of this update.
+
+### Deferred QA (ticket #3)
+
+Not run yet, lower priority than the core checklist (which passed in full):
+
+1. **Direct URL to another account's plant ID** — log in as account A, copy
+   a plant's `/registry/<id>` URL, log in as account B, paste it directly.
+   Expected: "Plant not found." (RLS `.maybeSingle()` returns null), not a
+   data leak or raw error.
+2. **Direct URL to a nonexistent plant ID** — same expected result.
+3. **Reload persistence for photos** — upload a reference photo, refresh
+   the page, confirm the thumbnail still renders (exercises the signed-URL
+   fetch on a fresh load, not just in-session state).
+4. **Multiple plants, alphabetical ordering** — add 2-3 plants with
+   different common names, confirm the Registry list sorts by name.
 
 ---
 
@@ -68,10 +110,20 @@ Domain glossary: `CONTEXT.md`
 
 ## Current state
 
-Nine commits, working tree clean (`git status` verified 2026-08-19):
+Working tree clean (`git status` verified 2026-08-19). Most recent commits
+first:
 
 ```
+1d20b8e Fix list styling on the Registry/Dashboard pages
+97550cc Show a confirmation after saving a Plant
+a702ec2 Fix spacing for elements outside <form>
+49a72dc Add minimal form styling
+285c72b Fix plant save 403 and mark required fields visibly
+e847b57 Add Supabase CLI for remote-only migration management
+9018f33 Add Plant record CRUD with reference photos (#3)
+a728d88 Updated handoff doc after ticket 2
 2668f2c Scaffold monorepo, Supabase auth, and web dashboard shell (#2)
+9b22c43 Updated handoff doc, pre-implementation
 1f756b1 Resolve bezier-pen scope, flag OCR execution as still open, refresh handoff
 eaf1f32 Add ADR-0003: web desktop + native mobile, cloud BaaS backend
 86f3772 Design Property, Scale Reference, and Tag Scan; correct base-layer purpose
@@ -82,9 +134,10 @@ eaf1f32 Add ADR-0003: web desktop + native mobile, cloud BaaS backend
 3697144 Init files
 ```
 
-`2668f2c` is the first actual build work — ticket #2, closed on GitHub.
-Everything before it is docs/prototypes/spec. The remaining 18 tickets
-(#3–#20) are still unbuilt.
+`2668f2c` (#2) and `9018f33`–`1d20b8e` (#3, plus fixes found during manual
+QA) are the build work so far. #3 is implemented and verified but **not
+yet closed on GitHub** — see "What to do next" above. The remaining 17
+tickets (#4–#20) are still unbuilt.
 
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
 > No GPS is read and no user photo is taken — that is exactly why the work was
@@ -94,7 +147,8 @@ Everything before it is docs/prototypes/spec. The remaining 18 tickets
 
 | Artifact | Path | Purpose |
 |---|---|---|
-| **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output: npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app with working Supabase auth and an auth-gated Dashboard shell. See `apps/web/README.md` for the one-time Supabase project setup (creating the project and dropping its URL/key into `.env.local` — already done for the project's own Supabase instance, but needed again on a fresh machine/clone). Not throwaway — build on this. |
+| **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output (npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app, Supabase auth, auth-gated Dashboard shell) plus ticket #3's output (`Plant`/`PlantInput` types + `validatePlantInput` in `packages/domain/src/plant.ts`; Registry list + create/view/edit/delete + reference-photo upload in `apps/web/src/routes/Plants*.tsx` and `apps/web/src/plants/`). See `apps/web/README.md` for the one-time Supabase project setup. Not throwaway — build on this. |
+| **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
 | **Spec (current)** | [GitHub issue #1](https://github.com/annetters/plant-app/issues/1) | The real spec. 53 user stories, full implementation/testing decisions. Labeled `ready-for-agent`. |
 | Spec (superseded) | `docs/plant-app-spec.md` | The original file-based spec, written before this repo had an issue tracker. Kept for history; has a banner pointing to issue #1. Do not implement against it. |
 | Domain glossary | `CONTEXT.md` | Canonical term definitions — Plant, Planting, Property, Scale Reference, Bed, Landmark (deferred), Pin, Tag Scan, Task model, Registry, Bloom Timeline, Dashboard |
@@ -248,7 +302,9 @@ Ticket map (dependency order; title abbreviated):
 
 **Frontier query**: open issues with `issue_dependencies_summary.blocked_by
 == 0` and no assignee. #2 is closed. Right now that's **#3, #5, #13, #19** —
-see "What to do next" above.
+but #3 is implemented and verified, just not yet closed (see "What to do
+next" above); treat #5, #13, #19 as the actual next picks. Closing #3 also
+flips #4 onto the frontier.
 
 ---
 
@@ -285,3 +341,9 @@ time.
   — that file is explicitly superseded and says so at the top.
 - GitHub issues are the source of truth for work tracking — run
   `gh issue list` before starting new work to avoid duplication.
+- **Prefer Docker-free tooling.** Stated explicitly when setting up the
+  Supabase CLI — use it in remote-only mode (`db push`/`db diff`/`gen
+  types` against the linked hosted project) rather than `supabase start`,
+  which needs a local Postgres-in-Docker stack. Applies beyond Supabase:
+  default to a Docker-free path for other dev tooling in this repo too,
+  unless told otherwise.
