@@ -57,11 +57,23 @@ export function validateCareTaskTemplateInput(
 }
 
 /**
+ * True when a date-range trigger's start falls later in the calendar than
+ * its end (e.g. Nov 15 -> Feb 15) — a deliberately supported window that
+ * wraps into the following year, not a data-entry mistake. Exported so the
+ * UI can flag this to the user rather than rendering it indistinguishably
+ * from a plain within-year range.
+ */
+export function dateRangeWraps(trigger: DateRangeTrigger): boolean {
+  return (
+    trigger.start.month > trigger.end.month ||
+    (trigger.start.month === trigger.end.month && trigger.start.day > trigger.end.day)
+  );
+}
+
+/**
  * The computed date range a date-range trigger falls in for a given year, or
  * `null` for a seasonal-marker trigger — which has no computed date per
- * CONTEXT.md ("freeform reminder text, no computed date"). A start month/day
- * later in the calendar than the end (e.g. Nov 15 -> Feb 15) is treated as a
- * window that wraps into the following year.
+ * CONTEXT.md ("freeform reminder text, no computed date").
  */
 export function computeTriggerDateRange(
   trigger: TaskTrigger,
@@ -70,10 +82,7 @@ export function computeTriggerDateRange(
   if (trigger.type === "seasonal-marker") return null;
 
   const start = new Date(Date.UTC(year, trigger.start.month - 1, trigger.start.day));
-  const wraps =
-    trigger.start.month > trigger.end.month ||
-    (trigger.start.month === trigger.end.month && trigger.start.day > trigger.end.day);
-  const endYear = wraps ? year + 1 : year;
+  const endYear = dateRangeWraps(trigger) ? year + 1 : year;
   const end = new Date(Date.UTC(endYear, trigger.end.month - 1, trigger.end.day));
 
   return { start, end };

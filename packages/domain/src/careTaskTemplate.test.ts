@@ -3,9 +3,11 @@ import {
   careTaskTemplateFromRow,
   careTaskTemplateInputToRow,
   computeTriggerDateRange,
+  dateRangeWraps,
   validateCareTaskTemplateInput,
   type CareTaskTemplateInput,
   type CareTaskTemplateRow,
+  type DateRangeTrigger,
   type TaskTrigger,
 } from "./careTaskTemplate.js";
 
@@ -62,6 +64,44 @@ describe("validateCareTaskTemplateInput", () => {
     );
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.errors["trigger.text"]).toBeDefined();
+  });
+});
+
+describe("dateRangeWraps", () => {
+  it("is false for a range within a single year", () => {
+    const trigger: DateRangeTrigger = {
+      type: "date-range",
+      start: { month: 4, day: 1 },
+      end: { month: 4, day: 15 },
+    };
+    expect(dateRangeWraps(trigger)).toBe(false);
+  });
+
+  it("is true when the start falls later in the calendar than the end", () => {
+    const trigger: DateRangeTrigger = {
+      type: "date-range",
+      start: { month: 6, day: 1 },
+      end: { month: 1, day: 1 },
+    };
+    expect(dateRangeWraps(trigger)).toBe(true);
+  });
+
+  it("is true for a same-month range where the start day is after the end day", () => {
+    const trigger: DateRangeTrigger = {
+      type: "date-range",
+      start: { month: 4, day: 20 },
+      end: { month: 4, day: 5 },
+    };
+    expect(dateRangeWraps(trigger)).toBe(true);
+  });
+
+  it("is false for a single-day range (start equals end)", () => {
+    const trigger: DateRangeTrigger = {
+      type: "date-range",
+      start: { month: 4, day: 1 },
+      end: { month: 4, day: 1 },
+    };
+    expect(dateRangeWraps(trigger)).toBe(false);
   });
 });
 

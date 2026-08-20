@@ -26,6 +26,7 @@ export {
   careTaskTemplateFromRow,
   careTaskTemplateInputToRow,
   computeTriggerDateRange,
+  dateRangeWraps,
   validateCareTaskTemplateInput,
 } from "./careTaskTemplate.js";
 export type {

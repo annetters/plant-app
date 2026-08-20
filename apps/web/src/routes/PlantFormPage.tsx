@@ -2,6 +2,7 @@ import {
   FOLIAGE_TYPES,
   NATIVE_STATUSES,
   SUN_REQUIREMENTS,
+  dateRangeWraps,
   validateCareTaskTemplateInput,
   validatePlantInput,
   type CareTaskTemplate,
@@ -28,7 +29,8 @@ function formatOption(value: string): string {
 function formatTrigger(trigger: TaskTrigger): string {
   if (trigger.type === 'seasonal-marker') return trigger.text
   const { start, end } = trigger
-  return `${start.month}/${start.day} – ${end.month}/${end.day}`
+  const range = `${start.month}/${start.day} – ${end.month}/${end.day}`
+  return dateRangeWraps(trigger) ? `${range} (wraps to the following year)` : range
 }
 
 const EMPTY_TEMPLATE_FORM = {
@@ -39,6 +41,17 @@ const EMPTY_TEMPLATE_FORM = {
   endMonth: '',
   endDay: '',
   seasonalText: '',
+}
+
+/** Whether the in-progress date-range fields represent a wraparound — `false` while any field is still blank. */
+function templateFormDateRangeWraps(form: typeof EMPTY_TEMPLATE_FORM): boolean {
+  const { startMonth, startDay, endMonth, endDay } = form
+  if (!startMonth || !startDay || !endMonth || !endDay) return false
+  return dateRangeWraps({
+    type: 'date-range',
+    start: { month: Number(startMonth), day: Number(startDay) },
+    end: { month: Number(endMonth), day: Number(endDay) },
+  })
 }
 
 export function PlantFormPage() {
@@ -62,6 +75,8 @@ export function PlantFormPage() {
   const [templateErrors, setTemplateErrors] = useState<CareTaskTemplateValidationErrors>({})
   const [templateTriggerTypeError, setTemplateTriggerTypeError] = useState<string | null>(null)
   const [templateBusy, setTemplateBusy] = useState(false)
+  const [templateFormError, setTemplateFormError] = useState<string | null>(null)
+  const [templateStatusMessage, setTemplateStatusMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (!plantId) return
@@ -247,6 +262,7 @@ export function PlantFormPage() {
   ) {
     setTemplateForm((current) => ({ ...current, [key]: value }))
     if (key === 'triggerType') setTemplateTriggerTypeError(null)
+    setTemplateStatusMessage(null)
   }
 
   async function handleAddCareTaskTemplate(event: FormEvent) {
@@ -276,15 +292,15 @@ export function PlantFormPage() {
     }
     setTemplateErrors({})
     setTemplateBusy(true)
-    setFormError(null)
-    setStatusMessage(null)
+    setTemplateFormError(null)
+    setTemplateStatusMessage(null)
     try {
       const created = await repository.createCareTaskTemplate(input)
       setCareTaskTemplates((current) => [...current, created])
       setTemplateForm(EMPTY_TEMPLATE_FORM)
-      setStatusMessage('Task template added.')
+      setTemplateStatusMessage('Task template added.')
     } catch {
-      setFormError('Could not add this task template. Please try again.')
+      setTemplateFormError('Could not add this task template. Please try again.')
     } finally {
       setTemplateBusy(false)
     }
@@ -292,13 +308,14 @@ export function PlantFormPage() {
 
   async function handleRemoveCareTaskTemplate(id: string) {
     setTemplateBusy(true)
-    setFormError(null)
-    setStatusMessage(null)
+    setTemplateFormError(null)
+    setTemplateStatusMessage(null)
     try {
       await repository.removeCareTaskTemplate(id)
       setCareTaskTemplates((current) => current.filter((template) => template.id !== id))
+      setTemplateStatusMessage('Task template removed.')
     } catch {
-      setFormError('Could not remove this task template. Please try again.')
+      setTemplateFormError('Could not remove this task template. Please try again.')
     } finally {
       setTemplateBusy(false)
     }
@@ -601,6 +618,9 @@ export function PlantFormPage() {
                     {templateErrors['trigger.start'] ?? templateErrors['trigger.end']}
                   </p>
                 )}
+                {templateFormDateRangeWraps(templateForm) && (
+                  <p>This range wraps into the following year.</p>
+                )}
               </fieldset>
             )}
 
@@ -616,6 +636,9 @@ export function PlantFormPage() {
                 {templateErrors['trigger.text'] && <p role="alert">{templateErrors['trigger.text']}</p>}
               </>
             )}
+
+            {templateFormError && <p role="alert">{templateFormError}</p>}
+            {templateStatusMessage && <p role="status">{templateStatusMessage}</p>}
 
             <button type="submit" disabled={templateBusy}>
               Add task template

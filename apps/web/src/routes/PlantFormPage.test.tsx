@@ -208,6 +208,30 @@ describe('PlantFormPage — care task templates', () => {
       date_end_day: 15,
     })
     expect(await screen.findByText('Prune', { exact: false })).toBeInTheDocument()
+    expect(await screen.findByText('Task template added.')).toBeInTheDocument()
+  })
+
+  it('flags a wraparound date range while entering it, and again once listed', async () => {
+    const user = userEvent.setup()
+    const fake = renderAt('/registry/p1', [row({ id: 'p1' })])
+
+    await screen.findByDisplayValue('Coneflower')
+    await user.type(screen.getByLabelText('Name'), 'Overwinter prep')
+    await user.selectOptions(screen.getByLabelText('Trigger type'), 'date-range')
+    await user.type(screen.getByLabelText('Trigger start month'), '6')
+    await user.type(screen.getByLabelText('Trigger start day'), '1')
+    await user.type(screen.getByLabelText('Trigger end month'), '1')
+    await user.type(screen.getByLabelText('Trigger end day'), '1')
+
+    expect(await screen.findByText('This range wraps into the following year.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Add task template' }))
+
+    await waitFor(() => expect(fake.careTaskTemplateRows()).toHaveLength(1))
+    expect(
+      await screen.findByText('Overwinter prep', { exact: false }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('6/1 – 1/1 (wraps to the following year)', { exact: false })).toBeInTheDocument()
   })
 
   it('adds a seasonal-marker task template', async () => {
