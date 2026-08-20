@@ -112,6 +112,22 @@ code {
   background: var(--code-bg);
 }
 
+/*
+ * Applies to every list inside <main> (Dashboard tiles, the Registry
+ * list, reference-photo thumbnails) — plain marker/alignment reset, not
+ * page-specific. main:has(form) ul below overrides just the direction for
+ * the reference-photos thumbnail row.
+ */
+main ul {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
 form {
   display: flex;
   flex-direction: column;
@@ -192,6 +208,7 @@ main:has(form) input[type='file'] {
 
 main:has(form) ul {
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
   gap: 12px;
   margin: 8px 0;
