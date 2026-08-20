@@ -11,9 +11,13 @@
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "test:run": "npm run test:run --workspaces --if-present"
+    "test:run": "npm run test:run --workspaces --if-present",
+    "db:push": "supabase db push",
+    "db:diff": "supabase db diff",
+    "db:types": "supabase gen types typescript --linked --schema public"
   },
   "devDependencies": {
+    "supabase": "^2.115.0",
     "typescript": "~6.0.2",
     "vitest": "^4.1.11"
   }

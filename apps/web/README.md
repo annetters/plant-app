@@ -22,18 +22,44 @@ human can do:
 
 ## One-time setup: database schema
 
-SQL migrations live in `supabase/migrations/` at the repo root. There's no
-Supabase CLI in this repo yet, so apply them by hand against your project's
-SQL editor (Supabase dashboard → SQL Editor → paste the file → Run), in
-filename order:
+SQL migrations live in `supabase/migrations/` at the repo root, applied via
+the Supabase CLI (`supabase` — a root npm dev dependency, so `npx supabase
+...` or the `npm run db:*` scripts below both work with no separate
+install). This project only ever uses the CLI against the *remote* hosted
+project — never `supabase start`, which spins up a full local Postgres
+stack in Docker. That keeps this workflow Docker-free.
+
+Linking the CLI to your project is a one-time, per-machine, human step (it
+needs an interactive browser login):
+
+```
+npx supabase login                          # opens a browser to authenticate
+npx supabase link --project-ref <your-ref>  # Project Settings → General → Reference ID
+```
+
+From then on, applying migrations is:
+
+```
+npm run db:push   # supabase db push — applies supabase/migrations/*.sql to the linked project
+```
+
+Currently applied:
 
 - `0001_plants.sql` — the `plants` table (ticket #3: Plant record CRUD),
   its row-level security policies, and the private `plant-reference-photos`
   storage bucket + policies reference photos are uploaded to.
 
-Re-running an already-applied migration is safe — every statement is
-idempotent (`if not exists` / `on conflict do nothing` / `create or
-replace`).
+Every migration here is written idempotently (`if not exists` / `on
+conflict do nothing` / `create or replace`), so re-running is always safe —
+useful if you ever do apply one by hand (Supabase dashboard → SQL Editor)
+instead of via the CLI.
+
+Other useful CLI commands once linked:
+
+```
+npm run db:diff    # supabase db diff — compares local migrations against the linked project's schema
+npm run db:types   # supabase gen types typescript --linked — prints generated row types to stdout
+```
 
 ## Baseline schema conventions
 
