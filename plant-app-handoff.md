@@ -7,6 +7,10 @@
 
 ## What to do next
 
+**#2 is implemented, committed, manually verified against a real Supabase
+project** (sign up, log in, land on the Dashboard shell, session survives
+reload), **and closed on GitHub** — see commit `2668f2c`.
+
 **Go straight to `/implement`, picking a ticket off the frontier.**
 
 `/to-tickets` has already run against issue #1. Nineteen tickets are
@@ -17,8 +21,12 @@ edges wired between them — see "Issue tracker" below for the full map.
 **The frontier right now** (open tickets with zero open blockers — safe to
 start immediately):
 
-- **#2** — Repo scaffold, Supabase backend, and web auth walking skeleton
-- **#19** — Tag Scan prototype: OCR placement + USDA data pull
+- **#3** — Plant record CRUD (manual entry) — highest-leverage pick, unblocks
+  the most downstream work (#4, #8, and everything past it)
+- **#5** — Property + aerial base map — independent of #3, map/base-layer work
+- **#13** — React Native app scaffold + auth — mirrors #2 for mobile
+- **#19** — Tag Scan prototype: OCR placement + USDA data pull — unchanged
+  since last update
 
 Run `/implement` in a **fresh session**, pointed at whichever ticket number
 you pick — that's the context-hygiene pattern the flow expects (grilling →
@@ -60,9 +68,10 @@ Domain glossary: `CONTEXT.md`
 
 ## Current state
 
-Eight commits, working tree clean (`git status` verified 2026-08-19):
+Nine commits, working tree clean (`git status` verified 2026-08-19):
 
 ```
+2668f2c Scaffold monorepo, Supabase auth, and web dashboard shell (#2)
 1f756b1 Resolve bezier-pen scope, flag OCR execution as still open, refresh handoff
 eaf1f32 Add ADR-0003: web desktop + native mobile, cloud BaaS backend
 86f3772 Design Property, Scale Reference, and Tag Scan; correct base-layer purpose
@@ -73,8 +82,9 @@ eaf1f32 Add ADR-0003: web desktop + native mobile, cloud BaaS backend
 3697144 Init files
 ```
 
-No code has been written yet — these commits are all docs/prototypes/spec.
-The 19 tickets (#2–#20) are the first actual build work.
+`2668f2c` is the first actual build work — ticket #2, closed on GitHub.
+Everything before it is docs/prototypes/spec. The remaining 18 tickets
+(#3–#20) are still unbuilt.
 
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
 > No GPS is read and no user photo is taken — that is exactly why the work was
@@ -84,6 +94,7 @@ The 19 tickets (#2–#20) are the first actual build work.
 
 | Artifact | Path | Purpose |
 |---|---|---|
+| **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output: npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app with working Supabase auth and an auth-gated Dashboard shell. See `apps/web/README.md` for the one-time Supabase project setup (creating the project and dropping its URL/key into `.env.local` — already done for the project's own Supabase instance, but needed again on a fresh machine/clone). Not throwaway — build on this. |
 | **Spec (current)** | [GitHub issue #1](https://github.com/annetters/plant-app/issues/1) | The real spec. 53 user stories, full implementation/testing decisions. Labeled `ready-for-agent`. |
 | Spec (superseded) | `docs/plant-app-spec.md` | The original file-based spec, written before this repo had an issue tracker. Kept for history; has a banner pointing to issue #1. Do not implement against it. |
 | Domain glossary | `CONTEXT.md` | Canonical term definitions — Plant, Planting, Property, Scale Reference, Bed, Landmark (deferred), Pin, Tag Scan, Task model, Registry, Bloom Timeline, Dashboard |
@@ -215,7 +226,7 @@ Ticket map (dependency order; title abbreviated):
 
 | # | Ticket | Blocked by |
 |---|---|---|
-| 2 | Repo scaffold, Supabase backend, web auth skeleton | — |
+| 2 | Repo scaffold, Supabase backend, web auth skeleton | — (built, `2668f2c`, closed) |
 | 3 | Plant record CRUD (manual entry) | 2 |
 | 4 | Care task templates on Plant | 3 |
 | 5 | Property + aerial base map | 2 |
@@ -236,8 +247,8 @@ Ticket map (dependency order; title abbreviated):
 | 20 | Tag Scan build | 3, 13, 19 |
 
 **Frontier query**: open issues with `issue_dependencies_summary.blocked_by
-== 0` and no assignee. Right now that's **#2** and **#19** — see "What to do
-next" above.
+== 0` and no assignee. #2 is closed. Right now that's **#3, #5, #13, #19** —
+see "What to do next" above.
 
 ---
 
