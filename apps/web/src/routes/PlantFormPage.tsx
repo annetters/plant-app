@@ -32,6 +32,7 @@ export function PlantFormPage() {
   const [loading, setLoading] = useState(isEditing)
   const [errors, setErrors] = useState<PlantValidationErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [photoBusy, setPhotoBusy] = useState(false)
 
@@ -82,6 +83,8 @@ export function PlantFormPage() {
 
   function updateField<K extends keyof PlantFormFields>(key: K, value: PlantFormFields[K]) {
     setFields((current) => ({ ...current, [key]: value }))
+    // An edit invalidates whatever "Saved." confirmation is currently showing.
+    setStatusMessage(null)
   }
 
   async function handleSubmit(event: FormEvent) {
@@ -89,10 +92,12 @@ export function PlantFormPage() {
     const input = validatedInputFor(referencePhotoPaths)
     if (!input) return
     setFormError(null)
+    setStatusMessage(null)
     setSubmitting(true)
     try {
       if (plantId) {
         await repository.update(plantId, input)
+        setStatusMessage('Saved.')
       } else {
         const created = await repository.create(input)
         navigate(`/registry/${created.id}`, { replace: true })
@@ -126,6 +131,7 @@ export function PlantFormPage() {
     if (!plantId || !fileList || fileList.length === 0) return
     setPhotoBusy(true)
     setFormError(null)
+    setStatusMessage(null)
     let uploadedPaths: string[] = []
     try {
       uploadedPaths = await Promise.all(
@@ -139,6 +145,7 @@ export function PlantFormPage() {
       }
       await repository.update(plantId, input)
       setReferencePhotoPaths(nextPaths)
+      setStatusMessage(uploadedPaths.length > 1 ? 'Photos added.' : 'Photo added.')
     } catch {
       // Roll back any upload that never made it onto the Plant's row, so a
       // validation or save failure doesn't leave orphaned storage objects.
@@ -163,12 +170,14 @@ export function PlantFormPage() {
     }
     setPhotoBusy(true)
     setFormError(null)
+    setStatusMessage(null)
     try {
       // Storage first: if this fails, the Plant row is never touched, so
       // nothing goes out of sync between what's stored and what's referenced.
       await repository.removeReferencePhoto(path)
       await repository.update(plantId, input)
       setReferencePhotoPaths(nextPaths)
+      setStatusMessage('Photo removed.')
     } catch {
       setFormError('Could not remove this photo. Please try again.')
     } finally {
@@ -357,6 +366,7 @@ export function PlantFormPage() {
         </select>
 
         {formError && <p role="alert">{formError}</p>}
+        {statusMessage && <p role="status">{statusMessage}</p>}
 
         <button type="submit" disabled={submitting}>
           {isEditing ? 'Save changes' : 'Add Plant'}

@@ -76,6 +76,18 @@ describe('PlantFormPage — edit/view/delete', () => {
     await waitFor(() => expect(fake.rows()[0].common_name).toBe('Purple Coneflower'))
   })
 
+  it('confirms a save with a status message, clearing it once the plant is edited again', async () => {
+    const user = userEvent.setup()
+    renderAt('/registry/p1', [row({ id: 'p1', common_name: 'Coneflower' })])
+
+    const commonName = await screen.findByDisplayValue('Coneflower')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+
+    await user.type(commonName, ' variant')
+    expect(screen.queryByText('Saved.')).not.toBeInTheDocument()
+  })
+
   it('deletes the Plant after confirmation', async () => {
     const user = userEvent.setup()
     const fake = renderAt('/registry/p1', [row({ id: 'p1' })])
