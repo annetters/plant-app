@@ -11,6 +11,18 @@ export const SUN_REQUIREMENTS: readonly SunRequirement[] = [
 export const FOLIAGE_TYPES: readonly FoliageType[] = ["deciduous", "evergreen"];
 export const NATIVE_STATUSES: readonly NativeStatus[] = ["native", "non-native"];
 
+/**
+ * The USDA's 13 whole hardiness zone numbers. A Plant's own hardiness
+ * rating is always a *range* of whole zones (a nursery tag reads "Zones
+ * 5-7", never "Zones 5a-7b") — the a/b half-zone precision only applies to
+ * a single real-world location's zone, not a plant's tolerance range, so
+ * it has no place here. See `HardinessZoneRange`.
+ */
+export const HARDINESS_ZONE_NUMBERS: readonly number[] = Array.from(
+  { length: 13 },
+  (_, i) => i + 1,
+);
+
 /** Month/day only — a bloom window is year-independent, per CONTEXT.md. */
 export interface MonthDay {
   month: number;
@@ -22,6 +34,12 @@ export interface BloomWindow {
   end: MonthDay;
 }
 
+/** The whole-zone range a Plant is rated hardy across, e.g. `{ min: 5, max: 7 }` for a tag reading "Zones 5-7". A single-zone rating is `min === max`. */
+export interface HardinessZoneRange {
+  min: number;
+  max: number;
+}
+
 export interface PlantInput {
   commonName: string;
   scientificName: string;
@@ -31,7 +49,7 @@ export interface PlantInput {
   sunRequirement?: SunRequirement;
   matureHeightInches?: number;
   matureSpreadInches?: number;
-  hardinessZone?: string;
+  hardinessZoneRange?: HardinessZoneRange;
   foliageType?: FoliageType;
   nativeStatus?: NativeStatus;
   referencePhotoPaths?: string[];
@@ -46,7 +64,14 @@ export interface Plant extends Omit<PlantInput, "referencePhotoPaths"> {
 }
 
 export type PlantValidationErrors = Partial<
-  Record<keyof PlantInput | "bloomWindow.start" | "bloomWindow.end", string>
+  Record<
+    | keyof PlantInput
+    | "bloomWindow.start"
+    | "bloomWindow.end"
+    | "hardinessZoneRange.min"
+    | "hardinessZoneRange.max",
+    string
+  >
 >;
 
 export type PlantValidationResult =
@@ -57,7 +82,11 @@ export type PlantValidationResult =
 // recurring Feb 29 bloom day is valid rather than tied to leap years.
 const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
-const HARDINESS_ZONE_PATTERN = /^([1-9]|1[0-3])[ab]?$/;
+// A free-text identity/descriptive field (name, cultivar, color) is
+// meaningless as digits/punctuation alone — "000" isn't a common name.
+// Unicode-aware (\p{L}) so a name written entirely in a non-Latin script
+// (e.g. Cyrillic, Japanese) isn't wrongly rejected as letterless.
+const LETTER_PATTERN = /\p{L}/u;
 
 export function isValidMonthDay(value: MonthDay): boolean {
   if (!Number.isInteger(value.month) || value.month < 1 || value.month > 12) return false;
@@ -65,11 +94,38 @@ export function isValidMonthDay(value: MonthDay): boolean {
   return value.day <= DAYS_IN_MONTH[value.month - 1];
 }
 
+/** A required free-text field: blank first, then must contain a letter. */
+function requiredTextError(value: string, fieldName: string): string | undefined {
+  if (!value.trim()) return `${fieldName} is required.`;
+  if (!LETTER_PATTERN.test(value)) return `${fieldName} must include a letter.`;
+  return undefined;
+}
+
+/** An optional free-text field: blank is fine (omitted), but if present must contain a letter. */
+function optionalTextError(value: string, fieldName: string): string | undefined {
+  if (!value.trim()) return undefined;
+  if (!LETTER_PATTERN.test(value)) return `${fieldName} must include a letter.`;
+  return undefined;
+}
+
 export function validatePlantInput(input: PlantInput): PlantValidationResult {
   const errors: PlantValidationErrors = {};
 
-  if (!input.commonName.trim()) errors.commonName = "Common name is required.";
-  if (!input.scientificName.trim()) errors.scientificName = "Scientific name is required.";
+  const commonNameError = requiredTextError(input.commonName, "Common name");
+  if (commonNameError) errors.commonName = commonNameError;
+
+  const scientificNameError = requiredTextError(input.scientificName, "Scientific name");
+  if (scientificNameError) errors.scientificName = scientificNameError;
+
+  if (input.cultivar !== undefined) {
+    const cultivarError = optionalTextError(input.cultivar, "Cultivar");
+    if (cultivarError) errors.cultivar = cultivarError;
+  }
+
+  if (input.flowerColor !== undefined) {
+    const flowerColorError = optionalTextError(input.flowerColor, "Flower color");
+    if (flowerColorError) errors.flowerColor = flowerColorError;
+  }
 
   if (input.bloomWindow) {
     if (!isValidMonthDay(input.bloomWindow.start)) {
@@ -87,12 +143,15 @@ export function validatePlantInput(input: PlantInput): PlantValidationResult {
     errors.matureSpreadInches = "Mature spread must be greater than zero.";
   }
 
-  if (
-    input.hardinessZone !== undefined &&
-    input.hardinessZone !== "" &&
-    !HARDINESS_ZONE_PATTERN.test(input.hardinessZone)
-  ) {
-    errors.hardinessZone = 'Hardiness zone must look like "6a" or "7".';
+  if (input.hardinessZoneRange) {
+    const { min, max } = input.hardinessZoneRange;
+    const minValid = HARDINESS_ZONE_NUMBERS.includes(min);
+    const maxValid = HARDINESS_ZONE_NUMBERS.includes(max);
+    if (!minValid) errors["hardinessZoneRange.min"] = "Min zone must be a standard USDA zone (1-13).";
+    if (!maxValid) errors["hardinessZoneRange.max"] = "Max zone must be a standard USDA zone (1-13).";
+    if (minValid && maxValid && max < min) {
+      errors["hardinessZoneRange.max"] = "Max zone must be at least the min zone.";
+    }
   }
 
   if (input.sunRequirement !== undefined && !SUN_REQUIREMENTS.includes(input.sunRequirement)) {
@@ -122,7 +181,8 @@ export interface PlantRow {
   sun_requirement: string | null;
   mature_height_inches: number | null;
   mature_spread_inches: number | null;
-  hardiness_zone: string | null;
+  hardiness_zone_min: number | null;
+  hardiness_zone_max: number | null;
   foliage_type: string | null;
   native_status: string | null;
   reference_photo_paths: string[];
@@ -145,7 +205,8 @@ export function plantInputToRow(
     sun_requirement: input.sunRequirement ?? null,
     mature_height_inches: input.matureHeightInches ?? null,
     mature_spread_inches: input.matureSpreadInches ?? null,
-    hardiness_zone: input.hardinessZone ?? null,
+    hardiness_zone_min: input.hardinessZoneRange?.min ?? null,
+    hardiness_zone_max: input.hardinessZoneRange?.max ?? null,
     foliage_type: input.foliageType ?? null,
     native_status: input.nativeStatus ?? null,
     reference_photo_paths: input.referencePhotoPaths ?? [],
@@ -162,6 +223,11 @@ export function plantFromRow(row: PlantRow): Plant {
           start: { month: row.bloom_start_month, day: row.bloom_start_day },
           end: { month: row.bloom_end_month, day: row.bloom_end_day },
         }
+      : undefined;
+
+  const hardinessZoneRange: HardinessZoneRange | undefined =
+    row.hardiness_zone_min !== null && row.hardiness_zone_max !== null
+      ? { min: row.hardiness_zone_min, max: row.hardiness_zone_max }
       : undefined;
 
   return {
@@ -182,7 +248,7 @@ export function plantFromRow(row: PlantRow): Plant {
     ...(row.mature_spread_inches !== null && {
       matureSpreadInches: row.mature_spread_inches,
     }),
-    ...(row.hardiness_zone !== null && { hardinessZone: row.hardiness_zone }),
+    ...(hardinessZoneRange && { hardinessZoneRange }),
     ...(row.foliage_type !== null && { foliageType: row.foliage_type as FoliageType }),
     ...(row.native_status !== null && { nativeStatus: row.native_status as NativeStatus }),
     referencePhotoPaths: row.reference_photo_paths,

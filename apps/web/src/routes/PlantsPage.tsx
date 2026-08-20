@@ -34,7 +34,7 @@ export function PlantsPage() {
       {plants === null && !error && <p>Loading…</p>}
       {plants && plants.length === 0 && <p>No plants yet — add your first one.</p>}
       {plants && plants.length > 0 && (
-        <ul>
+        <ul className="plant-list">
           {plants.map((plant) => (
             <li key={plant.id}>
               <Link to={`/registry/${plant.id}`}>

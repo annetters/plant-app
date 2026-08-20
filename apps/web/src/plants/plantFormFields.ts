@@ -13,7 +13,8 @@ export interface PlantFormFields {
   sunRequirement: SunRequirement | ''
   matureHeightInches: string
   matureSpreadInches: string
-  hardinessZone: string
+  hardinessZoneMin: string
+  hardinessZoneMax: string
   foliageType: FoliageType | ''
   nativeStatus: NativeStatus | ''
 }
@@ -30,7 +31,8 @@ export const EMPTY_PLANT_FORM_FIELDS: PlantFormFields = {
   sunRequirement: '',
   matureHeightInches: '',
   matureSpreadInches: '',
-  hardinessZone: '',
+  hardinessZoneMin: '',
+  hardinessZoneMax: '',
   foliageType: '',
   nativeStatus: '',
 }
@@ -48,7 +50,8 @@ export function plantFormFieldsFromPlant(plant: Plant): PlantFormFields {
     sunRequirement: plant.sunRequirement ?? '',
     matureHeightInches: plant.matureHeightInches !== undefined ? String(plant.matureHeightInches) : '',
     matureSpreadInches: plant.matureSpreadInches !== undefined ? String(plant.matureSpreadInches) : '',
-    hardinessZone: plant.hardinessZone ?? '',
+    hardinessZoneMin: plant.hardinessZoneRange ? String(plant.hardinessZoneRange.min) : '',
+    hardinessZoneMax: plant.hardinessZoneRange ? String(plant.hardinessZoneRange.max) : '',
     foliageType: plant.foliageType ?? '',
     nativeStatus: plant.nativeStatus ?? '',
   }
@@ -70,6 +73,9 @@ export function plantInputFromFormFields(
     fields.bloomEndDay,
   ].some((value) => value !== '')
 
+  const hardinessZoneRangeStarted =
+    fields.hardinessZoneMin !== '' || fields.hardinessZoneMax !== ''
+
   return {
     commonName: fields.commonName,
     scientificName: fields.scientificName,
@@ -88,7 +94,12 @@ export function plantInputFromFormFields(
     ...(fields.matureSpreadInches !== '' && {
       matureSpreadInches: Number(fields.matureSpreadInches),
     }),
-    ...(fields.hardinessZone !== '' && { hardinessZone: fields.hardinessZone }),
+    ...(hardinessZoneRangeStarted && {
+      hardinessZoneRange: {
+        min: Number(fields.hardinessZoneMin),
+        max: Number(fields.hardinessZoneMax),
+      },
+    }),
     ...(fields.foliageType !== '' && { foliageType: fields.foliageType }),
     ...(fields.nativeStatus !== '' && { nativeStatus: fields.nativeStatus }),
     referencePhotoPaths,

@@ -35,6 +35,22 @@ describe('PlantFormPage — create', () => {
     expect(fake.rows()).toHaveLength(0)
   })
 
+  it('rejects a common name, cultivar, or flower color with no letters', async () => {
+    const user = userEvent.setup()
+    const fake = renderAt('/registry/new')
+
+    await user.type(screen.getByLabelText('Common name *'), '000')
+    await user.type(screen.getByLabelText('Scientific name *'), 'Echinacea purpurea')
+    await user.type(screen.getByLabelText('Cultivar'), '000')
+    await user.type(screen.getByLabelText('Flower color'), '000')
+    await user.click(screen.getByRole('button', { name: 'Add Plant' }))
+
+    expect(await screen.findByText('Common name must include a letter.')).toBeInTheDocument()
+    expect(screen.getByText('Cultivar must include a letter.')).toBeInTheDocument()
+    expect(screen.getByText('Flower color must include a letter.')).toBeInTheDocument()
+    expect(fake.rows()).toHaveLength(0)
+  })
+
   it('creates a Plant from the entered fields', async () => {
     const user = userEvent.setup()
     const fake = renderAt('/registry/new')
@@ -120,7 +136,7 @@ describe('PlantFormPage — reference photos', () => {
     ])
 
     await screen.findByDisplayValue('Coneflower')
-    await user.type(screen.getByLabelText('USDA hardiness zone'), 'not-a-zone')
+    await user.clear(screen.getByLabelText('Common name *'))
     await user.click(screen.getByRole('button', { name: 'Remove photo' }))
 
     expect(
@@ -135,7 +151,7 @@ describe('PlantFormPage — reference photos', () => {
     const fake = renderAt('/registry/p1', [row({ id: 'p1' })])
 
     await screen.findByDisplayValue('Coneflower')
-    await user.type(screen.getByLabelText('USDA hardiness zone'), 'not-a-zone')
+    await user.clear(screen.getByLabelText('Common name *'))
     const file = new File(['data'], 'tag.jpg', { type: 'image/jpeg' })
     await user.upload(screen.getByLabelText('Add reference photos'), file)
 

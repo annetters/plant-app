@@ -29,7 +29,7 @@ describe("validatePlantInput", () => {
         sunRequirement: "full-sun",
         matureHeightInches: 72,
         matureSpreadInches: 48,
-        hardinessZone: "4b",
+        hardinessZoneRange: { min: 4, max: 8 },
         foliageType: "deciduous",
         nativeStatus: "native",
         referencePhotoPaths: ["user-1/plant-1/photo.jpg"],
@@ -48,6 +48,47 @@ describe("validatePlantInput", () => {
     const result = validatePlantInput(validInput({ scientificName: "" }));
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.errors.scientificName).toBeDefined();
+  });
+
+  it("rejects a common name with no letters", () => {
+    const result = validatePlantInput(validInput({ commonName: "000" }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.commonName).toBeDefined();
+  });
+
+  it("rejects a scientific name with no letters", () => {
+    const result = validatePlantInput(validInput({ scientificName: "000" }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.scientificName).toBeDefined();
+  });
+
+  it("rejects a cultivar with no letters", () => {
+    const result = validatePlantInput(validInput({ cultivar: "000" }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.cultivar).toBeDefined();
+  });
+
+  it("rejects a flower color with no letters", () => {
+    const result = validatePlantInput(validInput({ flowerColor: "000" }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors.flowerColor).toBeDefined();
+  });
+
+  it("accepts a cultivar or flower color that mixes letters and digits", () => {
+    const result = validatePlantInput(
+      validInput({ cultivar: "24-Karat Gold", flowerColor: "24k gold" }),
+    );
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("accepts a common name written entirely in a non-Latin script", () => {
+    const result = validatePlantInput(validInput({ commonName: "紫式部" }));
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("leaves an omitted cultivar and flower color unvalidated (still optional)", () => {
+    const result = validatePlantInput(validInput());
+    expect(result).toEqual({ ok: true });
   });
 
   it("rejects a bloom window with an out-of-range month", () => {
@@ -100,15 +141,31 @@ describe("validatePlantInput", () => {
     if (!result.ok) expect(result.errors.matureSpreadInches).toBeDefined();
   });
 
-  it("rejects a malformed USDA hardiness zone", () => {
-    const result = validatePlantInput(validInput({ hardinessZone: "zone 6" }));
+  it("rejects a hardiness zone range with an out-of-range min", () => {
+    const result = validatePlantInput(validInput({ hardinessZoneRange: { min: 0, max: 7 } }));
     expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.errors.hardinessZone).toBeDefined();
+    if (!result.ok) expect(result.errors["hardinessZoneRange.min"]).toBeDefined();
   });
 
-  it("accepts hardiness zones with and without a sub-band letter", () => {
-    expect(validatePlantInput(validInput({ hardinessZone: "6b" }))).toEqual({ ok: true });
-    expect(validatePlantInput(validInput({ hardinessZone: "10" }))).toEqual({ ok: true });
+  it("rejects a hardiness zone range with an out-of-range max", () => {
+    const result = validatePlantInput(validInput({ hardinessZoneRange: { min: 5, max: 14 } }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors["hardinessZoneRange.max"]).toBeDefined();
+  });
+
+  it("rejects a hardiness zone range where max is less than min", () => {
+    const result = validatePlantInput(validInput({ hardinessZoneRange: { min: 7, max: 5 } }));
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.errors["hardinessZoneRange.max"]).toBeDefined();
+  });
+
+  it("accepts a whole-number hardiness zone range, single-zone or multi-zone alike", () => {
+    expect(validatePlantInput(validInput({ hardinessZoneRange: { min: 5, max: 7 } }))).toEqual({
+      ok: true,
+    });
+    expect(validatePlantInput(validInput({ hardinessZoneRange: { min: 6, max: 6 } }))).toEqual({
+      ok: true,
+    });
   });
 
   it("reports every invalid field at once, not just the first", () => {
@@ -133,7 +190,7 @@ describe("plantInputToRow / plantFromRow", () => {
       bloomWindow: { start: { month: 7, day: 15 }, end: { month: 9, day: 1 } },
       sunRequirement: "full-sun",
       matureHeightInches: 72,
-      hardinessZone: "4b",
+      hardinessZoneRange: { min: 4, max: 8 },
       foliageType: "deciduous",
       nativeStatus: "native",
       referencePhotoPaths: ["user-1/plant-1/a.jpg"],

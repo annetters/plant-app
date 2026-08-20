@@ -3,6 +3,7 @@ export type { DashboardTile } from "./dashboard.js";
 
 export {
   FOLIAGE_TYPES,
+  HARDINESS_ZONE_NUMBERS,
   NATIVE_STATUSES,
   SUN_REQUIREMENTS,
   plantFromRow,
@@ -12,6 +13,7 @@ export {
 export type {
   BloomWindow,
   FoliageType,
+  HardinessZoneRange,
   MonthDay,
   NativeStatus,
   Plant,

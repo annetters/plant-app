@@ -34,7 +34,7 @@ describe('plantFormFieldsFromPlant', () => {
         bloomWindow: { start: { month: 6, day: 1 }, end: { month: 8, day: 15 } },
         matureHeightInches: 24,
         matureSpreadInches: 18,
-        hardinessZone: '5b',
+        hardinessZoneRange: { min: 5, max: 7 },
         sunRequirement: 'part-shade',
         foliageType: 'evergreen',
         nativeStatus: 'non-native',
@@ -46,7 +46,8 @@ describe('plantFormFieldsFromPlant', () => {
     expect(fields.bloomEndDay).toBe('15')
     expect(fields.matureHeightInches).toBe('24')
     expect(fields.matureSpreadInches).toBe('18')
-    expect(fields.hardinessZone).toBe('5b')
+    expect(fields.hardinessZoneMin).toBe('5')
+    expect(fields.hardinessZoneMax).toBe('7')
     expect(fields.sunRequirement).toBe('part-shade')
     expect(fields.foliageType).toBe('evergreen')
     expect(fields.nativeStatus).toBe('non-native')
@@ -112,7 +113,7 @@ describe('plantInputFromFormFields', () => {
       sunRequirement: 'full-sun',
       matureHeightInches: 72,
       matureSpreadInches: 48,
-      hardinessZone: '4b',
+      hardinessZoneRange: { min: 4, max: 8 },
       foliageType: 'deciduous',
       nativeStatus: 'native',
       referencePhotoPaths: ['user-1/plant-1/a.jpg'],

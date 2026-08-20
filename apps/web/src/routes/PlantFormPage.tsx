@@ -1,5 +1,6 @@
 import {
   FOLIAGE_TYPES,
+  HARDINESS_ZONE_NUMBERS,
   NATIVE_STATUSES,
   SUN_REQUIREMENTS,
   dateRangeWraps,
@@ -360,6 +361,7 @@ export function PlantFormPage() {
           value={fields.cultivar}
           onChange={(event) => updateField('cultivar', event.target.value)}
         />
+        {errors.cultivar && <p role="alert">{errors.cultivar}</p>}
 
         <label htmlFor="plant-flower-color">Flower color</label>
         <input
@@ -367,6 +369,7 @@ export function PlantFormPage() {
           value={fields.flowerColor}
           onChange={(event) => updateField('flowerColor', event.target.value)}
         />
+        {errors.flowerColor && <p role="alert">{errors.flowerColor}</p>}
 
         <fieldset>
           <legend>Bloom window</legend>
@@ -459,14 +462,40 @@ export function PlantFormPage() {
         />
         {errors.matureSpreadInches && <p role="alert">{errors.matureSpreadInches}</p>}
 
-        <label htmlFor="plant-hardiness-zone">USDA hardiness zone</label>
-        <input
-          id="plant-hardiness-zone"
-          placeholder="e.g. 6a"
-          value={fields.hardinessZone}
-          onChange={(event) => updateField('hardinessZone', event.target.value)}
-        />
-        {errors.hardinessZone && <p role="alert">{errors.hardinessZone}</p>}
+        <fieldset>
+          <legend>USDA hardiness zone</legend>
+          <label htmlFor="plant-hardiness-zone-min">Min zone</label>
+          <select
+            id="plant-hardiness-zone-min"
+            value={fields.hardinessZoneMin}
+            onChange={(event) => updateField('hardinessZoneMin', event.target.value)}
+          >
+            <option value="">Not specified</option>
+            {HARDINESS_ZONE_NUMBERS.map((zone) => (
+              <option key={zone} value={zone}>
+                {zone}
+              </option>
+            ))}
+          </select>
+          <label htmlFor="plant-hardiness-zone-max">Max zone</label>
+          <select
+            id="plant-hardiness-zone-max"
+            value={fields.hardinessZoneMax}
+            onChange={(event) => updateField('hardinessZoneMax', event.target.value)}
+          >
+            <option value="">Not specified</option>
+            {HARDINESS_ZONE_NUMBERS.map((zone) => (
+              <option key={zone} value={zone}>
+                {zone}
+              </option>
+            ))}
+          </select>
+          {(errors['hardinessZoneRange.min'] || errors['hardinessZoneRange.max']) && (
+            <p role="alert">
+              {errors['hardinessZoneRange.min'] ?? errors['hardinessZoneRange.max']}
+            </p>
+          )}
+        </fieldset>
 
         <label htmlFor="plant-foliage-type">Foliage</label>
         <select
@@ -509,6 +538,9 @@ export function PlantFormPage() {
       </form>
 
       {isEditing && (
+        <>
+        <hr />
+
         <section aria-label="Reference photos">
           <h2>Reference photos</h2>
           <ul>
@@ -539,9 +571,9 @@ export function PlantFormPage() {
             }}
           />
         </section>
-      )}
 
-      {isEditing && (
+        <hr />
+
         <section aria-label="Care task templates">
           <h2>Care task templates</h2>
           <ul>
@@ -669,12 +701,13 @@ export function PlantFormPage() {
             </button>
           </form>
         </section>
-      )}
 
-      {isEditing && (
+        <hr />
+
         <button type="button" onClick={handleDelete} disabled={submitting}>
           Delete Plant
         </button>
+        </>
       )}
 
       <Link to="/registry">Back to Registry</Link>
