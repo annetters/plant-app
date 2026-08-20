@@ -1,6 +1,6 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-19
+**Date:** 2026-08-20
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
@@ -18,19 +18,53 @@ closed on GitHub** — see commit `9018f33` and the follow-up fix commits
 below.
 
 - Four lower-priority manual QA items were identified but deliberately
-  deferred, not run (see "Deferred QA" below) — direct-URL access to
-  another account's plant, direct-URL access to a nonexistent plant,
-  photo-thumbnail persistence across a page reload, and Registry sort
-  order with multiple plants. None are blocking; worth running before/
-  during #4 or #10 (Registry view), whichever lands first.
-- Along the way, real bugs surfaced by manual testing (not caught by the
-  automated suite, which mocks Supabase entirely) got fixed in-branch:
-  a `42501 permission denied` 403 on save (newer Supabase projects don't
-  auto-GRANT new public-schema tables to API roles — see
-  `supabase/migrations/0002_grant_plants_table.sql`), missing
-  required-field indicators, unstyled/bunched form layout, no
-  save-confirmation feedback, and unstyled Registry/Dashboard lists. All
-  fixed and committed — see "Current state" below for the commit list.
+  deferred, not run (see "Deferred QA (ticket #3)" below) — direct-URL
+  access to another account's plant, direct-URL access to a nonexistent
+  plant, photo-thumbnail persistence across a page reload, and Registry
+  sort order with multiple plants. Still not run as of this update; worth
+  picking up during #10 (Registry view) or whenever RLS/reload behavior is
+  next touched.
+
+**#4 (Care task templates on Plant) is implemented, committed, and manually
+exercised against the real Supabase project** (add a date-range template,
+add a seasonal-marker template, remove a template) — see commit `4eea9e7`
+and the follow-up fix commits below. **Not yet closed on GitHub** —
+migrations `0003`/`0004` are live on the linked project, but the deferred
+QA items below (mirroring #3's list) haven't all been run, so it's holding
+open pending a final pass rather than closed prematurely.
+
+- Manual testing against the real project surfaced real gaps the automated
+  suite (which mocks Supabase entirely) couldn't catch, all fixed and
+  committed:
+  - Migrations `0003_care_task_templates.sql`/`0004_grant_care_task_templates_table.sql`
+    existed in-repo but hadn't actually been pushed to the linked Supabase
+    project — `createCareTaskTemplate` was hitting a table that didn't
+    exist, surfacing as a generic "Could not add this task template."
+    error. Pushed via `npm run db:push`; confirmed live via
+    `npx supabase migration list`.
+  - Adding or removing a task template gave no visible confirmation — the
+    status/error message only rendered near the Plant form's top-level
+    Save button, far from the Care task templates section. Given that
+    section its own status/error messages.
+  - Two same-named "Remove" buttons (reference photos, care task
+    templates) collided on accessible name — disambiguated with
+    `aria-label`.
+  - A date-range trigger where the start falls later in the calendar than
+    the end (e.g. `6/1–1/1`) is a deliberate wraparound into the following
+    year, but nothing distinguished it from a data-entry mistake. Now
+    flagged both while entering the range and once listed (`dateRangeWraps`
+    in `packages/domain/src/careTaskTemplate.ts`).
+  - The "Trigger date range" and "Bloom window" fieldsets let their four
+    month/day inputs wrap independently, reading as squished/ungrouped.
+    Both now group each month/day pair onto its own row with a divider
+    between start and end (`.date-pair` in `apps/web/src/index.css`).
+- A related but out-of-scope idea surfaced during manual testing — a
+  single-specific-day trigger (e.g. "the 1st of the month") rather than a
+  range. The domain model already supports this today (a date-range
+  trigger with `start == end` is valid), so this is a UI-affordance
+  question only. Filed as **#21**, labeled `needs-triage` (not
+  `ready-for-agent` — the proposed approach hasn't been agreed, only
+  suggested). Not blocking anything.
 
 **Go straight to `/implement`, picking a ticket off the frontier.**
 
@@ -38,16 +72,21 @@ below.
 published as GitHub issues **#2–#20**, each labeled `ready-for-agent`, each
 linked to #1 as parent, with GitHub's native issue-dependency ("blocked by")
 edges wired between them — see "Issue tracker" below for the full map.
+**#21** was filed ad hoc during #4's manual QA, labeled `needs-triage`, not
+part of the original 19.
 
-**The frontier right now** (open tickets with zero open blockers — safe to
-start immediately):
+**The frontier right now** (open tickets with zero open blockers, no
+assignee — safe to start immediately):
 
-- **#4** — Care task templates on Plant — newly unblocked now that #3 is
-  closed
 - **#5** — Property + aerial base map — independent, map/base-layer work
 - **#13** — React Native app scaffold + auth — mirrors #2 for mobile
 - **#19** — Tag Scan prototype: OCR placement + USDA data pull — unchanged
   since last update
+
+**#4** is implemented but intentionally left open (see above) rather than
+listed as frontier work to pick up — don't re-implement it. **#12** (Task
+completion logging) is still blocked: #4 alone isn't enough to unblock it,
+it also needs #8 (Planting) and #11 (Dashboard).
 
 Run `/implement` in a **fresh session**, pointed at whichever ticket number
 you pick — that's the context-hygiene pattern the flow expects (grilling →
@@ -72,6 +111,24 @@ Not run yet, lower priority than the core checklist (which passed in full):
    fetch on a fresh load, not just in-session state).
 4. **Multiple plants, alphabetical ordering** — add 2-3 plants with
    different common names, confirm the Registry list sorts by name.
+
+### Deferred QA (ticket #4)
+
+The add/remove/wraparound flows above were exercised manually; these were
+not, and are the reason #4 is still open rather than closed:
+
+1. **RLS via the `plants` join** — log in as account A, add a care task
+   template to one of A's plants; log in as account B, confirm the
+   template isn't readable/writable. New ownership-check pattern (a join
+   to `plants`, not a direct `user_id` column like #3's), never proven
+   against real Postgres.
+2. **Reload persistence** — refresh the Plant edit page after adding
+   templates; confirm they still load (exercises `listCareTaskTemplates`
+   on a fresh mount, not just in-session state).
+3. **Validation errors in the browser** — blank name, invalid trigger date
+   parts, blank seasonal-marker text; confirm inline messages render as
+   expected (covered by unit tests with a fake DB client, not eyeballed in
+   a real browser).
 
 ---
 
@@ -104,10 +161,16 @@ Domain glossary: `CONTEXT.md`
 
 ## Current state
 
-Working tree clean (`git status` verified 2026-08-19). Most recent commits
+Working tree clean (`git status` verified 2026-08-20). Most recent commits
 first:
 
 ```
+8ce7a48 Implementation of Issue 4
+b54c83c Fix care task template UX issues found in manual testing
+4eea9e7 Add care task templates on Plant (#4)
+8dec792 Document that plan-confirmation requests are a hard stop
+05240be Reflect #3's closure in the handoff doc
+f23513e Refresh handoff doc after ticket #3
 1d20b8e Fix list styling on the Registry/Dashboard pages
 97550cc Show a confirmation after saving a Plant
 a702ec2 Fix spacing for elements outside <form>
@@ -128,10 +191,13 @@ eaf1f32 Add ADR-0003: web desktop + native mobile, cloud BaaS backend
 3697144 Init files
 ```
 
-`2668f2c` (#2) and `9018f33`–`1d20b8e` (#3, plus fixes found during manual
-QA) are the build work so far. #3 is implemented and verified but **not
-yet closed on GitHub** — see "What to do next" above. The remaining 17
-tickets (#4–#20) are still unbuilt.
+`2668f2c` (#2), `9018f33`–`1d20b8e` (#3, plus fixes found during manual
+QA), and `4eea9e7`–`8ce7a48` (#4, plus fixes found during manual QA) are
+the build work so far. #3 is closed on GitHub. #4 is implemented and
+partially verified but **not yet closed on GitHub** — see "What to do
+next" above and "Deferred QA (ticket #4)". The remaining 16 tickets
+(#5–#20) are still unbuilt; #21 (filed during #4's QA) is `needs-triage`,
+not yet scoped for build.
 
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
 > No GPS is read and no user photo is taken — that is exactly why the work was
@@ -141,8 +207,8 @@ tickets (#4–#20) are still unbuilt.
 
 | Artifact | Path | Purpose |
 |---|---|---|
-| **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output (npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app, Supabase auth, auth-gated Dashboard shell) plus ticket #3's output (`Plant`/`PlantInput` types + `validatePlantInput` in `packages/domain/src/plant.ts`; Registry list + create/view/edit/delete + reference-photo upload in `apps/web/src/routes/Plants*.tsx` and `apps/web/src/plants/`). See `apps/web/README.md` for the one-time Supabase project setup. Not throwaway — build on this. |
-| **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
+| **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output (npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app, Supabase auth, auth-gated Dashboard shell) plus ticket #3's output (`Plant`/`PlantInput` types + `validatePlantInput` in `packages/domain/src/plant.ts`; Registry list + create/view/edit/delete + reference-photo upload in `apps/web/src/routes/Plants*.tsx` and `apps/web/src/plants/`) plus ticket #4's output (`TaskTrigger`/`CareTaskTemplate` types + `validateCareTaskTemplateInput` + `computeTriggerDateRange`/`dateRangeWraps` in `packages/domain/src/careTaskTemplate.ts`; add/list/remove UI in the "Care task templates" section of `apps/web/src/routes/PlantFormPage.tsx`, repository methods on `PlantsRepository`). See `apps/web/README.md` for the one-time Supabase project setup. Not throwaway — build on this. |
+| **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). `0003_care_task_templates.sql` — the `care_task_templates` table, owned by a `plant_id` FK with RLS via a join to `plants` (not a direct `user_id` column). `0004_grant_care_task_templates_table.sql` — the same follow-up GRANT `0002` needed, for the new table. All four are live on the linked project as of this update (verify with `npx supabase migration list`). Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
 | **Spec (current)** | [GitHub issue #1](https://github.com/annetters/plant-app/issues/1) | The real spec. 53 user stories, full implementation/testing decisions. Labeled `ready-for-agent`. |
 | Spec (superseded) | `docs/plant-app-spec.md` | The original file-based spec, written before this repo had an issue tracker. Kept for history; has a banner pointing to issue #1. Do not implement against it. |
 | Domain glossary | `CONTEXT.md` | Canonical term definitions — Plant, Planting, Property, Scale Reference, Bed, Landmark (deferred), Pin, Tag Scan, Task model, Registry, Bloom Timeline, Dashboard |
@@ -276,7 +342,7 @@ Ticket map (dependency order; title abbreviated):
 |---|---|---|
 | 2 | Repo scaffold, Supabase backend, web auth skeleton | — (built, `2668f2c`, closed) |
 | 3 | Plant record CRUD (manual entry) — built, `9018f33`, closed | 2 |
-| 4 | Care task templates on Plant | 3 |
+| 4 | Care task templates on Plant — built, `4eea9e7`–`8ce7a48`, **open** (deferred QA) | 3 |
 | 5 | Property + aerial base map | 2 |
 | 6 | Property: photographed/in-app-drawn base map + Scale Reference | 5 |
 | 7 | Bed drawing (desktop) | 5 |
@@ -293,10 +359,15 @@ Ticket map (dependency order; title abbreviated):
 | 18 | Native: Plant/Planting detail, tasks & todos | 3, 8, 12, 13 |
 | 19 | Tag Scan prototype: OCR placement + USDA data pull | — |
 | 20 | Tag Scan build | 3, 13, 19 |
+| 21 | Care task template: single-day trigger UX (filed during #4 QA, `needs-triage`) | 4 |
 
 **Frontier query**: open issues with `issue_dependencies_summary.blocked_by
-== 0` and no assignee. #2 and #3 are closed. Right now that's
-**#4, #5, #13, #19** — see "What to do next" above.
+== 0` and no assignee. #2 and #3 are closed. #4 has `blocked_by == 0` too
+(its blocker, #3, is closed) but is deliberately excluded from the frontier
+below — it's built and awaiting closure, not unstarted work. Right now the
+frontier is **#5, #13, #19** — see "What to do next" above. #21 is
+`needs-triage`, not `ready-for-agent`, so it's excluded from the frontier
+query by design until triaged.
 
 ---
 
