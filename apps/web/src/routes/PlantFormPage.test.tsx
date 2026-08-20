@@ -38,8 +38,8 @@ describe('PlantFormPage — create', () => {
     const user = userEvent.setup()
     const fake = renderAt('/registry/new')
 
-    await user.type(screen.getByLabelText('Common name'), 'Joe Pye Weed')
-    await user.type(screen.getByLabelText('Scientific name'), 'Eutrochium purpureum')
+    await user.type(screen.getByLabelText('Common name *'), 'Joe Pye Weed')
+    await user.type(screen.getByLabelText('Scientific name *'), 'Eutrochium purpureum')
     await user.type(screen.getByLabelText('Cultivar'), 'Gateway')
     await user.click(screen.getByRole('button', { name: 'Add Plant' }))
 

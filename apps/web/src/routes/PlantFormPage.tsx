@@ -202,17 +202,21 @@ export function PlantFormPage() {
       <h1>{isEditing ? fields.commonName || 'Plant' : 'Add Plant'}</h1>
 
       <form onSubmit={handleSubmit}>
-        <label htmlFor="plant-common-name">Common name</label>
+        <p>Fields marked * are required.</p>
+
+        <label htmlFor="plant-common-name">Common name *</label>
         <input
           id="plant-common-name"
+          aria-required="true"
           value={fields.commonName}
           onChange={(event) => updateField('commonName', event.target.value)}
         />
         {errors.commonName && <p role="alert">{errors.commonName}</p>}
 
-        <label htmlFor="plant-scientific-name">Scientific name</label>
+        <label htmlFor="plant-scientific-name">Scientific name *</label>
         <input
           id="plant-scientific-name"
+          aria-required="true"
           value={fields.scientificName}
           onChange={(event) => updateField('scientificName', event.target.value)}
         />
