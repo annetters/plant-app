@@ -1,25 +1,41 @@
-import type { PlantRow } from '@plant-app/domain'
+import type { CareTaskTemplateRow, PlantRow } from '@plant-app/domain'
 import { vi } from 'vitest'
 import type { PlantsDbClient } from '../plants/plantsRepository'
 
 type Row = Record<string, unknown>
 type Op = 'select' | 'insert' | 'update' | 'delete'
-/** A stored row is a PlantRow plus whatever extra DB-only columns (e.g. user_id) the repository writes. */
-type StoredRow = PlantRow & Record<string, unknown>
+type StoredRow = Row & { id: string }
+type Table = 'plants' | 'care_task_templates'
+
+const ID_PREFIX: Record<Table, string> = {
+  plants: 'plant',
+  care_task_templates: 'template',
+}
 
 /**
  * An in-memory stand-in for the slice of Supabase's query builder
- * PlantsRepository calls. Each chain method just records intent onto the
- * same builder object (order-independent) and the real work happens once
- * it's awaited, mirroring Postgrest's thenable builder.
+ * PlantsRepository calls, spanning both tables the repository reads from.
+ * Each chain method just records intent onto the same builder object
+ * (order-independent) and the real work happens once it's awaited,
+ * mirroring Postgrest's thenable builder.
  */
-export function createFakePlantsDbClient(initialRows: PlantRow[] = []) {
-  let rows: StoredRow[] = [...initialRows] as StoredRow[]
-  let nextId = rows.length + 1
+export function createFakePlantsDbClient(
+  initialPlantRows: PlantRow[] = [],
+  initialCareTaskTemplateRows: CareTaskTemplateRow[] = [],
+) {
+  const tables: Record<Table, StoredRow[]> = {
+    plants: [...initialPlantRows] as unknown as StoredRow[],
+    care_task_templates: [...initialCareTaskTemplateRows] as unknown as StoredRow[],
+  }
+  const nextId: Record<Table, number> = {
+    plants: tables.plants.length + 1,
+    care_task_templates: tables.care_task_templates.length + 1,
+  }
   const userId = 'user-1'
 
-  function builder(op: Op, payload?: Row) {
-    let filterId: string | undefined
+  function builder(table: Table, op: Op, payload?: Row) {
+    const filters: Record<string, string> = {}
+    let orderColumn: string | undefined
     let single = false
 
     const chain = {
@@ -27,10 +43,11 @@ export function createFakePlantsDbClient(initialRows: PlantRow[] = []) {
         return chain
       },
       eq(column: string, value: string) {
-        if (column === 'id') filterId = value
+        filters[column] = value
         return chain
       },
-      order() {
+      order(column: string) {
+        orderColumn = column
         return chain
       },
       single() {
@@ -51,19 +68,30 @@ export function createFakePlantsDbClient(initialRows: PlantRow[] = []) {
       },
     }
 
+    function matches(row: StoredRow): boolean {
+      return Object.entries(filters).every(([column, value]) => row[column] === value)
+    }
+
     function execute() {
+      const rows = tables[table]
+
       if (op === 'select') {
-        if (filterId !== undefined) {
-          const row = rows.find((r) => r.id === filterId) ?? null
+        if (filters.id !== undefined) {
+          const row = rows.find(matches) ?? null
           return { data: row, error: null }
         }
-        const sorted = [...rows].sort((a, b) => a.common_name.localeCompare(b.common_name))
+        const filtered = rows.filter(matches)
+        const sorted = orderColumn
+          ? [...filtered].sort((a, b) =>
+              String(a[orderColumn as string]).localeCompare(String(b[orderColumn as string])),
+            )
+          : filtered
         return { data: sorted, error: null }
       }
       if (op === 'insert') {
         const row: StoredRow = {
-          ...(payload as unknown as Omit<PlantRow, 'id' | 'created_at' | 'updated_at'>),
-          id: `plant-${nextId++}`,
+          ...payload,
+          id: `${ID_PREFIX[table]}-${nextId[table]++}`,
           created_at: '2026-01-01T00:00:00.000Z',
           updated_at: '2026-01-01T00:00:00.000Z',
         }
@@ -71,17 +99,17 @@ export function createFakePlantsDbClient(initialRows: PlantRow[] = []) {
         return { data: single ? row : [row], error: null }
       }
       if (op === 'update') {
-        const idx = rows.findIndex((r) => r.id === filterId)
-        if (idx === -1) return { data: null, error: { message: 'Plant not found.' } }
+        const idx = rows.findIndex(matches)
+        if (idx === -1) return { data: null, error: { message: 'Row not found.' } }
         rows[idx] = {
           ...rows[idx],
-          ...(payload as unknown as Partial<PlantRow>),
+          ...payload,
           updated_at: '2026-01-02T00:00:00.000Z',
         }
         return { data: single ? rows[idx] : [rows[idx]], error: null }
       }
       // delete
-      rows = rows.filter((r) => r.id !== filterId)
+      tables[table] = rows.filter((r) => !matches(r))
       return { data: null, error: null }
     }
 
@@ -97,12 +125,12 @@ export function createFakePlantsDbClient(initialRows: PlantRow[] = []) {
   }
 
   const client: PlantsDbClient = {
-    from() {
+    from(table: Table) {
       return {
-        select: () => builder('select'),
-        insert: (values: Row) => builder('insert', values),
-        update: (values: Row) => builder('update', values),
-        delete: () => builder('delete'),
+        select: () => builder(table, 'select'),
+        insert: (values: Row) => builder(table, 'insert', values),
+        update: (values: Row) => builder(table, 'update', values),
+        delete: () => builder(table, 'delete'),
       }
     },
     storage: {
@@ -113,5 +141,12 @@ export function createFakePlantsDbClient(initialRows: PlantRow[] = []) {
     },
   }
 
-  return { client, storage, userId, rows: () => rows }
+  return {
+    client,
+    storage,
+    userId,
+    rows: () => tables.plants as unknown as (PlantRow & Record<string, unknown>)[],
+    careTaskTemplateRows: () =>
+      tables.care_task_templates as unknown as (CareTaskTemplateRow & Record<string, unknown>)[],
+  }
 }

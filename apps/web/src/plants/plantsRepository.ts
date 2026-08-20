@@ -1,5 +1,17 @@
-import type { Plant, PlantInput, PlantRow } from '@plant-app/domain'
-import { plantFromRow, plantInputToRow } from '@plant-app/domain'
+import type {
+  CareTaskTemplate,
+  CareTaskTemplateInput,
+  CareTaskTemplateRow,
+  Plant,
+  PlantInput,
+  PlantRow,
+} from '@plant-app/domain'
+import {
+  careTaskTemplateFromRow,
+  careTaskTemplateInputToRow,
+  plantFromRow,
+  plantInputToRow,
+} from '@plant-app/domain'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 type Row = Record<string, unknown>
@@ -16,7 +28,7 @@ interface PlantsQuery extends PromiseLike<DbResult<unknown>> {
 
 /** The narrow shape of a Supabase client the repository needs — mirrors AuthContext's AuthClient pattern. */
 export interface PlantsDbClient {
-  from(table: 'plants'): {
+  from(table: 'plants' | 'care_task_templates'): {
     select(columns?: string): PlantsQuery
     insert(values: Row): PlantsQuery
     update(values: Row): PlantsQuery
@@ -56,6 +68,7 @@ export function asPlantsDbClient(client: SupabaseClient): PlantsDbClient {
 }
 
 const TABLE = 'plants'
+const CARE_TASK_TEMPLATES_TABLE = 'care_task_templates'
 const REFERENCE_PHOTOS_BUCKET = 'plant-reference-photos'
 
 function unwrap<T>({ data, error }: DbResult<unknown>): T {
@@ -133,5 +146,31 @@ export class PlantsRepository {
   async removeReferencePhoto(path: string): Promise<void> {
     const { error } = await this.client.storage.from(REFERENCE_PHOTOS_BUCKET).remove([path])
     if (error) throw new Error(error.message)
+  }
+
+  async listCareTaskTemplates(plantId: string): Promise<CareTaskTemplate[]> {
+    const result = unwrap<CareTaskTemplateRow[]>(
+      await this.client
+        .from(CARE_TASK_TEMPLATES_TABLE)
+        .select('*')
+        .eq('plant_id', plantId)
+        .order('created_at', { ascending: true }),
+    )
+    return result.map(careTaskTemplateFromRow)
+  }
+
+  async createCareTaskTemplate(input: CareTaskTemplateInput): Promise<CareTaskTemplate> {
+    const row = unwrap<CareTaskTemplateRow>(
+      await this.client
+        .from(CARE_TASK_TEMPLATES_TABLE)
+        .insert(careTaskTemplateInputToRow(input))
+        .select()
+        .single(),
+    )
+    return careTaskTemplateFromRow(row)
+  }
+
+  async removeCareTaskTemplate(id: string): Promise<void> {
+    unwrap(await this.client.from(CARE_TASK_TEMPLATES_TABLE).delete().eq('id', id))
   }
 }

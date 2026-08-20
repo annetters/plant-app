@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { careTaskTemplateRow } from '../test/careTaskTemplateRowFixture'
 import { createFakePlantsDbClient } from '../test/fakePlantsDbClient'
 import { plantRow as row } from '../test/plantRowFixture'
 import { PlantsRepository } from './plantsRepository'
@@ -87,5 +88,75 @@ describe('PlantsRepository', () => {
     await repo.removeReferencePhoto('user-1/plant-1/a.jpg')
 
     expect(storage.remove).toHaveBeenCalledWith(['user-1/plant-1/a.jpg'])
+  })
+
+  it('lists care task templates for a plant, ordered by creation', async () => {
+    const { client } = createFakePlantsDbClient(
+      [],
+      [
+        careTaskTemplateRow({
+          id: 't1',
+          plant_id: 'plant-1',
+          name: 'Fertilize',
+          created_at: '2026-02-01T00:00:00.000Z',
+        }),
+        careTaskTemplateRow({
+          id: 't2',
+          plant_id: 'plant-1',
+          name: 'Prune',
+          created_at: '2026-01-01T00:00:00.000Z',
+        }),
+        careTaskTemplateRow({ id: 't3', plant_id: 'plant-2', name: 'Water' }),
+      ],
+    )
+    const repo = new PlantsRepository(client)
+
+    const templates = await repo.listCareTaskTemplates('plant-1')
+
+    expect(templates.map((t) => t.name)).toEqual(['Prune', 'Fertilize'])
+  })
+
+  it('creates a date-range care task template', async () => {
+    const { client, careTaskTemplateRows } = createFakePlantsDbClient()
+    const repo = new PlantsRepository(client)
+
+    const template = await repo.createCareTaskTemplate({
+      plantId: 'plant-1',
+      name: 'Prune',
+      trigger: { type: 'date-range', start: { month: 4, day: 1 }, end: { month: 4, day: 15 } },
+    })
+
+    expect(template.name).toBe('Prune')
+    expect(template.trigger).toEqual({
+      type: 'date-range',
+      start: { month: 4, day: 1 },
+      end: { month: 4, day: 15 },
+    })
+    expect(careTaskTemplateRows()[0].plant_id).toBe('plant-1')
+  })
+
+  it('creates a seasonal-marker care task template', async () => {
+    const { client } = createFakePlantsDbClient()
+    const repo = new PlantsRepository(client)
+
+    const template = await repo.createCareTaskTemplate({
+      plantId: 'plant-1',
+      name: 'Winterize',
+      trigger: { type: 'seasonal-marker', text: 'After first hard frost' },
+    })
+
+    expect(template.trigger).toEqual({ type: 'seasonal-marker', text: 'After first hard frost' })
+  })
+
+  it('removes a care task template', async () => {
+    const { client, careTaskTemplateRows } = createFakePlantsDbClient(
+      [],
+      [careTaskTemplateRow({ id: 't1' })],
+    )
+    const repo = new PlantsRepository(client)
+
+    await repo.removeCareTaskTemplate('t1')
+
+    expect(careTaskTemplateRows()).toHaveLength(0)
   })
 })

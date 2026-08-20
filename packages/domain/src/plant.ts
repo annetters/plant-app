@@ -59,7 +59,7 @@ const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 
 const HARDINESS_ZONE_PATTERN = /^([1-9]|1[0-3])[ab]?$/;
 
-function isValidMonthDay(value: MonthDay): boolean {
+export function isValidMonthDay(value: MonthDay): boolean {
   if (!Number.isInteger(value.month) || value.month < 1 || value.month > 12) return false;
   if (!Number.isInteger(value.day) || value.day < 1) return false;
   return value.day <= DAYS_IN_MONTH[value.month - 1];

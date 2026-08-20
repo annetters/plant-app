@@ -21,3 +21,20 @@ export type {
   PlantValidationResult,
   SunRequirement,
 } from "./plant.js";
+
+export {
+  careTaskTemplateFromRow,
+  careTaskTemplateInputToRow,
+  computeTriggerDateRange,
+  validateCareTaskTemplateInput,
+} from "./careTaskTemplate.js";
+export type {
+  CareTaskTemplate,
+  CareTaskTemplateInput,
+  CareTaskTemplateRow,
+  CareTaskTemplateValidationErrors,
+  CareTaskTemplateValidationResult,
+  DateRangeTrigger,
+  SeasonalMarkerTrigger,
+  TaskTrigger,
+} from "./careTaskTemplate.js";
