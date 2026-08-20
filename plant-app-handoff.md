@@ -1,25 +1,33 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-18
+**Date:** 2026-08-19
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
 
-**Go straight to `/to-tickets`.**
+**Go straight to `/implement`, picking a ticket off the frontier.**
 
-Platform, persistence, and the full domain model are decided. One question
-remains genuinely open — which OCR mechanism Tag Scan uses — but it's
-explicitly non-blocking; see "Open, but not blocking" below. Nothing else is
-blocking ticket-writing. The full spec lives at
-**[GitHub issue #1](https://github.com/annetters/plant-app/issues/1)** — read
-that first, it's the actual source of truth, not this file.
+`/to-tickets` has already run against issue #1. Nineteen tickets are
+published as GitHub issues **#2–#20**, each labeled `ready-for-agent`, each
+linked to #1 as parent, with GitHub's native issue-dependency ("blocked by")
+edges wired between them — see "Issue tracker" below for the full map.
 
-**Before you start**, three files are modified but not committed:
-`CONTEXT.md`, `docs/adr/0003-web-desktop-native-mobile-cloud-backend.md`,
-`docs/plant-app-spec.md`. Run `git status` and commit them (or check whether a
-prior session already did and this note is stale).
+**The frontier right now** (open tickets with zero open blockers — safe to
+start immediately):
+
+- **#2** — Repo scaffold, Supabase backend, and web auth walking skeleton
+- **#19** — Tag Scan prototype: OCR placement + USDA data pull
+
+Run `/implement` in a **fresh session**, pointed at whichever ticket number
+you pick — that's the context-hygiene pattern the flow expects (grilling →
+spec → tickets stays one unbroken window; each `/implement` starts clean from
+the ticket alone). As each ticket closes, re-run the frontier query (see
+"Issue tracker") to see what newly unblocked.
+
+Nothing here is stale-checked for you the way the old "three uncommitted
+files" note used to be — `git status` was clean as of this update.
 
 ---
 
@@ -52,10 +60,10 @@ Domain glossary: `CONTEXT.md`
 
 ## Current state
 
-Seven commits, plus three files modified and not yet committed (see "What to
-do next" above):
+Eight commits, working tree clean (`git status` verified 2026-08-19):
 
 ```
+1f756b1 Resolve bezier-pen scope, flag OCR execution as still open, refresh handoff
 eaf1f32 Add ADR-0003: web desktop + native mobile, cloud BaaS backend
 86f3772 Design Property, Scale Reference, and Tag Scan; correct base-layer purpose
 85fcd4c Resolve ADR-0001 smoothing question, reconcile spec and glossary
@@ -64,6 +72,9 @@ eaf1f32 Add ADR-0003: web desktop + native mobile, cloud BaaS backend
 5f9fbc7 Gitignore added
 3697144 Init files
 ```
+
+No code has been written yet — these commits are all docs/prototypes/spec.
+The 19 tickets (#2–#20) are the first actual build work.
 
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
 > No GPS is read and no user photo is taken — that is exactly why the work was
@@ -190,22 +201,57 @@ CLI. See `docs/agents/issue-tracker.md` for the full workflow.
 Triage labels: `needs-triage`, `needs-info`, `ready-for-agent`,
 `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
 
-**One issue exists**: #1, the spec, labeled `ready-for-agent`. Nothing has
-been broken into tickets yet — that's the next step.
+**#1** is the spec, labeled `ready-for-agent`. **#2–#20** are the 19
+tracer-bullet tickets `/to-tickets` split it into, each also `ready-for-agent`
+and linked to #1 as parent. Dependency edges use GitHub's native issue
+dependencies (`issue_dependencies_summary` via the API), not a text
+convention — check blockers with:
+
+```
+gh api repos/annetters/plant-app/issues/<n> --jq '.issue_dependencies_summary'
+```
+
+Ticket map (dependency order; title abbreviated):
+
+| # | Ticket | Blocked by |
+|---|---|---|
+| 2 | Repo scaffold, Supabase backend, web auth skeleton | — |
+| 3 | Plant record CRUD (manual entry) | 2 |
+| 4 | Care task templates on Plant | 3 |
+| 5 | Property + aerial base map | 2 |
+| 6 | Property: photographed/in-app-drawn base map + Scale Reference | 5 |
+| 7 | Bed drawing (desktop) | 5 |
+| 8 | Planting: create + place Pin, view on tap | 3, 7 |
+| 9 | Bloom Timeline | 3, 8 |
+| 10 | Registry view | 3, 8 |
+| 11 | Dashboard (real content) | 7, 8, 9, 10 |
+| 12 | Task completion logging, history, one-off todos | 4, 8, 11 |
+| 13 | React Native app scaffold + auth | 2 |
+| 14 | Native: Map view | 8, 13 |
+| 15 | Native: Scale Reference calibration | 6, 13 |
+| 16 | Native: Registry view | 10, 13 |
+| 17 | Native: Bloom Timeline | 9, 13 |
+| 18 | Native: Plant/Planting detail, tasks & todos | 3, 8, 12, 13 |
+| 19 | Tag Scan prototype: OCR placement + USDA data pull | — |
+| 20 | Tag Scan build | 3, 13, 19 |
+
+**Frontier query**: open issues with `issue_dependencies_summary.blocked_by
+== 0` and no assignee. Right now that's **#2** and **#19** — see "What to do
+next" above.
 
 ---
 
 ## Suggested skills
 
-- **`/to-tickets`** — the immediate next step. Splits issue #1 into
-  tracer-bullet tickets with blocking edges, so any ticket whose blockers
-  are done can be picked up. Don't run `/to-spec` again — the spec is
-  already published and current.
-- **`/implement`** — per ticket, once `/to-tickets` runs. Clear context
-  between tickets; each is self-contained. Drives `/tdd` internally, closes
-  with `/code-review`.
-- **`/prototype`** — recommended specifically for Tag Scan's OCR and USDA
-  data pull before building them for real (see Tag Scan section above).
+- **`/implement`** — the immediate next step. Run once per ticket, fresh
+  session each time, pointed at a ticket number from the frontier (see
+  "Issue tracker" above). Drives `/tdd` internally, closes with
+  `/code-review`. Don't run `/to-tickets` again — tickets #2–#20 are already
+  published.
+- **`/prototype`** — what #19 actually is. Ticket #19 already frames the
+  scope (real nursery tags through candidate OCR options, a real USDA pull);
+  running `/implement` on it should drive `/prototype` internally the way
+  `/implement` drives `/tdd` for build tickets.
 - **`/codebase-design`** — for module structure once ticket-writing starts,
   particularly the shared-TypeScript-package boundary from ADR-0003.
 - **`/domain-modeling`** — if any term in `CONTEXT.md` needs sharpening
