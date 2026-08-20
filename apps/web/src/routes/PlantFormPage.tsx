@@ -370,42 +370,54 @@ export function PlantFormPage() {
 
         <fieldset>
           <legend>Bloom window</legend>
-          <label htmlFor="plant-bloom-start-month">Start month</label>
-          <input
-            id="plant-bloom-start-month"
-            type="number"
-            min={1}
-            max={12}
-            value={fields.bloomStartMonth}
-            onChange={(event) => updateField('bloomStartMonth', event.target.value)}
-          />
-          <label htmlFor="plant-bloom-start-day">Start day</label>
-          <input
-            id="plant-bloom-start-day"
-            type="number"
-            min={1}
-            max={31}
-            value={fields.bloomStartDay}
-            onChange={(event) => updateField('bloomStartDay', event.target.value)}
-          />
-          <label htmlFor="plant-bloom-end-month">End month</label>
-          <input
-            id="plant-bloom-end-month"
-            type="number"
-            min={1}
-            max={12}
-            value={fields.bloomEndMonth}
-            onChange={(event) => updateField('bloomEndMonth', event.target.value)}
-          />
-          <label htmlFor="plant-bloom-end-day">End day</label>
-          <input
-            id="plant-bloom-end-day"
-            type="number"
-            min={1}
-            max={31}
-            value={fields.bloomEndDay}
-            onChange={(event) => updateField('bloomEndDay', event.target.value)}
-          />
+          <div className="date-pair">
+            <div>
+              <label htmlFor="plant-bloom-start-month">Start month</label>
+              <input
+                id="plant-bloom-start-month"
+                type="number"
+                min={1}
+                max={12}
+                value={fields.bloomStartMonth}
+                onChange={(event) => updateField('bloomStartMonth', event.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="plant-bloom-start-day">Start day</label>
+              <input
+                id="plant-bloom-start-day"
+                type="number"
+                min={1}
+                max={31}
+                value={fields.bloomStartDay}
+                onChange={(event) => updateField('bloomStartDay', event.target.value)}
+              />
+            </div>
+          </div>
+          <div className="date-pair">
+            <div>
+              <label htmlFor="plant-bloom-end-month">End month</label>
+              <input
+                id="plant-bloom-end-month"
+                type="number"
+                min={1}
+                max={12}
+                value={fields.bloomEndMonth}
+                onChange={(event) => updateField('bloomEndMonth', event.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="plant-bloom-end-day">End day</label>
+              <input
+                id="plant-bloom-end-day"
+                type="number"
+                min={1}
+                max={31}
+                value={fields.bloomEndDay}
+                onChange={(event) => updateField('bloomEndDay', event.target.value)}
+              />
+            </div>
+          </div>
           {(errors['bloomWindow.start'] || errors['bloomWindow.end']) && (
             <p role="alert">{errors['bloomWindow.start'] ?? errors['bloomWindow.end']}</p>
           )}
@@ -577,42 +589,54 @@ export function PlantFormPage() {
             {templateForm.triggerType === 'date-range' && (
               <fieldset>
                 <legend>Trigger date range</legend>
-                <label htmlFor="care-task-start-month">Trigger start month</label>
-                <input
-                  id="care-task-start-month"
-                  type="number"
-                  min={1}
-                  max={12}
-                  value={templateForm.startMonth}
-                  onChange={(event) => updateTemplateField('startMonth', event.target.value)}
-                />
-                <label htmlFor="care-task-start-day">Trigger start day</label>
-                <input
-                  id="care-task-start-day"
-                  type="number"
-                  min={1}
-                  max={31}
-                  value={templateForm.startDay}
-                  onChange={(event) => updateTemplateField('startDay', event.target.value)}
-                />
-                <label htmlFor="care-task-end-month">Trigger end month</label>
-                <input
-                  id="care-task-end-month"
-                  type="number"
-                  min={1}
-                  max={12}
-                  value={templateForm.endMonth}
-                  onChange={(event) => updateTemplateField('endMonth', event.target.value)}
-                />
-                <label htmlFor="care-task-end-day">Trigger end day</label>
-                <input
-                  id="care-task-end-day"
-                  type="number"
-                  min={1}
-                  max={31}
-                  value={templateForm.endDay}
-                  onChange={(event) => updateTemplateField('endDay', event.target.value)}
-                />
+                <div className="date-pair">
+                  <div>
+                    <label htmlFor="care-task-start-month">Trigger start month</label>
+                    <input
+                      id="care-task-start-month"
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={templateForm.startMonth}
+                      onChange={(event) => updateTemplateField('startMonth', event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="care-task-start-day">Trigger start day</label>
+                    <input
+                      id="care-task-start-day"
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={templateForm.startDay}
+                      onChange={(event) => updateTemplateField('startDay', event.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="date-pair">
+                  <div>
+                    <label htmlFor="care-task-end-month">Trigger end month</label>
+                    <input
+                      id="care-task-end-month"
+                      type="number"
+                      min={1}
+                      max={12}
+                      value={templateForm.endMonth}
+                      onChange={(event) => updateTemplateField('endMonth', event.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="care-task-end-day">Trigger end day</label>
+                    <input
+                      id="care-task-end-day"
+                      type="number"
+                      min={1}
+                      max={31}
+                      value={templateForm.endDay}
+                      onChange={(event) => updateTemplateField('endDay', event.target.value)}
+                    />
+                  </div>
+                </div>
                 {(templateErrors['trigger.start'] || templateErrors['trigger.end']) && (
                   <p role="alert">
                     {templateErrors['trigger.start'] ?? templateErrors['trigger.end']}

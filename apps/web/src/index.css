@@ -147,6 +147,25 @@ form fieldset {
   border-radius: 4px;
 }
 
+/*
+ * A month + day pair (e.g. "Trigger start month"/"Trigger start day") reads
+ * as one unit — grouped onto their own row so flex-wrap can't split a
+ * label from its input, with a divider between the start and end pairs so
+ * the two halves of the range read as distinct groups.
+ */
+form fieldset .date-pair {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  width: 100%;
+}
+
+form fieldset .date-pair + .date-pair {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
 form [role='alert'] {
   margin-top: 4px;
   color: var(--danger);
