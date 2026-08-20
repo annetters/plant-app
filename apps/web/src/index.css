@@ -121,36 +121,6 @@ form {
   text-align: left;
 }
 
-form label {
-  margin-top: 14px;
-  font-weight: 500;
-  color: var(--text-h);
-}
-
-form label:first-of-type {
-  margin-top: 0;
-}
-
-form input,
-form select {
-  margin-top: 4px;
-  padding: 8px 10px;
-  font: inherit;
-  color: inherit;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-}
-
-form input[type='number'] {
-  max-width: 100px;
-}
-
-form input[type='file'] {
-  border: none;
-  padding-left: 0;
-}
-
 form fieldset {
   display: flex;
   flex-wrap: wrap;
@@ -159,10 +129,6 @@ form fieldset {
   padding: 12px;
   border: 1px solid var(--border);
   border-radius: 4px;
-}
-
-form fieldset label {
-  margin-top: 8px;
 }
 
 form [role='alert'] {
@@ -191,6 +157,39 @@ main:has(form) {
   text-align: left;
 }
 
+/*
+ * Wider than `form ...` on purpose: the reference-photos label/input and
+ * the Delete/Back controls below sit outside <form> as siblings, but
+ * should still read as part of the same stacked layout.
+ */
+main:has(form) label {
+  display: block;
+  margin-top: 14px;
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+main:has(form) input,
+main:has(form) select {
+  display: block;
+  margin-top: 4px;
+  padding: 8px 10px;
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+main:has(form) input[type='number'] {
+  max-width: 100px;
+}
+
+main:has(form) input[type='file'] {
+  border: none;
+  padding-left: 0;
+}
+
 main:has(form) ul {
   display: flex;
   flex-wrap: wrap;
@@ -207,11 +206,12 @@ main:has(form) img {
 }
 
 main:has(form) button:not([type='submit']) {
+  display: block;
   margin-top: 12px;
   padding: 6px 12px;
 }
 
 main:has(form) a {
-  display: inline-block;
+  display: block;
   margin-top: 16px;
 }
