@@ -8,7 +8,7 @@ const config = getDefaultConfig(projectRoot);
 
 // Lets Metro resolve and watch the sibling @plant-app/domain workspace
 // package, which lives outside apps/mobile.
-config.watchFolders = [monorepoRoot];
+config.watchFolders = [...config.watchFolders, monorepoRoot];
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(monorepoRoot, 'node_modules'),
