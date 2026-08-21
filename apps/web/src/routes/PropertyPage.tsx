@@ -92,7 +92,7 @@ export function PropertyPage() {
   }
 
   return (
-    <main>
+    <main className="property-page">
       <header>
         <h1>Map</h1>
       </header>
