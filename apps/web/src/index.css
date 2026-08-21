@@ -258,6 +258,45 @@ main:has(form) a {
   margin-top: 16px;
 }
 
+/*
+ * The address-picker dropdown (AddressAutocomplete). Targeted by id, not
+ * `main:has(form) ul`'s selector above — that generic rule turns any <ul>
+ * into a horizontal flex row for the reference-photos thumbnail list, which
+ * left these options rendering as plain unstyled text with no border,
+ * background, or hover state: visually indistinguishable from body copy,
+ * reading as "not clickable" even though the click handler itself worked.
+ */
+main:has(form) .address-autocomplete {
+  position: relative;
+}
+
+main:has(form) #address-candidates {
+  position: absolute;
+  z-index: 20;
+  inset-inline: 0;
+  top: 100%;
+  margin: 4px 0 0;
+  padding: 4px 0;
+  list-style: none;
+  display: block;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+main:has(form) #address-candidates li {
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+main:has(form) #address-candidates li:hover,
+main:has(form) #address-candidates li[aria-selected='true'] {
+  background: var(--border);
+}
+
 main:has(form) hr {
   margin: 24px 0 0;
   border: none;
