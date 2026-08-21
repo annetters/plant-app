@@ -16,6 +16,13 @@ function Probe() {
         <Text>signup</Text>
       </Pressable>
       <Pressable
+        onPress={() =>
+          auth.signUp('new@example.com', 'hunter2', { emailRedirectTo: 'plant-app://redirect' })
+        }
+      >
+        <Text>signup-with-redirect</Text>
+      </Pressable>
+      <Pressable
         onPress={async () => {
           const result = await auth.logIn('new@example.com', 'hunter2')
           setLastError(result.error?.message ?? 'none')
@@ -135,5 +142,24 @@ describe('AuthProvider / useAuth', () => {
     })
 
     expect(screen.getByTestId('status')).toHaveTextContent('authenticated')
+  })
+
+  it('forwards emailRedirectTo to the client when signUp is given options', async () => {
+    const { client } = createMockAuthClient(null)
+    await render(
+      <AuthProvider client={client}>
+        <Probe />
+      </AuthProvider>,
+    )
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('unauthenticated'))
+
+    await act(async () => {
+      fireEvent.press(screen.getByText('signup-with-redirect'))
+    })
+    expect(client.auth.signUp).toHaveBeenCalledWith({
+      email: 'new@example.com',
+      password: 'hunter2',
+      options: { emailRedirectTo: 'plant-app://redirect' },
+    })
   })
 })

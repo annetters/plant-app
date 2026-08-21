@@ -6,6 +6,12 @@ import { AuthProvider } from '../auth/AuthContext'
 import { createMockAuthClient } from '../test/mockAuthClient'
 import { SignUpScreen } from './SignUpScreen'
 
+// makeRedirectUri() needs Expo's runtime manifest (expo-constants), which
+// isn't populated under Jest — mock the boundary rather than the plumbing.
+jest.mock('expo-auth-session', () => ({
+  makeRedirectUri: () => 'plant-app://redirect',
+}))
+
 const Stack = createNativeStackNavigator()
 
 async function renderSignUpFlow(session: Parameters<typeof createMockAuthClient>[0] = null) {
@@ -35,6 +41,7 @@ describe('SignUpScreen', () => {
     expect(client.auth.signUp).toHaveBeenCalledWith({
       email: 'me@example.com',
       password: 'hunter22',
+      options: { emailRedirectTo: 'plant-app://redirect' },
     })
     expect(await screen.findByText('Check your email')).toBeTruthy()
   })

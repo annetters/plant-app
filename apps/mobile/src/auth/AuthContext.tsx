@@ -8,7 +8,11 @@ export interface AuthClient {
     onAuthStateChange(callback: AuthChangeCallback): {
       data: { subscription: { unsubscribe(): void } }
     }
-    signUp(params: { email: string; password: string }): Promise<{
+    signUp(params: {
+      email: string
+      password: string
+      options?: { emailRedirectTo?: string }
+    }): Promise<{
       data: { user: User | null; session: Session | null }
       error: AuthError | null
     }>
@@ -25,7 +29,11 @@ export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated'
 interface AuthContextValue {
   status: AuthStatus
   user: User | null
-  signUp(email: string, password: string): Promise<{ error: AuthError | null }>
+  signUp(
+    email: string,
+    password: string,
+    options?: { emailRedirectTo?: string },
+  ): Promise<{ error: AuthError | null }>
   logIn(email: string, password: string): Promise<{ error: AuthError | null }>
   logOut(): Promise<void>
 }
@@ -55,8 +63,12 @@ export function AuthProvider({ client, children }: { client: AuthClient; childre
     () => ({
       status: session === undefined ? 'loading' : session ? 'authenticated' : 'unauthenticated',
       user: session?.user ?? null,
-      signUp: async (email, password) => {
-        const { error } = await client.auth.signUp({ email, password })
+      signUp: async (email, password, options) => {
+        const { error } = await client.auth.signUp({
+          email,
+          password,
+          ...(options ? { options } : {}),
+        })
         return { error }
       },
       logIn: async (email, password) => {

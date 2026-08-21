@@ -1,5 +1,6 @@
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
+import { makeRedirectUri } from 'expo-auth-session'
 import { useState } from 'react'
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useAuth } from '../auth/AuthContext'
@@ -11,7 +12,7 @@ export function SignUpScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<AuthStackParamList>>()
   const [submitted, setSubmitted] = useState(false)
   const form = useCredentialsForm(async (email, password) => {
-    const result = await signUp(email, password)
+    const result = await signUp(email, password, { emailRedirectTo: makeRedirectUri() })
     if (!result.error) {
       setSubmitted(true)
     }
