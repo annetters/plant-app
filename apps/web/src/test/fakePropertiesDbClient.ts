@@ -2,9 +2,11 @@ import type { PropertyRow } from '@plant-app/domain'
 import { vi } from 'vitest'
 import type { PropertiesDbClient } from '../property/propertiesRepository'
 
+type DbResult = { data: unknown; error: { message: string } | null }
+
 /**
  * An in-memory stand-in for the slice of Supabase's client PropertiesRepository
- * calls — a plain select on the `properties` table, plus `functions.invoke`
+ * calls — select/delete on the `properties` table, plus `functions.invoke`
  * for the `create-property` edge function. Mirrors fakePlantsDbClient's shape.
  */
 export function createFakePropertiesDbClient(initialRow: PropertyRow | null = null) {
@@ -33,31 +35,52 @@ export function createFakePropertiesDbClient(initialRow: PropertyRow | null = nu
     },
   )
 
+  function builder(op: 'select' | 'delete') {
+    const filters: Record<string, string> = {}
+
+    const chain = {
+      select() {
+        return chain
+      },
+      eq(column: string, value: string) {
+        filters[column] = value
+        return chain
+      },
+      maybeSingle() {
+        return chain
+      },
+      then<T1 = unknown, T2 = never>(
+        onfulfilled?: ((value: DbResult) => T1 | PromiseLike<T1>) | null,
+        onrejected?: ((reason: unknown) => T2 | PromiseLike<T2>) | null,
+      ) {
+        return Promise.resolve(execute()).then(onfulfilled, onrejected)
+      },
+    }
+
+    function matches(): boolean {
+      return Object.entries(filters).every(([column, value]) => {
+        const rowValue = row ? (row as unknown as Record<string, string>)[column] : undefined
+        return rowValue === value
+      })
+    }
+
+    function execute(): DbResult {
+      if (op === 'select') {
+        return { data: row, error: null }
+      }
+      // delete
+      if (row && matches()) row = null
+      return { data: null, error: null }
+    }
+
+    return chain
+  }
+
   const client: PropertiesDbClient = {
     from(_table: 'properties') {
       return {
-        select() {
-          const chain = {
-            select() {
-              return chain
-            },
-            maybeSingle() {
-              return chain
-            },
-            then<T1 = unknown, T2 = never>(
-              onfulfilled?:
-                | ((value: {
-                    data: unknown
-                    error: { message: string } | null
-                  }) => T1 | PromiseLike<T1>)
-                | null,
-              onrejected?: ((reason: unknown) => T2 | PromiseLike<T2>) | null,
-            ) {
-              return Promise.resolve({ data: row, error: null }).then(onfulfilled, onrejected)
-            },
-          }
-          return chain
-        },
+        select: () => builder('select'),
+        delete: () => builder('delete'),
       }
     },
     functions: { invoke },

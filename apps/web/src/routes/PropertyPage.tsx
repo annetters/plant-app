@@ -30,6 +30,7 @@ export function PropertyPage() {
   const [addressError, setAddressError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -71,6 +72,20 @@ export function PropertyPage() {
       setFormError(error instanceof Error ? error.message : 'Could not create this Property.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleDelete() {
+    if (!property) return
+    if (!window.confirm('Delete this Property? This cannot be undone.')) return
+    setDeleting(true)
+    try {
+      await repository.remove(property.id)
+      setProperty(null)
+    } catch {
+      setFormError('Could not delete this Property. Please try again.')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -127,6 +142,9 @@ export function PropertyPage() {
               plan or an in-app drawn base map will cover this case in a later ticket.
             </p>
           )}
+          <button type="button" onClick={handleDelete} disabled={deleting}>
+            {deleting ? 'Deleting…' : 'Delete Property'}
+          </button>
         </section>
       )}
 

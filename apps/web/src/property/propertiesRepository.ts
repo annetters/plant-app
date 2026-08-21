@@ -7,6 +7,7 @@ type DbResult<T> = { data: T; error: { message: string } | null }
 /** The slice of a Postgrest filter builder the repository actually calls. */
 interface PropertiesQuery extends PromiseLike<DbResult<unknown>> {
   select(columns?: string): PropertiesQuery
+  eq(column: string, value: string): PropertiesQuery
   maybeSingle(): PropertiesQuery
 }
 
@@ -14,6 +15,7 @@ interface PropertiesQuery extends PromiseLike<DbResult<unknown>> {
 export interface PropertiesDbClient {
   from(table: 'properties'): {
     select(columns?: string): PropertiesQuery
+    delete(): PropertiesQuery
   }
   functions: {
     invoke(
@@ -69,5 +71,11 @@ export class PropertiesRepository {
     const result = data as { error?: string } & Partial<PropertyRow>
     if (result?.error) throw new Error(result.error)
     return propertyFromRow(result as PropertyRow)
+  }
+
+  /** Frees the account's one-Property slot (MVP has no edit — delete and re-create instead). */
+  async remove(id: string): Promise<void> {
+    const { error } = await this.client.from(TABLE).delete().eq('id', id)
+    if (error) throw new Error(error.message)
   }
 }

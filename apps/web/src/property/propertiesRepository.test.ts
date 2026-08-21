@@ -59,3 +59,14 @@ describe('PropertiesRepository.create', () => {
     )
   })
 })
+
+describe('PropertiesRepository.remove', () => {
+  it('deletes the Property, freeing the account up to create another', async () => {
+    const { client } = createFakePropertiesDbClient(EXISTING_ROW)
+    const repository = new PropertiesRepository(client)
+
+    await repository.remove('property-1')
+
+    expect(await repository.get()).toBeNull()
+  })
+})

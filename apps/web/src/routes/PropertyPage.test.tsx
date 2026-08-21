@@ -2,7 +2,7 @@ import type { PropertyRow } from '@plant-app/domain'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { PropertiesRepositoryProvider } from '../property/PropertiesRepositoryContext'
 import { createFakePropertiesDbClient } from '../test/fakePropertiesDbClient'
 import { PropertyPage } from './PropertyPage'
@@ -92,5 +92,29 @@ describe('PropertyPage — existing Property', () => {
       await screen.findByText(/No aerial imagery is available for this property/),
     ).toBeInTheDocument()
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  })
+
+  it('deletes the Property after confirmation, freeing the account up to create another', async () => {
+    const user = userEvent.setup()
+    renderPage(availableRow)
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+
+    await screen.findByText('10 Main St, Cambridge, MA')
+    await user.click(screen.getByRole('button', { name: 'Delete Property' }))
+
+    expect(await screen.findByLabelText('Address')).toBeInTheDocument()
+    expect(screen.queryByText('10 Main St, Cambridge, MA')).not.toBeInTheDocument()
+  })
+
+  it('does not delete the Property when the confirmation is declined', async () => {
+    const user = userEvent.setup()
+    renderPage(availableRow)
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+
+    await screen.findByText('10 Main St, Cambridge, MA')
+    await user.click(screen.getByRole('button', { name: 'Delete Property' }))
+
+    expect(screen.getByText('10 Main St, Cambridge, MA')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Address')).not.toBeInTheDocument()
   })
 })
