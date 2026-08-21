@@ -1,12 +1,13 @@
 import { DASHBOARD_TILES } from '@plant-app/domain'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAuth } from '../auth/AuthContext'
 
 export function DashboardScreen() {
   const { logOut } = useAuth()
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Text style={styles.title}>Dashboard</Text>
         <Pressable accessibilityRole="button" onPress={() => logOut()}>
@@ -20,7 +21,7 @@ export function DashboardScreen() {
           </View>
         ))}
       </View>
-    </View>
+    </SafeAreaView>
   )
 }
 

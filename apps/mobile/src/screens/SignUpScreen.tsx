@@ -2,7 +2,8 @@ import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { makeRedirectUri } from 'expo-auth-session'
 import { useState } from 'react'
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAuth } from '../auth/AuthContext'
 import { useCredentialsForm } from '../auth/useCredentialsForm'
 import type { AuthStackParamList } from '../navigation/types'
@@ -21,59 +22,71 @@ export function SignUpScreen() {
 
   if (submitted) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Check your email</Text>
-        <Text>We sent a confirmation link to {form.email}. Follow it to finish signing up.</Text>
-      </View>
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView contentContainerStyle={styles.container}>
+          <Text style={styles.title}>Check your email</Text>
+          <Text>We sent a confirmation link to {form.email}. Follow it to finish signing up.</Text>
+        </ScrollView>
+      </SafeAreaView>
     )
   }
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Sign up</Text>
-
-      <Text>Email</Text>
-      <TextInput
-        accessibilityLabel="Email"
-        autoCapitalize="none"
-        autoComplete="email"
-        keyboardType="email-address"
-        style={styles.input}
-        value={form.email}
-        onChangeText={form.setEmail}
-      />
-
-      <Text>Password</Text>
-      <TextInput
-        accessibilityLabel="Password"
-        autoComplete="new-password"
-        secureTextEntry
-        style={styles.input}
-        value={form.password}
-        onChangeText={form.setPassword}
-      />
-
-      {form.error && <Text style={styles.error}>{form.error}</Text>}
-
-      <Pressable
-        accessibilityRole="button"
-        disabled={form.submitting}
-        style={styles.button}
-        onPress={form.submit}
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        style={styles.safeArea}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Text>Sign up</Text>
-      </Pressable>
+        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+          <Text style={styles.title}>Sign up</Text>
 
-      <Pressable onPress={() => navigation.navigate('Login')}>
-        <Text>Already have an account? Log in</Text>
-      </Pressable>
-    </View>
+          <Text>Email</Text>
+          <TextInput
+            accessibilityLabel="Email"
+            autoCapitalize="none"
+            autoComplete="email"
+            keyboardType="email-address"
+            style={styles.input}
+            value={form.email}
+            onChangeText={form.setEmail}
+          />
+
+          <Text>Password</Text>
+          <TextInput
+            accessibilityLabel="Password"
+            autoComplete="new-password"
+            secureTextEntry
+            style={styles.input}
+            value={form.password}
+            onChangeText={form.setPassword}
+          />
+
+          {form.error && <Text style={styles.error}>{form.error}</Text>}
+
+          <Pressable
+            accessibilityRole="button"
+            disabled={form.submitting}
+            style={styles.button}
+            onPress={form.submit}
+          >
+            <Text>Sign up</Text>
+          </Pressable>
+
+          <Pressable onPress={() => navigation.navigate('Login')}>
+            <Text>Already have an account? Log in</Text>
+          </Pressable>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   )
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
+  },
+  container: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: 24,
     gap: 8,

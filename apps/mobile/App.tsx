@@ -1,5 +1,6 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider } from './src/auth/AuthContext';
 import { useAuthDeepLinkHandler } from './src/auth/useAuthDeepLinkHandler';
 import { supabase } from './src/lib/supabaseClient';
@@ -18,8 +19,10 @@ function AppShell() {
 
 export default function App() {
   return (
-    <AuthProvider client={supabase}>
-      <AppShell />
-    </AuthProvider>
+    <SafeAreaProvider>
+      <AuthProvider client={supabase}>
+        <AppShell />
+      </AuthProvider>
+    </SafeAreaProvider>
   );
 }
