@@ -7,28 +7,65 @@
 
 ## What to do next
 
-**#5 (Property + aerial base map) is implemented and committed** — see
-commit `1380351`. A gardener can create their one Property (per account,
-MVP) by address; the new `create-property` Edge Function geocodes it
-(Nominatim) and probes Esri World Imagery zoom availability server-side
-(ADR-0002/ADR-0003) before persisting the resolved Property row; the web
-Property page (`/map`) renders the base map as a plain, non-drawable
-structural reference layer, or a degraded-mode message when no imagery is
-available anywhere probed. Migrations `0006`/`0007` are **pushed** and the
-Edge Function is **deployed** to the linked Supabase project (verified via
-`npx supabase migration list` and a direct `curl` smoke test of the
-function's method/auth/validation guard paths — see "Deferred QA (ticket
-#5)" for what a real-browser pass still needs to cover). **Not yet closed
-on GitHub** — held open the same way #4 was, pending that manual pass.
+**#5 (Property + aerial base map) is implemented, committed, and has had
+substantially more real-world verification than usual** — a gardener can
+create their one Property (per account, MVP) by address, picked from a
+live autocomplete rather than freeform text (see below), and see it
+rendered as a non-drawable structural reference layer or a degraded-mode
+message. **Still not closed on GitHub** — held open the same way #4 was;
+"Deferred QA (ticket #5)" below is shorter than it was but not empty.
 
-Code review (run before committing) caught and fixed three real bugs in the
-Edge Function before deploy: no CORS handling at all (would have silently
-broken every browser call — Edge Functions need an explicit OPTIONS/
-`Access-Control-Allow-*` response, not just the real POST), the inserted
-row never set `user_id` (would have failed the table's `NOT NULL` and RLS
-check on every request), and a malformed geocoder hit could put `NaN`
-straight into the `latitude`/`longitude` columns instead of being treated
-as "no match."
+What shipped, across several rounds of real manual QA in this session
+(not just unit tests — a real signed-in browser, then a Playwright-driven
+headless browser for the last two bugs, which unit tests couldn't have
+caught either):
+
+- **`create-property` Edge Function** (commit `1380351`) — probes Esri
+  World Imagery zoom availability server-side (ADR-0002/ADR-0003) and
+  persists the resulting Property row. Code review caught three real bugs
+  before first deploy: no CORS handling at all, the inserted row never set
+  `user_id`, and a malformed geocoder hit could put `NaN` into
+  `latitude`/`longitude`.
+- **CORS preflight fix** (`f78788b`) — manual QA hit "Failed to send a
+  request to the Edge Function" on every submit. `supabase-js` sends an
+  `X-Client-Info` header on every request by default; the function's
+  `Access-Control-Allow-Headers` didn't list it, so the browser's real
+  preflight failed silently. A hand-crafted `curl OPTIONS` test hadn't
+  caught this, because it hadn't set that header either — the lesson being
+  a Edge Function's CORS surface needs testing against what the *real*
+  client actually sends, not a guessed header list.
+- **Delete Property** (`b4570b2`) — the one-per-account design had no
+  recovery path for a wrong address or a QA retry. No new migration
+  needed; the owner-scoped delete RLS policy and grant were already there
+  from `0006`/`0007`.
+- **Resolved-address display, then full address autocomplete**
+  (`af95e6a`, `fe0443c`) — flagged directly by the user: a bare street with
+  no city/state/country ("1 main st") geocoded to *something*, silently,
+  anywhere on the planet. First pass showed what Nominatim actually
+  matched, next to what was typed. User then asked for the more robust
+  fix: a `search-addresses` Edge Function returning multiple candidates,
+  and a combobox (`AddressAutocomplete.tsx`) that requires picking one —
+  raw text can no longer be geocoded and saved directly. `create-property`
+  no longer geocodes at all; it only takes an already-picked candidate and
+  probes imagery. New `supabase/functions/_shared/{cors,auth,nominatim}.ts`
+  once a second function existed. Code review on this diff caught a real
+  race (stale candidates from a superseded search staying clickable) plus
+  several smaller issues, all fixed with a regression test added for the
+  race.
+- **Dropdown was invisible, then too narrow** (`b7f01c3`, `3b7fa07`) — user
+  reported suggestions "aren't clickable." Diagnosed by actually driving a
+  real headless browser (Playwright, both Chromium and WebKit engines)
+  against the dev server instead of guessing: the click handler was never
+  broken in either engine — a pre-existing global CSS rule (written for an
+  unrelated thumbnail list) was rendering the dropdown as unstyled flex
+  text with no border, background, or hover state, indistinguishable from
+  body copy. Fixed with a real dropdown style, scoped by id. Widening it
+  afterward (full geocoder results run long) took two more overrides and a
+  real flexbox diagnosis — bumping `main`'s `max-width` alone silently did
+  nothing, because `#root` is a flex column container and `main`'s
+  existing `margin: 0 auto` suppresses flex-stretch on auto-margined
+  items; `width: 100%` was the actual fix. Both diagnosed by checking
+  actual computed styles in a real browser, not by re-guessing.
 
 **#2 is implemented, committed, manually verified against a real Supabase
 project** (sign up, log in, land on the Dashboard shell, session survives
@@ -151,34 +188,45 @@ the ticket alone). As each ticket closes, re-run the frontier query (see
 "Issue tracker") to see what newly unblocked.
 
 Nothing here is stale-checked for you the way the old "three uncommitted
-files" note used to be — but unlike every prior update, `git status` is
-**not** clean as of this one: an untracked `apps/mobile/` directory and a
-locally-modified `package-lock.json` (picked up `apps/mobile`'s dependency
-tree the moment any `npm run` command touched the workspace) are sitting in
-the working tree, from what looks like a concurrent session working #13.
-Neither is this update's work — `git status` before assuming either
-reflects what you expect, and don't `git add -A`/force-overwrite them.
+files" note used to be — `git status` was clean as of this update.
+Earlier in this same round, a concurrent session working #13 had
+`apps/mobile/` sitting untracked in this working tree — it's since been
+committed for real (`7ff1943`, `80f8b84`, `f37c2fb`; #13 is still **open**
+on GitHub as of this update, so don't assume it's finished — check
+`gh issue view 13` rather than trusting a stale summary). That's a
+concrete instance of the risk this doc keeps flagging: this repo's
+working tree is shared by more than one session, so `git status` before
+any broad `git add`.
 
 ### Deferred QA (ticket #5)
 
 Ticket #5's Edge Function and migrations were verified via `npx supabase
-migration list` (0006/0007 live) and direct `curl` smoke tests of the
-deployed function's guard paths (CORS preflight, missing/invalid auth,
-blank address) — see commit `1380351`'s message for the three real bugs
-that smoke-testing caught before deploy. None of the below were run, since
-they need a real signed-in browser session:
+migration list` (all migrations through `0008` live) and direct `curl`
+smoke tests of both deployed functions' guard paths (CORS preflight,
+missing/invalid auth, blank address, malformed body). Item 1 below is now
+done — both by the user directly confirming a real create succeeded, and
+by a Playwright-driven headless-browser pass (used to diagnose the two CSS
+bugs — see "What to do next" above) that exercised the same flow
+end-to-end, including a real click-to-select. The rest still need a real
+signed-in browser session:
 
-1. **Full create-Property flow in the browser** — sign up/log in, enter a
-   real address on `/map`, confirm the base map tiles actually render (a
-   `curl OPTIONS` proving CORS headers are correct is not the same as a
-   real browser fetch succeeding end-to-end).
+1. ~~Full create-Property flow in the browser~~ — **done**, address
+   autocomplete → pick a candidate → base map renders. Verified twice:
+   directly by the user, and via automated headless-browser driving.
 2. **Degraded-mode path** — create a Property at a location with no Esri
-   imagery (open ocean coordinates are a reliable way to force this),
-   confirm the "No aerial imagery is available" message shows instead of a
-   silent gap or broken images.
+   imagery (open ocean coordinates are a reliable way to force this, though
+   Esri's basemap has close-to-global coverage even at zoom 18, so a real
+   land address triggering this reliably is uncommon — see the
+   conversation this session for a DB-side shortcut: edit the row's
+   `imagery_zoom`/`imagery_available` directly via the Supabase dashboard
+   to isolate just the UI's rendering of this state), confirm the "No
+   aerial imagery is available" message shows instead of a silent gap or
+   broken images.
 3. **One-Property-per-account** — after creating a Property, try again;
    confirm the "You already have a Property." error surfaces cleanly
-   rather than a raw Postgres constraint error.
+   rather than a raw Postgres constraint error. (Delete Property, added
+   this session, is the easier way to free the slot back up between
+   attempts rather than needing a second account.)
 4. **Reload persistence** — refresh `/map` after creating a Property;
    confirm it loads the existing one (`PropertiesRepository.get()`) instead
    of re-showing the address form.
@@ -247,12 +295,19 @@ Domain glossary: `CONTEXT.md`
 
 ## Current state
 
-Working tree **not** clean as of this update — see the note at the end of
-"What to do next" above (`apps/mobile/` untracked, `package-lock.json`
-locally modified, neither from this update's work). Most recent commits
-first:
+Working tree clean as of this update. Most recent commits first:
 
 ```
+3b7fa07 Widen the Property page so full addresses aren't cramped
+b7f01c3 Style the address-picker dropdown — reported as "not clickable"
+f37c2fb Handle Supabase email-confirmation deep links on mobile
+fe0443c Add address autocomplete to replace freeform geocoding
+80f8b84 Downgrade mobile app to Expo SDK 54 to match Expo Go
+af95e6a Show the geocoder's resolved address alongside what was typed
+7ff1943 Add React Native app scaffold + auth (#13)
+b4570b2 Add a Delete Property control
+f78788b Fix CORS preflight rejection on create-property (missing x-client-info)
+84c803d Update handoff doc for ticket #5
 1380351 Add Property + aerial base map (#5)
 58672c8 Mark commits and migration 0005 as pushed in handoff doc
 91fac04 Update handoff doc for the Plant-form fixes batch
@@ -286,17 +341,22 @@ eaf1f32 Add ADR-0003: web desktop + native mobile, cloud BaaS backend
 
 `2668f2c` (#2), `9018f33`–`1d20b8e` (#3, plus fixes found during manual
 QA), `4eea9e7`–`91fac04` (#4, plus fixes found during manual QA, including
-the hardiness-zone-range rework in `9b74934`), and `1380351` (#5) are the
-build work so far. #3 is closed on GitHub. #4 and #5 are implemented and
-partially verified but **not yet closed on GitHub** — see "What to do
-next" above and each ticket's "Deferred QA" section. `1380351`'s
-migrations (`0006`/`0007`) are pushed to the linked Supabase project and
-its `create-property` Edge Function is deployed — but unlike every prior
-commit in this list, **`1380351` itself has not been `git push`ed to the
-GitHub remote yet**, since pushing to a shared remote wasn't asked for in
-this session; do that (or ask first) before treating this branch as
-published. The remaining 15 tickets (#6, #13, #14–#20) are still unbuilt;
-#21 (filed during #4's QA) is `needs-triage`, not yet scoped for build.
+the hardiness-zone-range rework in `9b74934`), and `1380351`–`3b7fa07`
+(#5, plus several real rounds of fixes found during manual QA — see "What
+to do next" above for the detailed list) are the build work so far. #3 is
+closed on GitHub. #4 and #5 are implemented and partially verified but
+**not yet closed on GitHub** — see "What to do next" above and each
+ticket's "Deferred QA" section. #5's migrations (through `0008`) are
+pushed to the linked Supabase project and both its Edge Functions
+(`create-property`, `search-addresses`) are deployed — but **none of this
+session's commits have been `git push`ed to the GitHub remote yet**, since
+pushing to a shared remote wasn't asked for in this session; do that (or
+ask first) before treating this branch as published. `7ff1943`, `80f8b84`,
+`f37c2fb` are #13's work from a concurrent session, not this one — #13 is
+still open on GitHub, don't assume it's finished without checking. The
+remaining tickets (#6, #14–#20, and #13 pending its own verification) are
+still unbuilt or unverified; #21 (filed during #4's QA) is `needs-triage`,
+not yet scoped for build.
 
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
 > No GPS is read and no user photo is taken — that is exactly why the work was
@@ -306,9 +366,9 @@ published. The remaining 15 tickets (#6, #13, #14–#20) are still unbuilt;
 
 | Artifact | Path | Purpose |
 |---|---|---|
-| **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output (npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app, Supabase auth, auth-gated Dashboard shell) plus ticket #3's output (`Plant`/`PlantInput` types + `validatePlantInput` in `packages/domain/src/plant.ts`; Registry list + create/view/edit/delete + reference-photo upload in `apps/web/src/routes/Plants*.tsx` and `apps/web/src/plants/`) plus ticket #4's output (`TaskTrigger`/`CareTaskTemplate` types + `validateCareTaskTemplateInput` + `computeTriggerDateRange`/`dateRangeWraps` in `packages/domain/src/careTaskTemplate.ts`; add/list/remove UI in the "Care task templates" section of `apps/web/src/routes/PlantFormPage.tsx`, repository methods on `PlantsRepository`) plus ticket #5's output (`Property`/`PropertyInput` types + Web Mercator scale math — `metersPerPixel`/`feetPerPixel`/`pixelsPerFoot`/`lonLatToTile`/`pickBestZoom`/`aerialTileUrl` — in `packages/domain/src/property.ts`; the `/map` page in `apps/web/src/routes/PropertyPage.tsx` and `apps/web/src/property/`, backed by the `create-property` Edge Function). See `apps/web/README.md` for the one-time Supabase project setup. Not throwaway — build on this. |
-| **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). `0003_care_task_templates.sql` — the `care_task_templates` table, owned by a `plant_id` FK with RLS via a join to `plants` (not a direct `user_id` column). `0004_grant_care_task_templates_table.sql` — the same follow-up GRANT `0002` needed, for the new table. `0005_plant_hardiness_zone_range.sql` — drops `hardiness_zone`, adds `hardiness_zone_min`/`hardiness_zone_max` (a plant's hardiness rating is a whole-zone range, not a single value — see "What to do next"). `0006_properties.sql` — the `properties` table (one row per account for MVP, `properties_one_per_user unique (user_id)`), RLS. `0007_grant_properties_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`, for `properties`. All seven (`0001`–`0007`) are live on the linked project as of this update (verify with `npx supabase migration list`). Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
-| **Edge Functions** | `supabase/functions/` | Server-side adapter calls per ADR-0003, deployed via `npm run functions:deploy` (Docker-free — deploy just bundles+uploads, unlike `functions serve`/`start` which need a local Docker stack). `create-property` (ticket #5) — geocodes an address (Nominatim) and probes Esri World Imagery zoom availability before inserting the resulting Property row. Its Web Mercator math is hand-duplicated from `packages/domain/src/property.ts` (Deno edge functions can't import this npm workspace package) — keep the two in sync by hand, same convention as the `PlantRow`/migration "keep in sync" comments elsewhere. |
+| **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output (npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app, Supabase auth, auth-gated Dashboard shell) plus ticket #3's output (`Plant`/`PlantInput` types + `validatePlantInput` in `packages/domain/src/plant.ts`; Registry list + create/view/edit/delete + reference-photo upload in `apps/web/src/routes/Plants*.tsx` and `apps/web/src/plants/`) plus ticket #4's output (`TaskTrigger`/`CareTaskTemplate` types + `validateCareTaskTemplateInput` + `computeTriggerDateRange`/`dateRangeWraps` in `packages/domain/src/careTaskTemplate.ts`; add/list/remove UI in the "Care task templates" section of `apps/web/src/routes/PlantFormPage.tsx`, repository methods on `PlantsRepository`) plus ticket #5's output (`Property`/`PropertyInput`/`AddressCandidate` types + Web Mercator scale math — `metersPerPixel`/`feetPerPixel`/`pixelsPerFoot`/`lonLatToTile`/`pickBestZoom`/`aerialTileUrl` — in `packages/domain/src/property.ts`; the `/map` page in `apps/web/src/routes/PropertyPage.tsx` and `apps/web/src/property/` — `PropertiesRepository` with `get`/`search`/`create`/`remove`, and the `AddressAutocomplete.tsx` combobox that requires picking a specific geocoder candidate rather than submitting freeform text — backed by the `create-property` and `search-addresses` Edge Functions). See `apps/web/README.md` for the one-time Supabase project setup. Not throwaway — build on this. |
+| **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). `0003_care_task_templates.sql` — the `care_task_templates` table, owned by a `plant_id` FK with RLS via a join to `plants` (not a direct `user_id` column). `0004_grant_care_task_templates_table.sql` — the same follow-up GRANT `0002` needed, for the new table. `0005_plant_hardiness_zone_range.sql` — drops `hardiness_zone`, adds `hardiness_zone_min`/`hardiness_zone_max` (a plant's hardiness rating is a whole-zone range, not a single value — see "What to do next"). `0006_properties.sql` — the `properties` table (one row per account for MVP, `properties_one_per_user unique (user_id)`), RLS. `0007_grant_properties_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`, for `properties`. `0008_property_resolved_address.sql` — adds nullable `resolved_address` (what the geocoder actually matched, shown next to what the user typed so a bad match is visible — see "What to do next"). All eight (`0001`–`0008`) are live on the linked project as of this update (verify with `npx supabase migration list`). Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
+| **Edge Functions** | `supabase/functions/` | Server-side adapter calls per ADR-0003, deployed via `npm run functions:deploy` (deploys every function found under `supabase/functions/` in one go — Docker-free, just bundles+uploads, unlike `functions serve`/`start` which need a local Docker stack). `create-property` (ticket #5) — takes a location already picked from `search-addresses`'s candidates (no longer geocodes raw text itself), probes Esri World Imagery zoom availability, and inserts the resulting Property row. `search-addresses` (added during #5's QA) — returns multiple geocoder candidates for the address-picker UI to choose from; requiring a specific pick, not stricter input validation, is what keeps a bare street ("1 main st") from silently resolving to an arbitrary global match. `_shared/{cors,auth,nominatim}.ts` — CORS/auth/geocoding helpers shared between the two functions, extracted once a second one existed. Web Mercator math in `create-property` is hand-duplicated from `packages/domain/src/property.ts` (Deno edge functions can't import this npm workspace package) — keep the two in sync by hand, same convention as the `PlantRow`/migration "keep in sync" comments elsewhere. |
 | **Spec (current)** | [GitHub issue #1](https://github.com/annetters/plant-app/issues/1) | The real spec. 53 user stories, full implementation/testing decisions. Labeled `ready-for-agent`. |
 | Spec (superseded) | `docs/plant-app-spec.md` | The original file-based spec, written before this repo had an issue tracker. Kept for history; has a banner pointing to issue #1. Do not implement against it. |
 | Domain glossary | `CONTEXT.md` | Canonical term definitions — Plant, Planting, Property, Scale Reference, Bed, Landmark (deferred), Pin, Tag Scan, Task model, Registry, Bloom Timeline, Dashboard |
@@ -443,7 +503,7 @@ Ticket map (dependency order; title abbreviated):
 | 2 | Repo scaffold, Supabase backend, web auth skeleton | — (built, `2668f2c`, closed) |
 | 3 | Plant record CRUD (manual entry) — built, `9018f33`, closed | 2 |
 | 4 | Care task templates on Plant — built, `4eea9e7`–`8ce7a48`, **open** (deferred QA) | 3 |
-| 5 | Property + aerial base map — built, `1380351`, **open** (deferred QA) | 2 |
+| 5 | Property + aerial base map — built, `1380351`–`3b7fa07`, **open** (deferred QA) | 2 |
 | 6 | Property: photographed/in-app-drawn base map + Scale Reference | 5 |
 | 7 | Bed drawing (desktop) | 5 |
 | 8 | Planting: create + place Pin, view on tap | 3, 7 |
@@ -451,7 +511,7 @@ Ticket map (dependency order; title abbreviated):
 | 10 | Registry view | 3, 8 |
 | 11 | Dashboard (real content) | 7, 8, 9, 10 |
 | 12 | Task completion logging, history, one-off todos | 4, 8, 11 |
-| 13 | React Native app scaffold + auth | 2 |
+| 13 | React Native app scaffold + auth — has commits (`7ff1943`, `80f8b84`, `f37c2fb`) from a concurrent session, **still open** — verify status before assuming done | 2 |
 | 14 | Native: Map view | 8, 13 |
 | 15 | Native: Scale Reference calibration | 6, 13 |
 | 16 | Native: Registry view | 10, 13 |
