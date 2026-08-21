@@ -67,6 +67,19 @@ export function aerialTileUrl(zoom: number, x: number, y: number): string {
   return `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${y}/${x}`;
 }
 
+/**
+ * One geocoder search result, offered as a pick — never applied
+ * automatically. A bare street with no locality ("1 main st") is
+ * otherwise a shot in the dark across the whole planet; requiring a
+ * specific candidate to be chosen is what narrows it, not stricter input
+ * validation (real addresses vary too much to validate by shape).
+ */
+export interface AddressCandidate {
+  displayName: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface PropertyInput {
   /** What the user typed in. Never re-derived — always shown alongside `resolvedAddress` so a bad geocoder match is visible, not silent. */
   address: string;

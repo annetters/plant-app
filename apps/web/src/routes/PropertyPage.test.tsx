@@ -19,6 +19,13 @@ function renderPage(initialRow: PropertyRow | null = null) {
   return fake
 }
 
+/** Types into the address field, waits for candidates, and picks the first one. */
+async function pickFirstCandidate(query: string) {
+  await userEvent.type(await screen.findByLabelText('Address'), query)
+  const [firstOption] = await screen.findAllByRole('option')
+  await userEvent.click(firstOption)
+}
+
 describe('PropertyPage — no Property yet', () => {
   it('offers an address form', async () => {
     renderPage(null)
@@ -26,29 +33,33 @@ describe('PropertyPage — no Property yet', () => {
     expect(screen.getByRole('button', { name: 'Create Property' })).toBeInTheDocument()
   })
 
-  it('rejects a blank address without calling the repository', async () => {
+  it('rejects submission with no picked candidate, without calling the repository', async () => {
     const { invoke } = renderPage(null)
     await screen.findByLabelText('Address')
     await userEvent.click(screen.getByRole('button', { name: 'Create Property' }))
-    expect(await screen.findByText('Address is required.')).toBeInTheDocument()
+    expect(await screen.findByText('Select an address from the results list.')).toBeInTheDocument()
     expect(invoke).not.toHaveBeenCalled()
   })
 
-  it('creates the Property and then renders its base map', async () => {
+  it('rejects typed-but-unpicked text — typing alone is not enough to submit', async () => {
     renderPage(null)
-    await userEvent.type(await screen.findByLabelText('Address'), '10 Main St, Cambridge, MA')
+    await userEvent.type(await screen.findByLabelText('Address'), '10 main st')
+    await screen.findAllByRole('option') // candidates loaded, but none clicked
+    await userEvent.click(screen.getByRole('button', { name: 'Create Property' }))
+    expect(await screen.findByText('Select an address from the results list.')).toBeInTheDocument()
+  })
+
+  it('creates the Property once a candidate is picked, and renders its base map', async () => {
+    renderPage(null)
+    await pickFirstCandidate('10 main st')
     await userEvent.click(screen.getByRole('button', { name: 'Create Property' }))
 
-    expect(await screen.findByText('10 Main St, Cambridge, MA')).toBeInTheDocument()
+    expect(await screen.findByText('10 main st')).toBeInTheDocument()
     expect(screen.queryByLabelText('Address')).not.toBeInTheDocument()
   })
 
   it('surfaces a failure from the edge function as a form error', async () => {
     const fake = createFakePropertiesDbClient(null)
-    fake.invoke.mockResolvedValueOnce({
-      data: { error: 'Could not resolve that address.' },
-      error: null,
-    })
     render(
       <MemoryRouter>
         <PropertiesRepositoryProvider client={fake.client}>
@@ -58,6 +69,15 @@ describe('PropertyPage — no Property yet', () => {
     )
 
     await userEvent.type(await screen.findByLabelText('Address'), 'nowhere at all')
+    const [firstOption] = await screen.findAllByRole('option')
+    await userEvent.click(firstOption)
+
+    // Overrides only the next invoke() call — the create-property submission
+    // below — leaving the search-addresses call above on the default fake.
+    fake.invoke.mockResolvedValueOnce({
+      data: { error: 'Could not resolve that address.' },
+      error: null,
+    })
     await userEvent.click(screen.getByRole('button', { name: 'Create Property' }))
 
     expect(await screen.findByText('Could not resolve that address.')).toBeInTheDocument()

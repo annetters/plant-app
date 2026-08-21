@@ -3,40 +3,62 @@ import { vi } from 'vitest'
 import type { PropertiesDbClient } from '../property/propertiesRepository'
 
 type DbResult = { data: unknown; error: { message: string } | null }
+type CreatePropertyBody = {
+  address: string
+  resolvedAddress: string
+  latitude: number
+  longitude: number
+}
 
 /**
  * An in-memory stand-in for the slice of Supabase's client PropertiesRepository
  * calls — select/delete on the `properties` table, plus `functions.invoke`
- * for the `create-property` edge function. Mirrors fakePlantsDbClient's shape.
+ * for the `search-addresses` and `create-property` edge functions. Mirrors
+ * fakePlantsDbClient's shape.
  */
 export function createFakePropertiesDbClient(initialRow: PropertyRow | null = null) {
   let row: PropertyRow | null = initialRow
   let nextId = 1
 
-  const invoke = vi.fn(
-    async (
-      _name: string,
-      options: { body: { address: string } },
-    ): Promise<{ data: unknown; error: { message: string } | null }> => {
-      if (row) {
-        return { data: { error: 'You already have a Property.' }, error: null }
+  const invoke = vi.fn(async (name: string, options: { body: unknown }): Promise<DbResult> => {
+    if (name === 'search-addresses') {
+      const { query } = options.body as { query: string }
+      // A magic substring, not a real geocoder behavior — lets tests exercise
+      // the "no matches" state without a separate fake-client mode.
+      if (query.includes('noresults')) {
+        return { data: { candidates: [] }, error: null }
       }
-      const created: PropertyRow = {
-        id: `property-${nextId++}`,
-        address: options.body.address,
-        // Deliberately distinct from the typed address, mirroring a real
-        // geocoder response — exercises the UI's side-by-side display.
-        resolved_address: `${options.body.address} (resolved)`,
-        latitude: 42.3782,
-        longitude: -71.1266,
-        imagery_zoom: 20,
-        imagery_available: true,
-        created_at: '2026-01-01T00:00:00.000Z',
+      // Mirrors a real geocoder response: candidates distinct from the raw
+      // query, exercising the picker UI's rendering.
+      return {
+        data: {
+          candidates: [
+            { displayName: `${query} (candidate 1)`, latitude: 42.3782, longitude: -71.1266 },
+            { displayName: `${query} (candidate 2)`, latitude: 40.7128, longitude: -74.006 },
+          ],
+        },
+        error: null,
       }
-      row = created
-      return { data: created, error: null }
-    },
-  )
+    }
+
+    // create-property
+    if (row) {
+      return { data: { error: 'You already have a Property.' }, error: null }
+    }
+    const body = options.body as CreatePropertyBody
+    const created: PropertyRow = {
+      id: `property-${nextId++}`,
+      address: body.address,
+      resolved_address: body.resolvedAddress,
+      latitude: body.latitude,
+      longitude: body.longitude,
+      imagery_zoom: 20,
+      imagery_available: true,
+      created_at: '2026-01-01T00:00:00.000Z',
+    }
+    row = created
+    return { data: created, error: null }
+  })
 
   function builder(op: 'select' | 'delete') {
     const filters: Record<string, string> = {}

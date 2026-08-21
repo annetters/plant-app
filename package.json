@@ -15,7 +15,7 @@
     "db:push": "supabase db push",
     "db:diff": "supabase db diff",
     "db:types": "supabase gen types typescript --linked --schema public",
-    "functions:deploy": "supabase functions deploy create-property"
+    "functions:deploy": "supabase functions deploy"
   },
   "devDependencies": {
     "supabase": "^2.115.0",

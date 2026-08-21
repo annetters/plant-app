@@ -1,4 +1,4 @@
-import type { Property, PropertyRow } from '@plant-app/domain'
+import type { AddressCandidate, Property, PropertyRow } from '@plant-app/domain'
 import { propertyFromRow } from '@plant-app/domain'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -36,6 +36,13 @@ export function asPropertiesDbClient(client: SupabaseClient): PropertiesDbClient
 
 const TABLE = 'properties'
 const CREATE_FUNCTION = 'create-property'
+const SEARCH_FUNCTION = 'search-addresses'
+
+/** Address the user typed in, plus the specific geocoder candidate they picked for it. */
+export interface PropertyCreateInput {
+  address: string
+  candidate: AddressCandidate
+}
 
 export class PropertiesRepository {
   private readonly client: PropertiesDbClient
@@ -52,20 +59,45 @@ export class PropertiesRepository {
   }
 
   /**
-   * Geocodes the address and fetches/probes aerial imagery server-side (the
-   * `create-property` Edge Function — see ADR-0003: an external adapter call
-   * runs server-side even when, as here, neither adapter needs a credential),
-   * then persists the resulting Property row.
-   *
-   * The function always answers HTTP 200 and carries expected failures (no
-   * geocoder match, one-Property-per-account already claimed) as a `{
-   * error }` body instead of a non-2xx status — `supabase-js`'s
-   * `functions.invoke` doesn't surface a non-2xx response's JSON body as a
-   * usable message, only a generic transport-level one.
+   * Geocoding candidates for an in-progress address search (the
+   * `search-addresses` Edge Function — see ADR-0003: an external adapter
+   * call runs server-side even though Nominatim itself needs no
+   * credential; browsers also can't set the User-Agent header its usage
+   * policy requires). Below the function's own minimum query length, this
+   * resolves to an empty list rather than erroring — that's a normal
+   * "still typing" state, not a failure.
    */
-  async create(address: string): Promise<Property> {
+  async search(query: string): Promise<AddressCandidate[]> {
+    const { data, error } = await this.client.functions.invoke(SEARCH_FUNCTION, {
+      body: { query },
+    })
+    if (error) throw new Error(error.message)
+    const result = data as { error?: string; candidates?: AddressCandidate[] }
+    if (result?.error) throw new Error(result.error)
+    return result.candidates ?? []
+  }
+
+  /**
+   * Persists the Property at a candidate the user already picked from
+   * `search()` — never re-geocodes freeform text (see `search-addresses`:
+   * requiring a specific pick, not stricter input validation, is what
+   * keeps a bare street from resolving to an arbitrary global match).
+   * Also probes aerial imagery availability server-side before inserting.
+   *
+   * The function always answers HTTP 200 and carries expected failures
+   * (one-Property-per-account already claimed) as a `{ error }` body
+   * instead of a non-2xx status — `supabase-js`'s `functions.invoke`
+   * doesn't surface a non-2xx response's JSON body as a usable message,
+   * only a generic transport-level one.
+   */
+  async create(input: PropertyCreateInput): Promise<Property> {
     const { data, error } = await this.client.functions.invoke(CREATE_FUNCTION, {
-      body: { address },
+      body: {
+        address: input.address,
+        resolvedAddress: input.candidate.displayName,
+        latitude: input.candidate.latitude,
+        longitude: input.candidate.longitude,
+      },
     })
     if (error) throw new Error(error.message)
     const result = data as { error?: string } & Partial<PropertyRow>

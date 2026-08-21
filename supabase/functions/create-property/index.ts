@@ -1,13 +1,17 @@
 // Ticket #5: Property + aerial base map.
 //
 // Runs server-side (Deno edge runtime) per ADR-0003 — anything calling an
-// external adapter (here: a geocoder and a tile server) runs as a Supabase
-// Edge Function, even though neither Nominatim nor Esri needs a credential.
-// Geocodes the submitted address, probes which zoom levels actually have
-// aerial imagery there (see ADR-0002 — missing tiles come back HTTP 200 as
-// grey placeholders, so this can't be skipped), and inserts the resulting
+// external adapter (here: a tile server) runs as a Supabase Edge Function,
+// even though it doesn't need a credential. Takes a location the user has
+// already picked from search-addresses's candidates (never raw address
+// text — see that function for why: a bare street with no locality is a
+// geocoding shot in the dark, closed by requiring a specific pick, not by
+// re-resolving text here), probes which zoom levels actually have aerial
+// imagery there (see ADR-0002 — missing tiles come back HTTP 200 as grey
+// placeholders, so this can't be skipped), and inserts the resulting
 // Property row as the calling user.
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { handlePreflight, jsonResponse } from "../_shared/cors.ts";
+import { requireUser } from "../_shared/auth.ts";
 
 // Mirrors packages/domain/src/property.ts's Web Mercator math. Deno edge
 // functions can't import this npm workspace package directly — keep the
@@ -29,39 +33,10 @@ function pickBestZoom(results: { zoom: number; available: boolean }[]): number |
   return available.length > 0 ? Math.max(...available) : null;
 }
 
-const geocodeUrl = (address: string) =>
-  `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(address)}`;
-
 // tilemap, not tile — this is the availability probe (see ADR-0002), not
 // image bytes. Path order is {z}/{row}/{col}, i.e. y before x.
 const tilemapUrl = (z: number, x: number, y: number) =>
   `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tilemap/${z}/${y}/${x}/2/2`;
-
-// Nominatim's usage policy requires a descriptive User-Agent identifying the
-// calling application; unidentified traffic gets rate-limited or blocked.
-const USER_AGENT = "plant-app (personal garden registry; github.com/annetters/plant-app)";
-
-async function geocode(
-  address: string,
-): Promise<{ latitude: number; longitude: number; resolvedAddress: string } | null> {
-  const res = await fetch(geocodeUrl(address), { headers: { "User-Agent": USER_AGENT } });
-  if (!res.ok) throw new Error(`Geocoding service returned HTTP ${res.status}.`);
-  const results = await res.json();
-  if (!Array.isArray(results) || results.length === 0) return null;
-  const [hit] = results;
-  const latitude = parseFloat(hit.lat);
-  const longitude = parseFloat(hit.lon);
-  // A malformed hit (missing/non-numeric lat or lon) is treated the same as
-  // no match — better than letting NaN reach the `properties` table's
-  // latitude/longitude CHECK constraints as a raw, unfriendly Postgres error.
-  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
-  // Nominatim's top-ranked match for a vague address (e.g. "1 main st", no
-  // city/state) can easily be nowhere near what the user meant — display_name
-  // is what it actually matched, kept distinct from the typed address so a
-  // mismatch is visible on the Property page rather than silent.
-  const resolvedAddress = typeof hit.display_name === "string" ? hit.display_name : address;
-  return { latitude, longitude, resolvedAddress };
-}
 
 async function probeImagery(
   latitude: number,
@@ -83,88 +58,71 @@ async function probeImagery(
   );
 }
 
-// Browser calls to an Edge Function are cross-origin, so a POST carrying a
-// JSON body and an Authorization header triggers a CORS preflight (OPTIONS)
-// first. Without these headers on every response — the preflight's included —
-// the browser blocks the real request before this function's own logic ever
-// gets a say.
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  // x-client-info is sent by supabase-js on every request by default (see
-  // its DEFAULT_HEADERS), not just when explicitly configured — omitting it
-  // here makes the browser's real preflight fail even though a hand-crafted
-  // curl OPTIONS request (which doesn't set that header) looks fine.
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+interface CreatePropertyRequest {
+  address: string;
+  resolvedAddress: string;
+  latitude: number;
+  longitude: number;
+}
 
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-  });
+/**
+ * Range/shape-checked, but not re-verified against Nominatim — this trusts
+ * that latitude/longitude/resolvedAddress actually came from a real
+ * search-addresses pick rather than re-geocoding to confirm it. Consistent
+ * with ADR-0003's "Domain logic execution" section, held there at lower
+ * confidence for the same reason: acceptable for a single-user personal app
+ * with no adversarial threat model, not for a multi-tenant one. Reconsider
+ * (e.g. re-run the geocode server-side and compare) if this app ever gains
+ * multi-user or shared-access features.
+ */
+function parseRequestBody(body: unknown): CreatePropertyRequest | null {
+  if (typeof body !== "object" || body === null) return null;
+  const { address, resolvedAddress, latitude, longitude } = body as Record<string, unknown>;
+  if (typeof address !== "string" || !address.trim()) return null;
+  if (typeof resolvedAddress !== "string" || !resolvedAddress.trim()) return null;
+  if (typeof latitude !== "number" || !(latitude >= -90 && latitude <= 90)) return null;
+  if (typeof longitude !== "number" || !(longitude >= -180 && longitude <= 180)) return null;
+  return { address: address.trim(), resolvedAddress, latitude, longitude };
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: CORS_HEADERS });
-  }
+  const preflight = handlePreflight(req);
+  if (preflight) return preflight;
   if (req.method !== "POST") {
     return jsonResponse({ error: "Method not allowed." }, 405);
   }
 
-  let address = "";
+  let parsedBody: unknown;
   try {
-    const body = await req.json();
-    if (typeof body.address === "string") address = body.address.trim();
+    parsedBody = await req.json();
   } catch {
     return jsonResponse({ error: "Invalid request body." }, 400);
   }
-  if (!address) return jsonResponse({ error: "Address is required." }, 400);
+  const input = parseRequestBody(parsedBody);
+  // A well-formed client can't reach this — the address-picker only ever
+  // sends a candidate it just received from search-addresses — so this is a
+  // client-bug guard, not a user-reachable validation message.
+  if (!input) return jsonResponse({ error: "A picked address location is required." }, 400);
 
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) return jsonResponse({ error: "Not authenticated." }, 401);
-
-  const supabase = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!,
-    { global: { headers: { Authorization: authHeader } } },
-  );
-
-  // Resolved explicitly (not left to a column default) because this insert
-  // runs as this function's own client, authenticated only via the forwarded
-  // header above — the row's `user_id` has to come from somewhere, and
-  // `auth.getUser()` is also what proves the header is a real, live session
-  // rather than just any non-empty string.
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError || !user) return jsonResponse({ error: "Not authenticated." }, 401);
+  const auth = await requireUser(req);
+  if (!auth) return jsonResponse({ error: "Not authenticated." }, 401);
+  const { supabase, user } = auth;
 
   // Expected, user-reachable failures below are returned as HTTP 200 with an
   // `{ error }` body — not a non-2xx status — because `supabase-js`'s
   // `functions.invoke` doesn't surface a non-2xx response's JSON body as a
   // usable client-side message, only a generic transport-level one.
-  let location: { latitude: number; longitude: number; resolvedAddress: string } | null;
-  try {
-    location = await geocode(address);
-  } catch {
-    return jsonResponse({ error: "Could not reach the geocoding service. Try again." });
-  }
-  if (!location) return jsonResponse({ error: "No match for that address." });
-
-  const probeResults = await probeImagery(location.latitude, location.longitude);
+  const probeResults = await probeImagery(input.latitude, input.longitude);
   const bestZoom = pickBestZoom(probeResults);
 
   const { data, error } = await supabase
     .from("properties")
     .insert({
       user_id: user.id,
-      address,
-      resolved_address: location.resolvedAddress,
-      latitude: location.latitude,
-      longitude: location.longitude,
+      address: input.address,
+      resolved_address: input.resolvedAddress,
+      latitude: input.latitude,
+      longitude: input.longitude,
       imagery_zoom: bestZoom,
       imagery_available: bestZoom !== null,
     })

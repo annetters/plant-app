@@ -55,6 +55,7 @@ export {
   validatePropertyInput,
 } from "./property.js";
 export type {
+  AddressCandidate,
   Property,
   PropertyInput,
   PropertyRow,

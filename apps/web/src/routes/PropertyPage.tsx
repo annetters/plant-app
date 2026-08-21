@@ -1,7 +1,9 @@
 import { aerialTileUrl, lonLatToTile, type Property } from '@plant-app/domain'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { AddressAutocomplete } from '../property/AddressAutocomplete'
 import { usePropertiesRepository } from '../property/PropertiesRepositoryContext'
+import type { PropertyCreateInput } from '../property/propertiesRepository'
 
 // A fixed grid around the property's center tile. Wide enough to show the
 // property and its immediate surroundings without panning — panning/zooming
@@ -26,7 +28,7 @@ function baseMapTiles(property: Property): { key: string; url: string }[] {
 export function PropertyPage() {
   const repository = usePropertiesRepository()
   const [property, setProperty] = useState<Property | null | undefined>(undefined)
-  const [address, setAddress] = useState('')
+  const [pick, setPick] = useState<PropertyCreateInput | null>(null)
   const [addressError, setAddressError] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -59,14 +61,14 @@ export function PropertyPage() {
     event.preventDefault()
     setFormError(null)
 
-    if (!address.trim()) {
-      setAddressError('Address is required.')
+    if (!pick) {
+      setAddressError('Select an address from the results list.')
       return
     }
     setAddressError(null)
     setSubmitting(true)
     try {
-      const created = await repository.create(address)
+      const created = await repository.create(pick)
       setProperty(created)
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Could not create this Property.')
@@ -102,15 +104,11 @@ export function PropertyPage() {
       {property === null && (
         <form onSubmit={handleSubmit}>
           <label htmlFor="property-address">Address</label>
-          <input
-            id="property-address"
-            type="text"
-            value={address}
-            onChange={(event) => {
-              setAddress(event.target.value)
+          <AddressAutocomplete
+            onSelect={(next) => {
+              setPick(next)
               setAddressError(null)
             }}
-            placeholder="e.g. 10 Main St, Cambridge, MA"
           />
           {addressError && <p role="alert">{addressError}</p>}
           <button type="submit" disabled={submitting}>
