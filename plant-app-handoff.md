@@ -67,6 +67,38 @@ caught either):
   items; `width: 100%` was the actual fix. Both diagnosed by checking
   actual computed styles in a real browser, not by re-guessing.
 
+**#13 (React Native app scaffold + auth) is implemented, committed,
+manually verified on a physical iPhone via Expo Go, and closed on
+GitHub** — see commits `7ff1943`, `80f8b84`, `f37c2fb`, `7d28ab0`, plus
+the closing comment on the issue for full detail. `apps/mobile/` mirrors
+#2's web auth scaffold (same Supabase email/password flow, `RootNavigator`
+standing in for web's `RequireAuth`), imports `@plant-app/domain` per
+ADR-0003. Along the way: downgraded from the initial SDK 57 scaffold to
+SDK 54 to match the Expo Go build actually available on the App Store;
+fixed a real npm-workspace bug where Expo's exact `react` pin conflicted
+with the web app's `^` range, causing packages hoisted to the workspace
+root to resolve against the wrong React instance (invalid-hooks crashes at
+runtime, not just in Jest — fixed with a root-level `overrides` pin, see
+`package.json`); built real email-confirmation deep-linking
+(`plant-app://` scheme, `emailRedirectTo`, a link handler) that's
+currently dormant since "Confirm email" was turned off on the Supabase
+project during this ticket's manual QA (Supabase's default mailer hit its
+rate limit, and separately the confirmation link pointed at the web app's
+localhost dev URL, useless on a phone) — it's real tested code, not a
+stub, and resumes working automatically if confirmation is ever
+re-enabled; fixed the keyboard covering the Log in/Sign up button
+(`KeyboardAvoidingView`) and the Dashboard title rendering under the
+notch (`SafeAreaView` — lost automatically once `headerShown: false` is
+set on the native-stack navigator). Manually verified on a real device:
+sign up, log in (correct/wrong password), log out, Dashboard shell with
+placeholder nav, session persists across a real force-quit/relaunch,
+already-logged-in cold start skips straight to Dashboard. Not tested:
+Android (no device available) and foreground/background token refresh
+(not practically triggerable in a manual pass). Closing #13 does **not**
+newly unblock #14–#18 — each also needs another still-open ticket (#8,
+#6, #10, #9, or #3+#8+#12 respectively), confirmed via the frontier query
+below.
+
 **#2 is implemented, committed, manually verified against a real Supabase
 project** (sign up, log in, land on the Dashboard shell, session survives
 reload), **and closed on GitHub** — see commit `2668f2c`.
@@ -164,11 +196,6 @@ part of the original 19.
 **The frontier right now** (open tickets with zero open blockers, no
 assignee — safe to start immediately):
 
-- **#13** — React Native app scaffold + auth — mirrors #2 for mobile. An
-  `apps/mobile/` directory exists on disk as of this update (Expo/React
-  Native scaffold files) but is **untracked and uncommitted** — check
-  `git status` before assuming it's finished or starting fresh on #13
-  yourself; it may be another session's in-progress work.
 - **#19** — Tag Scan prototype: OCR placement + USDA data pull — unchanged
   since last update
 
@@ -188,15 +215,15 @@ the ticket alone). As each ticket closes, re-run the frontier query (see
 "Issue tracker") to see what newly unblocked.
 
 Nothing here is stale-checked for you the way the old "three uncommitted
-files" note used to be — `git status` was clean as of this update.
-Earlier in this same round, a concurrent session working #13 had
-`apps/mobile/` sitting untracked in this working tree — it's since been
-committed for real (`7ff1943`, `80f8b84`, `f37c2fb`; #13 is still **open**
-on GitHub as of this update, so don't assume it's finished — check
-`gh issue view 13` rather than trusting a stale summary). That's a
-concrete instance of the risk this doc keeps flagging: this repo's
-working tree is shared by more than one session, so `git status` before
-any broad `git add`.
+files" note used to be — `git status` was clean as of this update. Earlier
+in this same round, a concurrent session working #13 had `apps/mobile/`
+sitting untracked in this working tree; it's since been committed for real
+(`7ff1943`, `80f8b84`, `f37c2fb`, `7d28ab0`) and **#13 is now closed** on
+GitHub, verified against a real Supabase project and a physical iPhone —
+see the #13 entry above. That was still a real concrete instance of the
+risk this doc keeps flagging while it was in progress: this repo's working
+tree is shared by more than one session, so `git status` before any broad
+`git add`.
 
 ### Deferred QA (ticket #5)
 
@@ -298,6 +325,7 @@ Domain glossary: `CONTEXT.md`
 Working tree clean as of this update. Most recent commits first:
 
 ```
+7d28ab0 Fix keyboard-covered buttons and missing safe-area insets on mobile
 3b7fa07 Widen the Property page so full addresses aren't cramped
 b7f01c3 Style the address-picker dropdown — reported as "not clickable"
 f37c2fb Handle Supabase email-confirmation deep links on mobile
@@ -341,22 +369,21 @@ eaf1f32 Add ADR-0003: web desktop + native mobile, cloud BaaS backend
 
 `2668f2c` (#2), `9018f33`–`1d20b8e` (#3, plus fixes found during manual
 QA), `4eea9e7`–`91fac04` (#4, plus fixes found during manual QA, including
-the hardiness-zone-range rework in `9b74934`), and `1380351`–`3b7fa07`
-(#5, plus several real rounds of fixes found during manual QA — see "What
-to do next" above for the detailed list) are the build work so far. #3 is
-closed on GitHub. #4 and #5 are implemented and partially verified but
-**not yet closed on GitHub** — see "What to do next" above and each
+the hardiness-zone-range rework in `9b74934`), `1380351`–`3b7fa07` (#5,
+plus several real rounds of fixes found during manual QA — see "What to do
+next" above for the detailed list), and `7ff1943`–`7d28ab0` (#13, RN
+scaffold + auth, plus the SDK downgrade, deep-link, and device-QA fix
+commits — see "What to do next" above) are the build work so far. #3 and
+#13 are closed on GitHub. #4 and #5 are implemented and partially verified
+but **not yet closed on GitHub** — see "What to do next" above and each
 ticket's "Deferred QA" section. #5's migrations (through `0008`) are
 pushed to the linked Supabase project and both its Edge Functions
 (`create-property`, `search-addresses`) are deployed — but **none of this
 session's commits have been `git push`ed to the GitHub remote yet**, since
 pushing to a shared remote wasn't asked for in this session; do that (or
-ask first) before treating this branch as published. `7ff1943`, `80f8b84`,
-`f37c2fb` are #13's work from a concurrent session, not this one — #13 is
-still open on GitHub, don't assume it's finished without checking. The
-remaining tickets (#6, #14–#20, and #13 pending its own verification) are
-still unbuilt or unverified; #21 (filed during #4's QA) is `needs-triage`,
-not yet scoped for build.
+ask first) before treating this branch as published. The remaining tickets
+(#6, #14–#20) are still unbuilt or unverified; #21 (filed during #4's QA)
+is `needs-triage`, not yet scoped for build.
 
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
 > No GPS is read and no user photo is taken — that is exactly why the work was
@@ -367,6 +394,7 @@ not yet scoped for build.
 | Artifact | Path | Purpose |
 |---|---|---|
 | **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output (npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app, Supabase auth, auth-gated Dashboard shell) plus ticket #3's output (`Plant`/`PlantInput` types + `validatePlantInput` in `packages/domain/src/plant.ts`; Registry list + create/view/edit/delete + reference-photo upload in `apps/web/src/routes/Plants*.tsx` and `apps/web/src/plants/`) plus ticket #4's output (`TaskTrigger`/`CareTaskTemplate` types + `validateCareTaskTemplateInput` + `computeTriggerDateRange`/`dateRangeWraps` in `packages/domain/src/careTaskTemplate.ts`; add/list/remove UI in the "Care task templates" section of `apps/web/src/routes/PlantFormPage.tsx`, repository methods on `PlantsRepository`) plus ticket #5's output (`Property`/`PropertyInput`/`AddressCandidate` types + Web Mercator scale math — `metersPerPixel`/`feetPerPixel`/`pixelsPerFoot`/`lonLatToTile`/`pickBestZoom`/`aerialTileUrl` — in `packages/domain/src/property.ts`; the `/map` page in `apps/web/src/routes/PropertyPage.tsx` and `apps/web/src/property/` — `PropertiesRepository` with `get`/`search`/`create`/`remove`, and the `AddressAutocomplete.tsx` combobox that requires picking a specific geocoder candidate rather than submitting freeform text — backed by the `create-property` and `search-addresses` Edge Functions). See `apps/web/README.md` for the one-time Supabase project setup. Not throwaway — build on this. |
+| **Mobile app (real, built)** | `apps/mobile` | Ticket #13's output — Expo/TypeScript RN app on SDK 54, importing `@plant-app/domain` for `DASHBOARD_TILES` per ADR-0003. Mirrors (does not share code with) `apps/web`'s auth scaffold: `AuthContext`/`useCredentialsForm` in `apps/mobile/src/auth/`, `LoginScreen`/`SignUpScreen`/`DashboardScreen` in `apps/mobile/src/screens/`, `RootNavigator` (`src/navigation/`) swapping between an Auth stack and a Main stack based on auth status — the native equivalent of web's `RequireAuth` guard. `authDeepLink.ts`/`useAuthDeepLinkHandler.ts` complete Supabase's email-confirmation redirect via the `plant-app://` URL scheme (`app.json`); currently dormant since "Confirm email" is off on the linked Supabase project (see the #13 entry above), but real and tested, not a stub. See `apps/mobile/README.md` for one-time setup (same Supabase project as web, `EXPO_PUBLIC_`-prefixed env vars, running via Expo Go — no Xcode/CocoaPods needed for day-to-day dev). Not throwaway — build on this. |
 | **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). `0003_care_task_templates.sql` — the `care_task_templates` table, owned by a `plant_id` FK with RLS via a join to `plants` (not a direct `user_id` column). `0004_grant_care_task_templates_table.sql` — the same follow-up GRANT `0002` needed, for the new table. `0005_plant_hardiness_zone_range.sql` — drops `hardiness_zone`, adds `hardiness_zone_min`/`hardiness_zone_max` (a plant's hardiness rating is a whole-zone range, not a single value — see "What to do next"). `0006_properties.sql` — the `properties` table (one row per account for MVP, `properties_one_per_user unique (user_id)`), RLS. `0007_grant_properties_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`, for `properties`. `0008_property_resolved_address.sql` — adds nullable `resolved_address` (what the geocoder actually matched, shown next to what the user typed so a bad match is visible — see "What to do next"). All eight (`0001`–`0008`) are live on the linked project as of this update (verify with `npx supabase migration list`). Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
 | **Edge Functions** | `supabase/functions/` | Server-side adapter calls per ADR-0003, deployed via `npm run functions:deploy` (deploys every function found under `supabase/functions/` in one go — Docker-free, just bundles+uploads, unlike `functions serve`/`start` which need a local Docker stack). `create-property` (ticket #5) — takes a location already picked from `search-addresses`'s candidates (no longer geocodes raw text itself), probes Esri World Imagery zoom availability, and inserts the resulting Property row. `search-addresses` (added during #5's QA) — returns multiple geocoder candidates for the address-picker UI to choose from; requiring a specific pick, not stricter input validation, is what keeps a bare street ("1 main st") from silently resolving to an arbitrary global match. `_shared/{cors,auth,nominatim}.ts` — CORS/auth/geocoding helpers shared between the two functions, extracted once a second one existed. Web Mercator math in `create-property` is hand-duplicated from `packages/domain/src/property.ts` (Deno edge functions can't import this npm workspace package) — keep the two in sync by hand, same convention as the `PlantRow`/migration "keep in sync" comments elsewhere. |
 | **Spec (current)** | [GitHub issue #1](https://github.com/annetters/plant-app/issues/1) | The real spec. 53 user stories, full implementation/testing decisions. Labeled `ready-for-agent`. |
@@ -511,7 +539,7 @@ Ticket map (dependency order; title abbreviated):
 | 10 | Registry view | 3, 8 |
 | 11 | Dashboard (real content) | 7, 8, 9, 10 |
 | 12 | Task completion logging, history, one-off todos | 4, 8, 11 |
-| 13 | React Native app scaffold + auth — has commits (`7ff1943`, `80f8b84`, `f37c2fb`) from a concurrent session, **still open** — verify status before assuming done | 2 |
+| 13 | React Native app scaffold + auth — built and verified, `7ff1943`–`7d28ab0`, closed | 2 |
 | 14 | Native: Map view | 8, 13 |
 | 15 | Native: Scale Reference calibration | 6, 13 |
 | 16 | Native: Registry view | 10, 13 |
@@ -522,14 +550,16 @@ Ticket map (dependency order; title abbreviated):
 | 21 | Care task template: single-day trigger UX (filed during #4 QA, `needs-triage`) | 4 |
 
 **Frontier query**: open issues with `issue_dependencies_summary.blocked_by
-== 0` and no assignee. #2 and #3 are closed. #4 and #5 both have
+== 0` and no assignee. #2, #3, and #13 are closed. #4 and #5 both have
 `blocked_by == 0` (their blockers, #3 and #2, are closed) but are
 deliberately excluded from the frontier below — both are built and awaiting
-closure, not unstarted work. Right now the frontier is **#13, #19** — see
+closure, not unstarted work. Right now the frontier is **#19** — see
 "What to do next" above. #6 and #7 (blocked by #5) still show `blocked_by:
 1`, not `0`, since #5 hasn't closed — don't start those expecting them to be
-unblocked. #21 is `needs-triage`, not `ready-for-agent`, so it's excluded
-from the frontier query by design until triaged.
+unblocked. #14–#18 (each blocked by #13 plus at least one other still-open
+ticket) similarly don't newly unblock from #13 alone — confirmed via the
+API, not assumed. #21 is `needs-triage`, not `ready-for-agent`, so it's
+excluded from the frontier query by design until triaged.
 
 ---
 
