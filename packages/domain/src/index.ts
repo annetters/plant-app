@@ -41,3 +41,24 @@ export type {
   SeasonalMarkerTrigger,
   TaskTrigger,
 } from "./careTaskTemplate.js";
+
+export {
+  AERIAL_ZOOM_CANDIDATES,
+  aerialTileUrl,
+  feetPerPixel,
+  lonLatToTile,
+  metersPerPixel,
+  pickBestZoom,
+  pixelsPerFoot,
+  propertyFromRow,
+  propertyInputToRow,
+  validatePropertyInput,
+} from "./property.js";
+export type {
+  Property,
+  PropertyInput,
+  PropertyRow,
+  PropertyValidationErrors,
+  PropertyValidationResult,
+  ZoomProbeResult,
+} from "./property.js";

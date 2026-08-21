@@ -61,6 +61,20 @@ npm run db:diff    # supabase db diff — compares local migrations against the 
 npm run db:types   # supabase gen types typescript --linked — prints generated row types to stdout
 ```
 
+## Edge Functions
+
+Server-side adapter calls (per ADR-0003 — anything hitting an external
+service, credentialed or not) live in `supabase/functions/` and deploy with
+the CLI, same Docker-free remote-only posture as migrations:
+
+```
+npm run functions:deploy   # supabase functions deploy create-property
+```
+
+- `create-property` (ticket #5) — geocodes a submitted address (Nominatim)
+  and probes aerial-imagery zoom availability (Esri World Imagery, see
+  ADR-0002) before inserting the resulting Property row.
+
 ## Baseline schema conventions
 
 Every table follows the baseline conventions ADR-0003 calls out as

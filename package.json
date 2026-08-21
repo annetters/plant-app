@@ -14,7 +14,8 @@
     "test:run": "npm run test:run --workspaces --if-present",
     "db:push": "supabase db push",
     "db:diff": "supabase db diff",
-    "db:types": "supabase gen types typescript --linked --schema public"
+    "db:types": "supabase gen types typescript --linked --schema public",
+    "functions:deploy": "supabase functions deploy create-property"
   },
   "devDependencies": {
     "supabase": "^2.115.0",
