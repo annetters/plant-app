@@ -85,7 +85,11 @@ async function probeImagery(
 // gets a say.
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, apikey, content-type",
+  // x-client-info is sent by supabase-js on every request by default (see
+  // its DEFAULT_HEADERS), not just when explicitly configured — omitting it
+  // here makes the browser's real preflight fail even though a hand-crafted
+  // curl OPTIONS request (which doesn't set that header) looks fine.
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
