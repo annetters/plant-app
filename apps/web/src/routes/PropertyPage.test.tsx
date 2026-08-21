@@ -68,12 +68,27 @@ describe('PropertyPage — existing Property', () => {
   const availableRow: PropertyRow = {
     id: 'property-1',
     address: '10 Main St, Cambridge, MA',
+    resolved_address: '10 Main Street, Cambridge, Middlesex County, Massachusetts, 02142',
     latitude: 42.3782,
     longitude: -71.1266,
     imagery_zoom: 20,
     imagery_available: true,
     created_at: '2026-01-01T00:00:00.000Z',
   }
+
+  it('shows what was typed alongside what the geocoder actually matched it to', async () => {
+    renderPage(availableRow)
+    expect(await screen.findByText('10 Main St, Cambridge, MA')).toBeInTheDocument()
+    expect(
+      screen.getByText(/Matched to: 10 Main Street, Cambridge, Middlesex County, Massachusetts, 02142/),
+    ).toBeInTheDocument()
+  })
+
+  it('shows only the typed address for a Property created before resolvedAddress existed', async () => {
+    renderPage({ ...availableRow, resolved_address: null })
+    expect(await screen.findByText('10 Main St, Cambridge, MA')).toBeInTheDocument()
+    expect(screen.queryByText(/Matched to/)).not.toBeInTheDocument()
+  })
 
   it('renders the base map imagery for an available property', async () => {
     renderPage(availableRow)

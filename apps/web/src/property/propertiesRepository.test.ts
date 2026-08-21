@@ -6,6 +6,7 @@ import { PropertiesRepository } from './propertiesRepository'
 const EXISTING_ROW: PropertyRow = {
   id: 'property-1',
   address: '10 Main St, Cambridge, MA',
+  resolved_address: '10 Main Street, Cambridge, Middlesex County, Massachusetts, 02142',
   latitude: 42.3782,
   longitude: -71.1266,
   imagery_zoom: 20,
@@ -28,6 +29,7 @@ describe('PropertiesRepository.get', () => {
       id: 'property-1',
       createdAt: '2026-01-01T00:00:00.000Z',
       address: '10 Main St, Cambridge, MA',
+      resolvedAddress: '10 Main Street, Cambridge, Middlesex County, Massachusetts, 02142',
       latitude: 42.3782,
       longitude: -71.1266,
       imageryZoom: 20,

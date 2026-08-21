@@ -16,6 +16,7 @@ import {
 function validInput(overrides: Partial<PropertyInput> = {}): PropertyInput {
   return {
     address: "1600 Pennsylvania Ave NW, Washington DC",
+    resolvedAddress: "White House, 1600, Pennsylvania Avenue Northwest, Washington, DC 20500",
     latitude: 38.8977,
     longitude: -77.0365,
     imageryZoom: 20,
@@ -69,6 +70,7 @@ describe("propertyInputToRow / propertyFromRow", () => {
       id: "property-1",
       createdAt: "2026-01-01T00:00:00.000Z",
       address: input.address,
+      resolvedAddress: input.resolvedAddress,
       latitude: input.latitude,
       longitude: input.longitude,
       imageryZoom: input.imageryZoom,
@@ -84,6 +86,16 @@ describe("propertyInputToRow / propertyFromRow", () => {
       ...propertyInputToRow(input),
     };
     expect(propertyFromRow(row).imageryZoom).toBeNull();
+  });
+
+  it("preserves a null resolvedAddress (a Property created before this field existed)", () => {
+    const input = validInput({ resolvedAddress: null });
+    const row: PropertyRow = {
+      id: "property-1",
+      created_at: "2026-01-01T00:00:00.000Z",
+      ...propertyInputToRow(input),
+    };
+    expect(propertyFromRow(row).resolvedAddress).toBeNull();
   });
 });
 

@@ -24,6 +24,9 @@ export function createFakePropertiesDbClient(initialRow: PropertyRow | null = nu
       const created: PropertyRow = {
         id: `property-${nextId++}`,
         address: options.body.address,
+        // Deliberately distinct from the typed address, mirroring a real
+        // geocoder response — exercises the UI's side-by-side display.
+        resolved_address: `${options.body.address} (resolved)`,
         latitude: 42.3782,
         longitude: -71.1266,
         imagery_zoom: 20,

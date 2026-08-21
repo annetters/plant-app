@@ -68,7 +68,10 @@ export function aerialTileUrl(zoom: number, x: number, y: number): string {
 }
 
 export interface PropertyInput {
+  /** What the user typed in. Never re-derived — always shown alongside `resolvedAddress` so a bad geocoder match is visible, not silent. */
   address: string;
+  /** What the geocoder actually matched `address` to (Nominatim's `display_name`), or `null` for a Property created before this field existed. */
+  resolvedAddress: string | null;
   latitude: number;
   longitude: number;
   /** Highest zoom with confirmed imagery, or `null` if none was available anywhere probed. */
@@ -107,6 +110,7 @@ export function validatePropertyInput(input: PropertyInput): PropertyValidationR
 export interface PropertyRow {
   id: string;
   address: string;
+  resolved_address: string | null;
   latitude: number;
   longitude: number;
   imagery_zoom: number | null;
@@ -119,6 +123,7 @@ export function propertyInputToRow(
 ): Omit<PropertyRow, "id" | "created_at"> {
   return {
     address: input.address,
+    resolved_address: input.resolvedAddress,
     latitude: input.latitude,
     longitude: input.longitude,
     imagery_zoom: input.imageryZoom,
@@ -131,6 +136,7 @@ export function propertyFromRow(row: PropertyRow): Property {
     id: row.id,
     createdAt: row.created_at,
     address: row.address,
+    resolvedAddress: row.resolved_address,
     latitude: row.latitude,
     longitude: row.longitude,
     imageryZoom: row.imagery_zoom,

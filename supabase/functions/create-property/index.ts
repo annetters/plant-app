@@ -43,7 +43,7 @@ const USER_AGENT = "plant-app (personal garden registry; github.com/annetters/pl
 
 async function geocode(
   address: string,
-): Promise<{ latitude: number; longitude: number } | null> {
+): Promise<{ latitude: number; longitude: number; resolvedAddress: string } | null> {
   const res = await fetch(geocodeUrl(address), { headers: { "User-Agent": USER_AGENT } });
   if (!res.ok) throw new Error(`Geocoding service returned HTTP ${res.status}.`);
   const results = await res.json();
@@ -55,7 +55,12 @@ async function geocode(
   // no match — better than letting NaN reach the `properties` table's
   // latitude/longitude CHECK constraints as a raw, unfriendly Postgres error.
   if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
-  return { latitude, longitude };
+  // Nominatim's top-ranked match for a vague address (e.g. "1 main st", no
+  // city/state) can easily be nowhere near what the user meant — display_name
+  // is what it actually matched, kept distinct from the typed address so a
+  // mismatch is visible on the Property page rather than silent.
+  const resolvedAddress = typeof hit.display_name === "string" ? hit.display_name : address;
+  return { latitude, longitude, resolvedAddress };
 }
 
 async function probeImagery(
@@ -141,7 +146,7 @@ Deno.serve(async (req) => {
   // `{ error }` body — not a non-2xx status — because `supabase-js`'s
   // `functions.invoke` doesn't surface a non-2xx response's JSON body as a
   // usable client-side message, only a generic transport-level one.
-  let location: { latitude: number; longitude: number } | null;
+  let location: { latitude: number; longitude: number; resolvedAddress: string } | null;
   try {
     location = await geocode(address);
   } catch {
@@ -157,6 +162,7 @@ Deno.serve(async (req) => {
     .insert({
       user_id: user.id,
       address,
+      resolved_address: location.resolvedAddress,
       latitude: location.latitude,
       longitude: location.longitude,
       imagery_zoom: bestZoom,

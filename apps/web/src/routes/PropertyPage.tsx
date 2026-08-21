@@ -122,6 +122,14 @@ export function PropertyPage() {
       {property && (
         <section>
           <p>{property.address}</p>
+          {property.resolvedAddress && (
+            // A vague address (e.g. "1 main st", no city/state) still
+            // geocodes to *something* — the geocoder's top-ranked guess,
+            // silently. Showing what it actually matched, distinct from
+            // what was typed, is what makes a bad match visible instead of
+            // a Property quietly pinned to the wrong place.
+            <p>Matched to: {property.resolvedAddress}</p>
+          )}
           {property.imageryAvailable ? (
             <div
               className="property-base-map"
