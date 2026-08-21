@@ -7,6 +7,29 @@
 
 ## What to do next
 
+**#5 (Property + aerial base map) is implemented and committed** — see
+commit `1380351`. A gardener can create their one Property (per account,
+MVP) by address; the new `create-property` Edge Function geocodes it
+(Nominatim) and probes Esri World Imagery zoom availability server-side
+(ADR-0002/ADR-0003) before persisting the resolved Property row; the web
+Property page (`/map`) renders the base map as a plain, non-drawable
+structural reference layer, or a degraded-mode message when no imagery is
+available anywhere probed. Migrations `0006`/`0007` are **pushed** and the
+Edge Function is **deployed** to the linked Supabase project (verified via
+`npx supabase migration list` and a direct `curl` smoke test of the
+function's method/auth/validation guard paths — see "Deferred QA (ticket
+#5)" for what a real-browser pass still needs to cover). **Not yet closed
+on GitHub** — held open the same way #4 was, pending that manual pass.
+
+Code review (run before committing) caught and fixed three real bugs in the
+Edge Function before deploy: no CORS handling at all (would have silently
+broken every browser call — Edge Functions need an explicit OPTIONS/
+`Access-Control-Allow-*` response, not just the real POST), the inserted
+row never set `user_id` (would have failed the table's `NOT NULL` and RLS
+check on every request), and a malformed geocoder hit could put `NaN`
+straight into the `latitude`/`longitude` columns instead of being treated
+as "no match."
+
 **#2 is implemented, committed, manually verified against a real Supabase
 project** (sign up, log in, land on the Dashboard shell, session survives
 reload), **and closed on GitHub** — see commit `2668f2c`.
@@ -104,15 +127,22 @@ part of the original 19.
 **The frontier right now** (open tickets with zero open blockers, no
 assignee — safe to start immediately):
 
-- **#5** — Property + aerial base map — independent, map/base-layer work
-- **#13** — React Native app scaffold + auth — mirrors #2 for mobile
+- **#13** — React Native app scaffold + auth — mirrors #2 for mobile. An
+  `apps/mobile/` directory exists on disk as of this update (Expo/React
+  Native scaffold files) but is **untracked and uncommitted** — check
+  `git status` before assuming it's finished or starting fresh on #13
+  yourself; it may be another session's in-progress work.
 - **#19** — Tag Scan prototype: OCR placement + USDA data pull — unchanged
   since last update
 
-**#4** is implemented but intentionally left open (see above) rather than
-listed as frontier work to pick up — don't re-implement it. **#12** (Task
-completion logging) is still blocked: #4 alone isn't enough to unblock it,
-it also needs #8 (Planting) and #11 (Dashboard).
+**#4 and #5** are both implemented but intentionally left open (see above)
+rather than listed as frontier work to pick up — don't re-implement either.
+Both still count as open blockers in GitHub's dependency graph, confirmed via
+the frontier query: **#6** and **#7** (each blocked by #5) still show
+`blocked_by: 1`, not `0` — they do **not** become pickable just because #5
+is implemented; #5 has to actually close first, same as #4 vs. #12 below.
+**#12** (Task completion logging) is still blocked: #4 alone isn't enough to
+unblock it, it also needs #8 (Planting) and #11 (Dashboard).
 
 Run `/implement` in a **fresh session**, pointed at whichever ticket number
 you pick — that's the context-hygiene pattern the flow expects (grilling →
@@ -121,7 +151,37 @@ the ticket alone). As each ticket closes, re-run the frontier query (see
 "Issue tracker") to see what newly unblocked.
 
 Nothing here is stale-checked for you the way the old "three uncommitted
-files" note used to be — `git status` was clean as of this update.
+files" note used to be — but unlike every prior update, `git status` is
+**not** clean as of this one: an untracked `apps/mobile/` directory and a
+locally-modified `package-lock.json` (picked up `apps/mobile`'s dependency
+tree the moment any `npm run` command touched the workspace) are sitting in
+the working tree, from what looks like a concurrent session working #13.
+Neither is this update's work — `git status` before assuming either
+reflects what you expect, and don't `git add -A`/force-overwrite them.
+
+### Deferred QA (ticket #5)
+
+Ticket #5's Edge Function and migrations were verified via `npx supabase
+migration list` (0006/0007 live) and direct `curl` smoke tests of the
+deployed function's guard paths (CORS preflight, missing/invalid auth,
+blank address) — see commit `1380351`'s message for the three real bugs
+that smoke-testing caught before deploy. None of the below were run, since
+they need a real signed-in browser session:
+
+1. **Full create-Property flow in the browser** — sign up/log in, enter a
+   real address on `/map`, confirm the base map tiles actually render (a
+   `curl OPTIONS` proving CORS headers are correct is not the same as a
+   real browser fetch succeeding end-to-end).
+2. **Degraded-mode path** — create a Property at a location with no Esri
+   imagery (open ocean coordinates are a reliable way to force this),
+   confirm the "No aerial imagery is available" message shows instead of a
+   silent gap or broken images.
+3. **One-Property-per-account** — after creating a Property, try again;
+   confirm the "You already have a Property." error surfaces cleanly
+   rather than a raw Postgres constraint error.
+4. **Reload persistence** — refresh `/map` after creating a Property;
+   confirm it loads the existing one (`PropertiesRepository.get()`) instead
+   of re-showing the address form.
 
 ### Deferred QA (ticket #3)
 
@@ -187,10 +247,14 @@ Domain glossary: `CONTEXT.md`
 
 ## Current state
 
-Working tree clean (`git status` verified 2026-08-20). Most recent commits
+Working tree **not** clean as of this update — see the note at the end of
+"What to do next" above (`apps/mobile/` untracked, `package-lock.json`
+locally modified, neither from this update's work). Most recent commits
 first:
 
 ```
+1380351 Add Property + aerial base map (#5)
+58672c8 Mark commits and migration 0005 as pushed in handoff doc
 91fac04 Update handoff doc for the Plant-form fixes batch
 9b74934 Add Plant field validation, hardiness zone range, and layout fixes
 ffb3e93 Update handoff doc for ticket #4
@@ -221,15 +285,18 @@ eaf1f32 Add ADR-0003: web desktop + native mobile, cloud BaaS backend
 ```
 
 `2668f2c` (#2), `9018f33`–`1d20b8e` (#3, plus fixes found during manual
-QA), and `4eea9e7`–`91fac04` (#4, plus fixes found during manual QA,
-including the hardiness-zone-range rework in `9b74934`) are the build
-work so far. #3 is closed on GitHub. #4 is implemented and partially
-verified but **not yet closed on GitHub** — see "What to do next" above
-and "Deferred QA (ticket #4)". All commits, including `9b74934`'s
-migration (`0005`), are pushed — both `git push` and `npm run db:push`
-are done as of this update. The remaining 16 tickets (#5–#20) are still
-unbuilt; #21 (filed during #4's QA) is `needs-triage`, not yet scoped
-for build.
+QA), `4eea9e7`–`91fac04` (#4, plus fixes found during manual QA, including
+the hardiness-zone-range rework in `9b74934`), and `1380351` (#5) are the
+build work so far. #3 is closed on GitHub. #4 and #5 are implemented and
+partially verified but **not yet closed on GitHub** — see "What to do
+next" above and each ticket's "Deferred QA" section. `1380351`'s
+migrations (`0006`/`0007`) are pushed to the linked Supabase project and
+its `create-property` Edge Function is deployed — but unlike every prior
+commit in this list, **`1380351` itself has not been `git push`ed to the
+GitHub remote yet**, since pushing to a shared remote wasn't asked for in
+this session; do that (or ask first) before treating this branch as
+published. The remaining 15 tickets (#6, #13, #14–#20) are still unbuilt;
+#21 (filed during #4's QA) is `needs-triage`, not yet scoped for build.
 
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
 > No GPS is read and no user photo is taken — that is exactly why the work was
@@ -239,8 +306,9 @@ for build.
 
 | Artifact | Path | Purpose |
 |---|---|---|
-| **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output (npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app, Supabase auth, auth-gated Dashboard shell) plus ticket #3's output (`Plant`/`PlantInput` types + `validatePlantInput` in `packages/domain/src/plant.ts`; Registry list + create/view/edit/delete + reference-photo upload in `apps/web/src/routes/Plants*.tsx` and `apps/web/src/plants/`) plus ticket #4's output (`TaskTrigger`/`CareTaskTemplate` types + `validateCareTaskTemplateInput` + `computeTriggerDateRange`/`dateRangeWraps` in `packages/domain/src/careTaskTemplate.ts`; add/list/remove UI in the "Care task templates" section of `apps/web/src/routes/PlantFormPage.tsx`, repository methods on `PlantsRepository`). See `apps/web/README.md` for the one-time Supabase project setup. Not throwaway — build on this. |
-| **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). `0003_care_task_templates.sql` — the `care_task_templates` table, owned by a `plant_id` FK with RLS via a join to `plants` (not a direct `user_id` column). `0004_grant_care_task_templates_table.sql` — the same follow-up GRANT `0002` needed, for the new table. `0005_plant_hardiness_zone_range.sql` — drops `hardiness_zone`, adds `hardiness_zone_min`/`hardiness_zone_max` (a plant's hardiness rating is a whole-zone range, not a single value — see "What to do next"). All five (`0001`–`0005`) are live on the linked project as of this update (verify with `npx supabase migration list`). Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
+| **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output (npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app, Supabase auth, auth-gated Dashboard shell) plus ticket #3's output (`Plant`/`PlantInput` types + `validatePlantInput` in `packages/domain/src/plant.ts`; Registry list + create/view/edit/delete + reference-photo upload in `apps/web/src/routes/Plants*.tsx` and `apps/web/src/plants/`) plus ticket #4's output (`TaskTrigger`/`CareTaskTemplate` types + `validateCareTaskTemplateInput` + `computeTriggerDateRange`/`dateRangeWraps` in `packages/domain/src/careTaskTemplate.ts`; add/list/remove UI in the "Care task templates" section of `apps/web/src/routes/PlantFormPage.tsx`, repository methods on `PlantsRepository`) plus ticket #5's output (`Property`/`PropertyInput` types + Web Mercator scale math — `metersPerPixel`/`feetPerPixel`/`pixelsPerFoot`/`lonLatToTile`/`pickBestZoom`/`aerialTileUrl` — in `packages/domain/src/property.ts`; the `/map` page in `apps/web/src/routes/PropertyPage.tsx` and `apps/web/src/property/`, backed by the `create-property` Edge Function). See `apps/web/README.md` for the one-time Supabase project setup. Not throwaway — build on this. |
+| **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). `0003_care_task_templates.sql` — the `care_task_templates` table, owned by a `plant_id` FK with RLS via a join to `plants` (not a direct `user_id` column). `0004_grant_care_task_templates_table.sql` — the same follow-up GRANT `0002` needed, for the new table. `0005_plant_hardiness_zone_range.sql` — drops `hardiness_zone`, adds `hardiness_zone_min`/`hardiness_zone_max` (a plant's hardiness rating is a whole-zone range, not a single value — see "What to do next"). `0006_properties.sql` — the `properties` table (one row per account for MVP, `properties_one_per_user unique (user_id)`), RLS. `0007_grant_properties_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`, for `properties`. All seven (`0001`–`0007`) are live on the linked project as of this update (verify with `npx supabase migration list`). Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
+| **Edge Functions** | `supabase/functions/` | Server-side adapter calls per ADR-0003, deployed via `npm run functions:deploy` (Docker-free — deploy just bundles+uploads, unlike `functions serve`/`start` which need a local Docker stack). `create-property` (ticket #5) — geocodes an address (Nominatim) and probes Esri World Imagery zoom availability before inserting the resulting Property row. Its Web Mercator math is hand-duplicated from `packages/domain/src/property.ts` (Deno edge functions can't import this npm workspace package) — keep the two in sync by hand, same convention as the `PlantRow`/migration "keep in sync" comments elsewhere. |
 | **Spec (current)** | [GitHub issue #1](https://github.com/annetters/plant-app/issues/1) | The real spec. 53 user stories, full implementation/testing decisions. Labeled `ready-for-agent`. |
 | Spec (superseded) | `docs/plant-app-spec.md` | The original file-based spec, written before this repo had an issue tracker. Kept for history; has a banner pointing to issue #1. Do not implement against it. |
 | Domain glossary | `CONTEXT.md` | Canonical term definitions — Plant, Planting, Property, Scale Reference, Bed, Landmark (deferred), Pin, Tag Scan, Task model, Registry, Bloom Timeline, Dashboard |
@@ -375,7 +443,7 @@ Ticket map (dependency order; title abbreviated):
 | 2 | Repo scaffold, Supabase backend, web auth skeleton | — (built, `2668f2c`, closed) |
 | 3 | Plant record CRUD (manual entry) — built, `9018f33`, closed | 2 |
 | 4 | Care task templates on Plant — built, `4eea9e7`–`8ce7a48`, **open** (deferred QA) | 3 |
-| 5 | Property + aerial base map | 2 |
+| 5 | Property + aerial base map — built, `1380351`, **open** (deferred QA) | 2 |
 | 6 | Property: photographed/in-app-drawn base map + Scale Reference | 5 |
 | 7 | Bed drawing (desktop) | 5 |
 | 8 | Planting: create + place Pin, view on tap | 3, 7 |
@@ -394,12 +462,14 @@ Ticket map (dependency order; title abbreviated):
 | 21 | Care task template: single-day trigger UX (filed during #4 QA, `needs-triage`) | 4 |
 
 **Frontier query**: open issues with `issue_dependencies_summary.blocked_by
-== 0` and no assignee. #2 and #3 are closed. #4 has `blocked_by == 0` too
-(its blocker, #3, is closed) but is deliberately excluded from the frontier
-below — it's built and awaiting closure, not unstarted work. Right now the
-frontier is **#5, #13, #19** — see "What to do next" above. #21 is
-`needs-triage`, not `ready-for-agent`, so it's excluded from the frontier
-query by design until triaged.
+== 0` and no assignee. #2 and #3 are closed. #4 and #5 both have
+`blocked_by == 0` (their blockers, #3 and #2, are closed) but are
+deliberately excluded from the frontier below — both are built and awaiting
+closure, not unstarted work. Right now the frontier is **#13, #19** — see
+"What to do next" above. #6 and #7 (blocked by #5) still show `blocked_by:
+1`, not `0`, since #5 hasn't closed — don't start those expecting them to be
+unblocked. #21 is `needs-triage`, not `ready-for-agent`, so it's excluded
+from the frontier query by design until triaged.
 
 ---
 
