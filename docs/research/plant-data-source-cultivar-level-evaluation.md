@@ -48,9 +48,17 @@ stays user-observed only, never database-suggested.
     Treated as a dead end, not pursued further.
 - **Verdict**: passes free / easy / credible. Fails cultivar-level. Adopted
   anyway as the species-level foundation — see Decision below.
-- Hardiness zone specifically was not confirmed as one of the 80+
-  characteristics fields; likely present given the breadth of the
-  characteristics set, but unverified.
+- **Hardiness zone — resolved 2026-08-21** (`docs/adr/0004-tag-scan-ocr-placement-and-usda-adapter.md`):
+  confirmed live, there's no direct zone field, but `Temperature, Minimum
+  (°F)` is present per species and a zone is derivable from it client-side.
+- **Species-level coverage gap, tested against real nursery tags —
+  2026-08-21**: of 7 distinct species named across 8 real tags, only 2 had
+  an exact match in USDA's 2186-species characteristics dataset; the other
+  5 (including common garden species like *Phlox paniculata* and *Monarda
+  didyma*) had none. USDA's characteristics-search is an NRCS
+  conservation-plant dataset, not a general horticultural database — see
+  ADR-0004 for the full finding. Doesn't reverse the decision below, but
+  sharpens it: expect USDA to come up empty often, not occasionally.
 
 ## IPNI (International Plant Names Index) — ruled out
 
