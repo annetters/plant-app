@@ -49,7 +49,7 @@ tag inserts photographed together. Full transcripts in
 | Tag | Plant | Confidence | Notes |
 |---|---|---|---|
 | tag1 | Phlox paniculata 'Glamour Girl' | 1.00 throughout | Clean full extraction: cultivar, zone, height, light, bloom window. |
-| tag2 | Monarda didyma 'Pardon My Pink' + Veronica 'Magic Show Ever After' | Mixed, 0.5–1.0 | Two tags/faces in one photo; English fields (cultivar, zone, height) recovered, Spanish marketing copy garbled. |
+| tag2 | Monarda didyma 'Pardon My Pink' + Veronica 'Magic Show Ever After' | Mixed, 0.5–1.0 | **Mismatched pair**: front of the Monarda tag + back of the *unrelated* Veronica tag, framed together in one photo (confirmed by viewing the image — the Veronica side's own care text says "pair with... Bee Balm (Monarda)," i.e. it's describing a companion plant, not itself). English fields (cultivar, zone, height) recovered, Spanish marketing copy garbled. |
 | tag3 | Heucherella 'Wildberry' / 'Capture the Flag' | Mostly 0.3–0.5 | Weakest result — heavy English/French/Spanish mixing. Decision-critical fields (cultivar, zone 4-9, height, light) still legible despite low confidence. |
 | tag4 | Hibiscus (Summerific) 'All Eyes On Me' | 1.00 throughout | Clean full extraction. |
 | tag5 | Mangave 'Catch a Wave' | 1.00 throughout | Clean full extraction, including an intergeneric hybrid name Vision had no trouble with. |

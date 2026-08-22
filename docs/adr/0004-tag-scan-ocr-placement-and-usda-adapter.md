@@ -160,17 +160,31 @@ confirm from the tag rather than guessing — that now needs to include "USDA
 has nothing at all for this genus/species," not just "USDA can't get to
 cultivar level," as an expected, common outcome, not an edge case.
 
-### Tag data isn't always internally consistent
+### Tag data isn't always internally consistent — and a single photo isn't always one plant
 
-Two real tags surfaced a wrinkle for whatever eventually consumes OCR
-output: tag7 had two stapled inserts giving *different* hardiness ranges
-(3-8 vs 4-9) for the same plant, and tag8's header ("Tutti Frutti Agastache")
-didn't match its own body copy ("Scabiosa columbaria Harlequin Blue") — a
-supplier template error, not an OCR miss (Vision read both perfectly). Tag
-Scan's user-confirms-everything design already covers this in principle;
-worth having a concrete real example on record for whoever builds the
-confirmation UI, since "the tag disagrees with itself" is a real case, not a
-hypothetical one.
+Three real tags surfaced wrinkles for whatever eventually consumes OCR
+output. Two are the tag's own content disagreeing with itself: tag7 had two
+stapled inserts giving *different* hardiness ranges (3-8 vs 4-9) for the same
+plant, and tag8's header ("Tutti Frutti Agastache") didn't match its own body
+copy ("Scabiosa columbaria Harlequin Blue") — a supplier template error, not
+an OCR miss (Vision read both perfectly).
+
+The third is a different, sharper problem: **tag2 is not one plant's front
+and back.** It's the *front* of a Monarda didyma 'Pardon My Pink' tag
+photographed next to the *back* of an unrelated Veronica 'Magic Show Ever
+After' tag — confirmed by viewing the image, and by the Veronica side's own
+care text ("PAIR WITH: ...Bee Balm (Monarda)"), which is describing Monarda
+as a companion plant, not describing itself. OCR recovered both plants'
+names correctly; the mismatch is in what the photo contains, not in
+recognition accuracy.
+
+This means Tag Scan's matching logic can't assume "a photo names two
+plants" implies "front + back of one tag, reconcile them." It needs to
+surface both candidates and let the user pick, same as any other
+ambiguous-match case in `CONTEXT.md` — but this is a distinct trigger for
+that path (multi-tag framing) from the other two (a tag disagreeing with
+itself). Worth having all three concrete real examples on record for
+whoever builds the confirmation UI, since none of this is hypothetical.
 
 ## Consequences
 
