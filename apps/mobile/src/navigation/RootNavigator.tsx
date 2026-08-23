@@ -4,6 +4,10 @@ import { DashboardScreen } from '../screens/DashboardScreen'
 import { LoadingScreen } from '../screens/LoadingScreen'
 import { LoginScreen } from '../screens/LoginScreen'
 import { SignUpScreen } from '../screens/SignUpScreen'
+import { TagScanAmbiguousSpeciesScreen } from '../tagScan/TagScanAmbiguousSpeciesScreen'
+import { TagScanCaptureScreen } from '../tagScan/TagScanCaptureScreen'
+import { TagScanDuplicateOfferScreen } from '../tagScan/TagScanDuplicateOfferScreen'
+import { TagScanReviewScreen } from '../tagScan/TagScanReviewScreen'
 import type { AuthStackParamList, MainStackParamList } from './types'
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>()
@@ -34,6 +38,10 @@ export function RootNavigator() {
   return (
     <MainStack.Navigator screenOptions={{ headerShown: false }}>
       <MainStack.Screen name="Dashboard" component={DashboardScreen} />
+      <MainStack.Screen name="TagScanCapture" component={TagScanCaptureScreen} />
+      <MainStack.Screen name="TagScanReview" component={TagScanReviewScreen} />
+      <MainStack.Screen name="TagScanAmbiguousSpecies" component={TagScanAmbiguousSpeciesScreen} />
+      <MainStack.Screen name="TagScanDuplicateOffer" component={TagScanDuplicateOfferScreen} />
     </MainStack.Navigator>
   )
 }

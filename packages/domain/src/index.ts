@@ -63,3 +63,20 @@ export type {
   PropertyValidationResult,
   ZoomProbeResult,
 } from "./property.js";
+
+export { manualEntryAdapter, resolveCommonName, reviewTagOcrCandidates } from "./tagScanCandidate.js";
+export type {
+  CommonNameResolution,
+  SpeciesNameSummary,
+  TagOcrAdapter,
+  TagOcrCandidateFields,
+  TagOcrSource,
+  TagPhotoInput,
+  TagScanCandidateReview,
+} from "./tagScanCandidate.js";
+
+export { checkForDuplicatePlant, parseScientificName } from "./tagScanMatching.js";
+export type { DuplicatePlantCheck, ParsedScientificName, TagScanPlantIdentity } from "./tagScanMatching.js";
+
+export { deriveHardinessZoneFromMinimumTemperatureF, projectUsdaSpeciesTraits } from "./usdaTraits.js";
+export type { UsdaCharacteristic, UsdaSpeciesSuggestedTraits } from "./usdaTraits.js";

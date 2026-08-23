@@ -5,6 +5,8 @@ import { AuthProvider } from './src/auth/AuthContext';
 import { useAuthDeepLinkHandler } from './src/auth/useAuthDeepLinkHandler';
 import { supabase } from './src/lib/supabaseClient';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { asTagScanDbClient } from './src/tagScan/tagScanRepository';
+import { TagScanRepositoryProvider } from './src/tagScan/TagScanRepositoryContext';
 
 function AppShell() {
   useAuthDeepLinkHandler(supabase);
@@ -21,7 +23,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider client={supabase}>
-        <AppShell />
+        <TagScanRepositoryProvider client={asTagScanDbClient(supabase)}>
+          <AppShell />
+        </TagScanRepositoryProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

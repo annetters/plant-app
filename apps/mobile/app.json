@@ -21,6 +21,16 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Plant App to access your photos so you can attach a nursery tag photo to a scan.",
+          "cameraPermission": "Allow Plant App to access your camera to photograph a nursery tag.",
+          "microphonePermission": false
+        }
+      ]
+    ]
   }
 }
