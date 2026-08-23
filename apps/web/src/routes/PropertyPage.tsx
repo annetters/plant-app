@@ -1,29 +1,11 @@
-import { aerialTileUrl, lonLatToTile, type Property } from '@plant-app/domain'
+import type { Property } from '@plant-app/domain'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { AddressAutocomplete } from '../property/AddressAutocomplete'
+import { baseMapTiles, GRID_RADIUS } from '../property/baseMapTiles'
+import { BedEditor } from '../property/BedEditor'
 import { usePropertiesRepository } from '../property/PropertiesRepositoryContext'
 import type { PropertyCreateInput } from '../property/propertiesRepository'
-
-// A fixed grid around the property's center tile. Wide enough to show the
-// property and its immediate surroundings without panning — panning/zooming
-// is out of scope here, since the base map isn't drawable yet (a later
-// ticket owns Bed drawing).
-const GRID_RADIUS = 1
-
-function baseMapTiles(property: Property): { key: string; url: string }[] {
-  if (property.imageryZoom === null) return []
-  const center = lonLatToTile(property.latitude, property.longitude, property.imageryZoom)
-  const tiles: { key: string; url: string }[] = []
-  for (let dy = -GRID_RADIUS; dy <= GRID_RADIUS; dy++) {
-    for (let dx = -GRID_RADIUS; dx <= GRID_RADIUS; dx++) {
-      const x = center.x + dx
-      const y = center.y + dy
-      tiles.push({ key: `${x}-${y}`, url: aerialTileUrl(property.imageryZoom, x, y) })
-    }
-  }
-  return tiles
-}
 
 export function PropertyPage() {
   const repository = usePropertiesRepository()
@@ -129,19 +111,22 @@ export function PropertyPage() {
             <p>Matched to: {property.resolvedAddress}</p>
           )}
           {property.imageryAvailable ? (
-            <div
-              className="property-base-map"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${GRID_RADIUS * 2 + 1}, 1fr)`,
-                gap: 0,
-                maxWidth: 512,
-              }}
-            >
-              {baseMapTiles(property).map((tile) => (
-                <img key={tile.key} src={tile.url} alt="Aerial base map imagery" />
-              ))}
-            </div>
+            <>
+              <div
+                className="property-base-map"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: `repeat(${GRID_RADIUS * 2 + 1}, 1fr)`,
+                  gap: 0,
+                  maxWidth: 512,
+                }}
+              >
+                {baseMapTiles(property).map((tile) => (
+                  <img key={tile.key} src={tile.url} alt="Aerial base map imagery" />
+                ))}
+              </div>
+              <BedEditor property={property} />
+            </>
           ) : (
             <p>
               No aerial imagery is available for this property's location. A photographed plot

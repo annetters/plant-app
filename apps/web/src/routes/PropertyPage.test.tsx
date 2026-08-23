@@ -3,16 +3,21 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
+import { BedsRepositoryProvider } from '../property/BedsRepositoryContext'
 import { PropertiesRepositoryProvider } from '../property/PropertiesRepositoryContext'
+import { createFakeBedsDbClient } from '../test/fakeBedsDbClient'
 import { createFakePropertiesDbClient } from '../test/fakePropertiesDbClient'
 import { PropertyPage } from './PropertyPage'
 
 function renderPage(initialRow: PropertyRow | null = null) {
   const fake = createFakePropertiesDbClient(initialRow)
+  const beds = createFakeBedsDbClient([])
   render(
     <MemoryRouter>
       <PropertiesRepositoryProvider client={fake.client}>
-        <PropertyPage />
+        <BedsRepositoryProvider client={beds.client}>
+          <PropertyPage />
+        </BedsRepositoryProvider>
       </PropertiesRepositoryProvider>
     </MemoryRouter>,
   )
@@ -60,10 +65,13 @@ describe('PropertyPage — no Property yet', () => {
 
   it('surfaces a failure from the edge function as a form error', async () => {
     const fake = createFakePropertiesDbClient(null)
+    const beds = createFakeBedsDbClient([])
     render(
       <MemoryRouter>
         <PropertiesRepositoryProvider client={fake.client}>
-          <PropertyPage />
+          <BedsRepositoryProvider client={beds.client}>
+            <PropertyPage />
+          </BedsRepositoryProvider>
         </PropertiesRepositoryProvider>
       </MemoryRouter>,
     )

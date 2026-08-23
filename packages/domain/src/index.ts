@@ -64,6 +64,26 @@ export type {
   ZoomProbeResult,
 } from "./property.js";
 
+export {
+  bedFromRow,
+  bedInputToRow,
+  chaikinSmooth,
+  decimatePoints,
+  feetToPixels,
+  pixelsToFeet,
+  smoothBedOutline,
+  validateBedInput,
+} from "./bed.js";
+export type {
+  Bed,
+  BedInput,
+  BedPoint,
+  BedRow,
+  BedTool,
+  BedValidationErrors,
+  BedValidationResult,
+} from "./bed.js";
+
 export { manualEntryAdapter, resolveCommonName, reviewTagOcrCandidates } from "./tagScanCandidate.js";
 export type {
   CommonNameResolution,
