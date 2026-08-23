@@ -22,7 +22,7 @@ that's now its own ticket. Also sharpened the USDA-coverage picture: only
 designed as a routine outcome, not an edge case, which the code below does.
 
 **#20 (Tag Scan build) is implemented and committed (`96e46c6`), but NOT
-closed on GitHub** — same posture as #4/#5 below: real, tested code, not a
+closed on GitHub** — same posture as #5 below: real, tested code, not a
 stub, but held open pending real-environment verification this session
 couldn't do. What's built, all behind real test coverage (94 domain + 55
 mobile tests): OCR-candidate review, common-name-ambiguity resolution
@@ -71,7 +71,7 @@ whether #20 should stay open until #22 lands, is a call for whoever's
 driving next, not decided here.
 
 **Before closing #20**, still needed (none of it done this session, same
-as #4/#5's deferred posture below):
+as #5's deferred posture below):
 - Push migrations `0009`/`0010` (`npm run db:push`), confirm live via
   `npx supabase migration list`.
 - Deploy `usda-plant-traits` (`npm run functions:deploy`), smoke-test its
@@ -83,13 +83,18 @@ as #4/#5's deferred posture below):
   USDA-suggested-traits screen — none of this has been exercised outside
   Jest's fake DB client.
 
-**#5 (Property + aerial base map) is implemented, committed, and has had
-substantially more real-world verification than usual** — a gardener can
-create their one Property (per account, MVP) by address, picked from a
-live autocomplete rather than freeform text (see below), and see it
-rendered as a non-drawable structural reference layer or a degraded-mode
-message. **Still not closed on GitHub** — held open the same way #4 was;
-"Deferred QA (ticket #5)" below is shorter than it was but not empty.
+**#5 (Property + aerial base map) is implemented, committed, fully manually
+verified, and closed on GitHub** — a gardener can create their one Property
+(per account, MVP) by address, picked from a live autocomplete rather than
+freeform text (see below), and see it rendered as a non-drawable structural
+reference layer or a degraded-mode message. The three remaining deferred QA
+items (degraded-mode path, one-Property-per-account error, reload
+persistence) were run this update via a fresh throwaway test account
+signed up directly against the real linked Supabase project, driving the
+real `create-property` Edge Function and a real Playwright-driven browser
+— no code changes were needed, #5 was already correct. See the closing
+comment on the issue for full detail; "Deferred QA (ticket #5)" below is
+kept for history, all items now checked off.
 
 What shipped, across several rounds of real manual QA in this session
 (not just unit tests — a real signed-in browser, then a Playwright-driven
@@ -193,13 +198,13 @@ below.
   picking up during #10 (Registry view) or whenever RLS/reload behavior is
   next touched.
 
-**#4 (Care task templates on Plant) is implemented, committed, and manually
+**#4 (Care task templates on Plant) is implemented, committed, manually
 exercised against the real Supabase project** (add a date-range template,
-add a seasonal-marker template, remove a template) — see commit `4eea9e7`
-and the follow-up fix commits below. **Not yet closed on GitHub** —
-migrations `0003`/`0004` are live on the linked project, but the deferred
-QA items below (mirroring #3's list) haven't all been run, so it's holding
-open pending a final pass rather than closed prematurely.
+add a seasonal-marker template, remove a template), **all deferred QA items
+now verified via a real signed-in browser (two accounts), and closed on
+GitHub** — see commit `4eea9e7` and the follow-up fix commits below, plus
+the closing comment on the issue for the QA detail (RLS via the `plants`
+join, reload persistence, in-browser validation errors — all passed).
 
 - Manual testing against the real project surfaced real gaps the automated
   suite (which mocks Supabase entirely) couldn't catch, all fixed and
@@ -260,19 +265,23 @@ open pending a final pass rather than closed prematurely.
   list for the Registry's saved-plants list (scoped so Dashboard/other
   lists stay marker-free).
 
-**The frontier is currently empty of new agent-pickable work.** Every ticket
-with `blocked_by == 0` right now (#4, #5, #20) is already implemented and
-sitting open pending closure (see "What to do next" above), not unstarted
-work — re-implementing any of them would be redundant. **#22** also shows
+**#5 closed this update, and that newly unblocks real frontier work: #6 and
+#7 both now show `blocked_by: 0`** (confirmed directly against the API),
+are `ready-for-agent`, and have no assignee — genuine unstarted work,
+unlike #20 below. **#20** also shows `blocked_by == 0` but is already
+implemented and sitting open pending closure (see "What to do next"
+above) — re-implementing it would be redundant. **#22** also shows
 `blocked_by == 0` but is labeled `ready-for-human`, not `ready-for-agent`
 (see its "What to do next" entry above for why). **#21** is `needs-triage`.
+**#4 closed a previous update** (deferred QA all verified — see its entry
+above) but didn't change the frontier: #12, the only ticket that lists #4
+as a blocker, also needs #8 and #11, both still open.
 
-So the real next steps are: (a) do the deferred deploy/QA passes for #4,
-#5, and/or #20 so one of them can actually close — closing any of #4/#5
-would newly unblock real frontier work (#6/#7 for #5, #12 partially for
-#4); closing #20 unblocks nothing further downstream, since no other
-ticket lists it as a blocker; (b) triage #21; or (c) pick up #22 if you
-have a Mac/Apple Developer account/physical iPhone available.
+So the real next steps are: (a) pick up **#6** or **#7** — both are
+genuine, unstarted frontier work now; (b) do the deferred deploy/QA pass
+for #20 so it can actually close, though nothing downstream is waiting on
+it; (c) triage #21; or (d) pick up #22 if you have a Mac/Apple Developer
+account/physical iPhone available.
 
 `/to-tickets` has already run against issue #1. Nineteen tickets were
 published as GitHub issues **#2–#20**, each labeled `ready-for-agent`, each
@@ -282,14 +291,12 @@ edges wired between them — see "Issue tracker" below for the full map.
 **#22** was filed ad hoc during #20's implementation, labeled
 `ready-for-human` — neither is part of the original 19.
 
-**#4, #5, and #20** are all implemented but intentionally left open (see
-above) rather than listed as frontier work to pick up. All three still
-count as open blockers in GitHub's dependency graph, confirmed via the
-frontier query: **#6** and **#7** (each blocked by #5) still show
-`blocked_by: 1`, not `0` — they do **not** become pickable just because #5
-is implemented; #5 has to actually close first, same as #4 vs. #12 below.
-**#12** (Task completion logging) is still blocked: #4 alone isn't enough to
-unblock it, it also needs #8 (Planting) and #11 (Dashboard).
+**#5 has now closed**, and **#6**/**#7** (each blocked by #5) confirm it —
+both now show `blocked_by: 0` via the API, not `1`. **#20** is implemented
+but intentionally left open (see above) rather than listed as frontier
+work to pick up. **#4 also closed** an earlier update, but that alone
+doesn't unblock **#12** (Task completion logging) — it also needs #8
+(Planting) and #11 (Dashboard), both still open.
 
 Run `/implement` in a **fresh session**, pointed at whichever ticket number
 you pick — that's the context-hygiene pattern the flow expects (grilling →
@@ -308,38 +315,41 @@ risk this doc keeps flagging while it was in progress: this repo's working
 tree is shared by more than one session, so `git status` before any broad
 `git add`.
 
-### Deferred QA (ticket #5)
+### Deferred QA (ticket #5) — all done, #5 closed
 
 Ticket #5's Edge Function and migrations were verified via `npx supabase
 migration list` (all migrations through `0008` live) and direct `curl`
 smoke tests of both deployed functions' guard paths (CORS preflight,
-missing/invalid auth, blank address, malformed body). Item 1 below is now
-done — both by the user directly confirming a real create succeeded, and
-by a Playwright-driven headless-browser pass (used to diagnose the two CSS
-bugs — see "What to do next" above) that exercised the same flow
-end-to-end, including a real click-to-select. The rest still need a real
-signed-in browser session:
+missing/invalid auth, blank address, malformed body).
 
 1. ~~Full create-Property flow in the browser~~ — **done**, address
    autocomplete → pick a candidate → base map renders. Verified twice:
    directly by the user, and via automated headless-browser driving.
-2. **Degraded-mode path** — create a Property at a location with no Esri
-   imagery (open ocean coordinates are a reliable way to force this, though
-   Esri's basemap has close-to-global coverage even at zoom 18, so a real
-   land address triggering this reliably is uncommon — see the
-   conversation this session for a DB-side shortcut: edit the row's
-   `imagery_zoom`/`imagery_available` directly via the Supabase dashboard
-   to isolate just the UI's rendering of this state), confirm the "No
-   aerial imagery is available" message shows instead of a silent gap or
-   broken images.
-3. **One-Property-per-account** — after creating a Property, try again;
-   confirm the "You already have a Property." error surfaces cleanly
-   rather than a raw Postgres constraint error. (Delete Property, added
-   this session, is the easier way to free the slot back up between
-   attempts rather than needing a second account.)
-4. **Reload persistence** — refresh `/map` after creating a Property;
-   confirm it loads the existing one (`PropertiesRepository.get()`) instead
-   of re-showing the address form.
+2. ~~**Degraded-mode path**~~ — **done.** Rather than hunting for a real
+   land address with no Esri coverage, created a Property directly via the
+   deployed `create-property` Edge Function at open-ocean coordinates
+   (30°S, 140°W) using a fresh throwaway test account (signup returns a
+   session immediately — email confirmation is off). Backend correctly
+   returned `imagery_zoom: null`, `imagery_available: false`; a
+   Playwright-driven browser then confirmed `/map` renders "No aerial
+   imagery is available for this property's location..." instead of a
+   silent gap or broken images.
+3. ~~**One-Property-per-account**~~ — **done.** Called `create-property`
+   again for the same test account: got a clean
+   `{"error":"You already have a Property."}`, not a raw Postgres
+   constraint error. The current UI only ever shows the create form when
+   no Property exists, so this path isn't reachable through normal
+   navigation — verified at the API layer, which is what the form's
+   generic error-display code renders verbatim if it's ever hit.
+4. ~~**Reload persistence**~~ — **done.** Hard-refreshed `/map` with the
+   degraded-mode Property already created: it loaded the existing Property
+   (`PropertiesRepository.get()`) rather than re-showing the address form.
+
+All four verified via a fresh throwaway test account against the real
+linked Supabase project — no other account's data touched. The test
+Property row was deleted afterward; the throwaway auth user itself remains
+in the project (no service-role access from this session to remove it) —
+see the closing comment on #5 for full detail.
 
 ### Deferred QA (ticket #3)
 
@@ -356,23 +366,26 @@ Not run yet, lower priority than the core checklist (which passed in full):
 4. **Multiple plants, alphabetical ordering** — add 2-3 plants with
    different common names, confirm the Registry list sorts by name.
 
-### Deferred QA (ticket #4)
+### Deferred QA (ticket #4) — all done, #4 closed
 
-The add/remove/wraparound flows above were exercised manually; these were
-not, and are the reason #4 is still open rather than closed:
+All three items below were run this update via a real signed-in browser
+(two accounts) and passed — see the closing comment on #4 for the same
+detail:
 
-1. **RLS via the `plants` join** — log in as account A, add a care task
-   template to one of A's plants; log in as account B, confirm the
-   template isn't readable/writable. New ownership-check pattern (a join
-   to `plants`, not a direct `user_id` column like #3's), never proven
-   against real Postgres.
-2. **Reload persistence** — refresh the Plant edit page after adding
-   templates; confirm they still load (exercises `listCareTaskTemplates`
-   on a fresh mount, not just in-session state).
-3. **Validation errors in the browser** — blank name, invalid trigger date
-   parts, blank seasonal-marker text; confirm inline messages render as
-   expected (covered by unit tests with a fake DB client, not eyeballed in
-   a real browser).
+1. ~~**RLS via the `plants` join**~~ — **done.** Logged in as account A,
+   added a care task template to one of A's plants; logged in as account
+   B, pasted A's `/registry/<plantId>` URL directly. Correctly blocked —
+   "Plant not found." (the alert renders low in the form, just above the
+   Save button, easy to miss without scrolling; page title falls back to
+   "Plant" in this state). New ownership-check pattern (a join to
+   `plants`, not a direct `user_id` column like #3's) now proven against
+   real Postgres.
+2. ~~**Reload persistence**~~ — **done.** Hard-refreshed the Plant edit
+   page after adding a template; it still loaded (`listCareTaskTemplates`
+   on a fresh mount).
+3. ~~**Validation errors in the browser**~~ — **done.** Blank name → "Name
+   is required."; missing date-range parts and blank seasonal-marker text
+   both showed their inline alerts as expected.
 
 ---
 
@@ -464,20 +477,21 @@ commits — see "What to do next" above), `36da29d`/`9718f91` (#19, Tag Scan
 OCR-placement + USDA prototype, ADR-0004), and `96e46c6` (#20, Tag Scan
 build — domain logic, `tag_photos` migration/storage, `usda-plant-traits`
 Edge Function, and the full mobile capture/review flow, minus the native
-Vision OCR module split to #22) are the build work so far. #2, #3, #13,
-and #19 are closed on GitHub. #4, #5, and #20 are implemented (and #4/#5
-partially verified) but **not yet closed on GitHub** — see "What to do
-next" above and each ticket's "Deferred QA"/deploy notes. #5's migrations
-(through `0008`) are pushed to the linked Supabase project and both its
-Edge Functions (`create-property`, `search-addresses`) are deployed; #20's
-migrations (`0009`/`0010`) and its `usda-plant-traits` Edge Function are
-**not yet pushed/deployed** — see "What to do next" above. **None of this
-session's commits have been `git push`ed to the GitHub remote yet**, since
-pushing to a shared remote wasn't asked for in this session; do that (or
-ask first) before treating this branch as published. The remaining tickets
-(#6, #14–#18) are still unbuilt or unverified; #21 (filed during #4's QA)
-is `needs-triage`; #22 (filed during #20, `ready-for-human`) needs a Mac,
-an Apple Developer account, and a physical iPhone this environment doesn't
+Vision OCR module split to #22) are the build work so far. #2, #3, #4,
+#5, #13, and #19 are closed on GitHub. #20 is implemented but **not yet
+closed on GitHub** — see "What to do next" above and its "Deferred
+QA"/deploy notes. #5's migrations (through `0008`) are pushed to the
+linked Supabase project and both its Edge Functions (`create-property`,
+`search-addresses`) are deployed; #20's migrations (`0009`/`0010`) and its
+`usda-plant-traits` Edge Function are **not yet pushed/deployed** — see
+"What to do next" above. **None of this session's commits have been `git
+push`ed to the GitHub remote yet**, since pushing to a shared remote
+wasn't asked for in this session; do that (or ask first) before treating
+this branch as published. The remaining tickets (#6, #7, #14–#18) are
+still unbuilt or unverified — #6 and #7 are now genuine frontier work,
+newly unblocked by #5's closure; #21 (filed during #4's QA) is
+`needs-triage`; #22 (filed during #20, `ready-for-human`) needs a Mac, an
+Apple Developer account, and a physical iPhone this environment doesn't
 have.
 
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
@@ -631,10 +645,10 @@ Ticket map (dependency order; title abbreviated):
 |---|---|---|
 | 2 | Repo scaffold, Supabase backend, web auth skeleton | — (built, `2668f2c`, closed) |
 | 3 | Plant record CRUD (manual entry) — built, `9018f33`, closed | 2 |
-| 4 | Care task templates on Plant — built, `4eea9e7`–`8ce7a48`, **open** (deferred QA) | 3 |
-| 5 | Property + aerial base map — built, `1380351`–`3b7fa07`, **open** (deferred QA) | 2 |
-| 6 | Property: photographed/in-app-drawn base map + Scale Reference | 5 |
-| 7 | Bed drawing (desktop) | 5 |
+| 4 | Care task templates on Plant — built, `4eea9e7`–`8ce7a48`, closed | 3 |
+| 5 | Property + aerial base map — built, `1380351`–`3b7fa07`, closed | 2 |
+| 6 | Property: photographed/in-app-drawn base map + Scale Reference — **frontier, unblocked** | 5 |
+| 7 | Bed drawing (desktop) — **frontier, unblocked** | 5 |
 | 8 | Planting: create + place Pin, view on tap | 3, 7 |
 | 9 | Bloom Timeline | 3, 8 |
 | 10 | Registry view | 3, 8 |
@@ -652,19 +666,19 @@ Ticket map (dependency order; title abbreviated):
 | 22 | Tag Scan: on-device Vision OCR + EAS dev client migration (filed during #20, `ready-for-human`) | — |
 
 **Frontier query**: open issues with `issue_dependencies_summary.blocked_by
-== 0` and no assignee. #2, #3, #13, and #19 are closed. #4, #5, and #20 all
-have `blocked_by == 0` (their blockers are closed) but are deliberately
-excluded from the frontier — all three are built and awaiting closure, not
-unstarted work (see "What to do next" above). **#22** also has
-`blocked_by == 0` but is `ready-for-human`, not `ready-for-agent`, so it's
-excluded the same way #21 is (`needs-triage`). **The frontier is currently
-empty** — confirmed directly against the API on 2026-08-22, not assumed:
-every issue with zero open blockers is either closed, already-built, or not
-agent-labeled. #6 and #7 (blocked by #5) still show `blocked_by: 1`, not
-`0`, since #5 hasn't closed — don't start those expecting them to be
-unblocked. #14–#18 (each blocked by #13 plus at least one other still-open
-ticket) similarly don't newly unblock from #13 alone. Closing #20 doesn't
-unblock anything further — no other ticket lists #20 as a blocker.
+== 0` and no assignee. #2, #3, #4, #5, #13, and #19 are closed. **#6 and #7
+now have `blocked_by == 0`** (confirmed directly against the API on
+2026-08-22, right after closing #5) **and are genuine frontier work** —
+`ready-for-agent`, unassigned, not previously built. **#20** also has
+`blocked_by == 0` but is deliberately excluded from the frontier — it's
+built and awaiting closure, not unstarted work (see "What to do next"
+above). **#22** also has `blocked_by == 0` but is `ready-for-human`, not
+`ready-for-agent`, so it's excluded the same way #21 is (`needs-triage`).
+#14–#18 (each blocked by #13 plus at least one other still-open ticket)
+don't newly unblock from #13 alone. Closing #4 doesn't unblock #12 by
+itself either — it also needs #8 and #11, both still open. Closing #20
+doesn't unblock anything further — no other ticket lists #20 as a
+blocker.
 
 ---
 
@@ -673,10 +687,10 @@ unblock anything further — no other ticket lists #20 as a blocker.
 - **`/implement`** — the pattern used for every ticket so far. Run once per
   ticket, fresh session each time, pointed at a ticket number. Drives `/tdd`
   internally, closes with `/code-review`. Don't run `/to-tickets` again —
-  tickets #2–#20 are already published. **No ticket is currently frontier**
-  (see "Issue tracker" above) — the next `/implement` run is either a
-  deferred-QA/deploy pass on #4, #5, or #20 to actually close one, or #22
-  once someone has the Mac/Apple Developer account/iPhone it needs.
+  tickets #2–#20 are already published. **#6 and #7 are frontier now** (see
+  "Issue tracker" above) — either is the natural next `/implement` target.
+  #20 also still needs a deferred-QA/deploy pass to actually close, and #22
+  needs the Mac/Apple Developer account/iPhone it requires.
 - ~~`/prototype` — what #19 actually is~~ — done; see the #19 entry in "What
   to do next" above and `docs/adr/0004-tag-scan-ocr-placement-and-usda-adapter.md`.
 - **`/codebase-design`** — for module structure once ticket-writing starts,
