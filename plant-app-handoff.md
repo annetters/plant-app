@@ -1,11 +1,95 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-22
+**Date:** 2026-08-23
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
+
+**#7 (Bed drawing, desktop) is implemented, manually verified end-to-end
+against the real linked Supabase project, and closed on GitHub** — see
+commit `6173a57`. A gardener can draw a Bed outline on their Property's
+aerial base map with freehand, rectangle/oval, or bezier-pen tools, toggle
+pre-draw smoothing (freehand only, fixed strength per ADR-0001: decimate to
+every 4th point, then 4 Chaikin passes), and have it persist across a
+reload. All four tools normalize to the same `BedPoint[]` real-world-feet
+outline representation (`packages/domain/src/bed.ts`) regardless of which
+tool drew it — storage and rendering never branch on tool type except to
+decide whether smoothing applies. New `beds` table (migrations
+`0011`/`0012`, pushed and live), RLS via the parent Property (ownership-via-
+join, same pattern as `care_task_templates`), and a Konva-based editor
+(`apps/web/src/property/BedEditor.tsx`) wired into `/map`, gated to desktop
+(non-touch, ≥900px) viewports only.
+
+A parallel code-review pass (10 finder agents) caught and fixed several real
+bugs before this landed — worth knowing about since they're the kind that
+don't show up in unit tests:
+- **The drawing canvas was never actually overlaid on the aerial imagery**
+  it's meant to be traced against — two disconnected, differently-sized
+  blocks (a 768px native canvas under the always-visible thumbnail's 512px
+  CSS-capped display). Caught independently by three separate review
+  agents. Fixed by rendering the aerial tiles again at native resolution
+  directly behind the Konva stage when the editor is open, so both share
+  one coordinate space — confirmed visually via the Playwright QA
+  screenshots below.
+- **A quick, short freehand drag (4-9 raw points) collapsed to a degenerate
+  2-3 point sliver** under the fixed decimation strength, since
+  `chaikinSmooth` no-ops below 3 points. `smoothBedOutline` now skips
+  decimation when there aren't enough raw points for it to leave a
+  recognizable shape (`MIN_POINTS_TO_DECIMATE` in `bed.ts`), falling back
+  to running Chaikin on the raw points directly.
+- **Pen-tool draw state leaked across a Close/reopen cycle** — a
+  `useRef`-held in-progress anchor list survived the Konva stage's
+  teardown, so a stray click near where a discarded session's first anchor
+  used to be could silently close a new shape using stale points mixed with
+  fresh ones. Fixed by resetting the draw-state ref in the stage effect's
+  cleanup, not just on an explicit Clear/tool-change.
+- **Chaikin smoothing (domain-level) was being double-applied on top of
+  Konva's own curve tension**, over-rounding freehand shapes. Removed the
+  Konva `tension` setting entirely — the point-based smoothing already
+  handles it.
+- Also extracted rectangle/oval point-geometry into pure, unit-tested
+  functions (`apps/web/src/property/dragShapeGeometry.ts`, matching the pen
+  tool's existing `penPath.ts`) and split Bed rendering into separate
+  saved/draft Konva layers, so drawing a new Bed no longer re-smooths and
+  rebuilds every other already-saved Bed on the property on every mouse
+  move.
+
+**Manual QA** was a real Playwright-driven headless browser against the
+real Supabase project (a fresh throwaway account, same pattern as #5's QA):
+sign up → create Property → draw and save a Bed with each of the four tools
+(including smoothing on/off) → all four render correctly layered on the
+aerial photo → persists correctly across a full page reload → Remove a Bed
+→ Delete Property (cascades its Beds via the FK) → narrow-viewport gate
+shows the correct fallback message instead of the drawing tools. Zero
+console errors throughout. Test Property/Beds deleted afterward; the
+throwaway auth user itself remains (no service-role access to remove it
+from this session, same limitation noted on #5's QA).
+
+**A pre-existing, unrelated bug was found and fixed along the way**: all of
+`apps/web`'s React-Router-based component tests were failing with "invalid
+hook call," for every test file, independent of anything in #7. Root cause:
+`apps/web`'s own `react`/`react-dom` range (`^19.2.8`) conflicted with the
+root workspace's `19.1.0` override (added during #13 for mobile's exact
+Expo SDK peer pin — see that ticket's entry below), so npm had nested a
+second React copy under `apps/web/node_modules` while `react-router-dom`
+stayed hoisted to root and bound to the *other* copy. Confirmed via `git
+stash` that this was already broken on `main` before #7 touched anything.
+Fixed by realigning `apps/web`'s range to `19.1.0` so the whole monorepo
+shares one React instance again — full `npm run test:run` (all three
+workspaces) and `npm run typecheck` both pass clean now.
+
+**Also found, not fixed (out of scope for #7, flagging for whoever owns Tag
+Scan next)**: `packages/domain/src/usdaTraits.ts` around the
+`minimumHardinessZone` projection — `Number("")` and `Number(null)` both
+evaluate to `0`, which `Number.isFinite` accepts, so a USDA response with an
+empty/null `Temperature, Minimum (°F)` value gets silently read as `0°F`
+instead of "no data," producing a fabricated "zone 7" suggestion attributed
+to USDA. The `matureHeightFeet` field two lines above already guards against
+this same coercion (`> 0`); the temperature field doesn't. Caught by the
+same code-review pass, on `packages/domain`/`apps/mobile` code this session
+didn't otherwise touch (#20/#22's Tag Scan work, already closed).
 
 **#19 (Tag Scan prototype: OCR placement + USDA data pull) is done and
 closed on GitHub** — see commits `36da29d`, `9718f91`, and
@@ -421,6 +505,10 @@ Domain glossary: `CONTEXT.md`
 Working tree clean as of this update. Most recent commits first:
 
 ```
+6173a57 Add Bed drawing on the aerial base map (#7)
+dc33e47 Add on-device Vision OCR module and adapter (#22)
+4464cac Reflect #5's closure and #6/#7's new frontier status in the handoff doc
+bcd0e19 Reflect #19's closure and #20's implementation in the handoff doc
 96e46c6 Add Tag Scan domain logic, USDA lookup, and mobile capture/review flow (#20)
 9718f91 Correct tag2 finding: mismatched front/back, not one plant's two sides
 36da29d Add Tag Scan OCR-placement prototype + USDA adapter validation (#19)
@@ -474,25 +562,36 @@ plus several real rounds of fixes found during manual QA — see "What to do
 next" above for the detailed list), `7ff1943`–`7d28ab0` (#13, RN
 scaffold + auth, plus the SDK downgrade, deep-link, and device-QA fix
 commits — see "What to do next" above), `36da29d`/`9718f91` (#19, Tag Scan
-OCR-placement + USDA prototype, ADR-0004), and `96e46c6` (#20, Tag Scan
+OCR-placement + USDA prototype, ADR-0004), `96e46c6` (#20, Tag Scan
 build — domain logic, `tag_photos` migration/storage, `usda-plant-traits`
 Edge Function, and the full mobile capture/review flow, minus the native
-Vision OCR module split to #22) are the build work so far. #2, #3, #4,
-#5, #13, and #19 are closed on GitHub. #20 is implemented but **not yet
+Vision OCR module split to #22), `dc33e47` (#22, on-device Vision OCR
+module + adapter — **committed by a concurrent session this repo shares;
+not otherwise reflected in this doc, and this update did not review or
+verify its contents**), and `6173a57` (#7, Bed drawing — see "What to do
+next" above for full detail) are the build work so far. #2, #3, #4, #5,
+#7, #13, and #19 are closed on GitHub. #20 is implemented but **not yet
 closed on GitHub** — see "What to do next" above and its "Deferred
-QA"/deploy notes. #5's migrations (through `0008`) are pushed to the
-linked Supabase project and both its Edge Functions (`create-property`,
-`search-addresses`) are deployed; #20's migrations (`0009`/`0010`) and its
-`usda-plant-traits` Edge Function are **not yet pushed/deployed** — see
-"What to do next" above. **None of this session's commits have been `git
-push`ed to the GitHub remote yet**, since pushing to a shared remote
-wasn't asked for in this session; do that (or ask first) before treating
-this branch as published. The remaining tickets (#6, #7, #14–#18) are
-still unbuilt or unverified — #6 and #7 are now genuine frontier work,
-newly unblocked by #5's closure; #21 (filed during #4's QA) is
-`needs-triage`; #22 (filed during #20, `ready-for-human`) needs a Mac, an
-Apple Developer account, and a physical iPhone this environment doesn't
-have.
+QA"/deploy notes. **#22 is still open on GitHub, still labeled
+`ready-for-human`, still unassigned** (confirmed directly against the API
+right after #7 closed) — so despite `dc33e47` landing code, #22 evidently
+still needs the Mac/Apple Developer account/physical iPhone device-testing
+step this environment doesn't have; whoever picks this up next should read
+`dc33e47`'s diff before assuming it's a finished, tested module.
+#5's migrations (through `0008`) are pushed to the linked Supabase project
+and both its Edge Functions (`create-property`, `search-addresses`) are
+deployed; #7's migrations (`0011`/`0012`) are pushed; #20's migrations
+(`0009`/`0010`, pushed alongside #7's in the same `db push`) and its
+`usda-plant-traits` Edge Function — **the Edge Function itself is still not
+deployed**, so #20 still can't fully close on that front — see "What to do
+next" above. **None of this session's commits have been `git push`ed to the
+GitHub remote yet**, since pushing to a shared remote wasn't asked for in
+this session; do that (or ask first) before treating this branch as
+published. The remaining tickets (#6, #14–#18) are still unbuilt or
+unverified — #6 is genuine frontier work (unblocked since #5 closed); #8 is
+now also frontier, newly unblocked by #7's closure (it needed both #3 and
+#7); #21 (filed during #4's QA) is `needs-triage`; #22's status needs a
+direct GitHub check per the note above.
 
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
 > No GPS is read and no user photo is taken — that is exactly why the work was
@@ -502,10 +601,10 @@ have.
 
 | Artifact | Path | Purpose |
 |---|---|---|
-| **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output (npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app, Supabase auth, auth-gated Dashboard shell) plus ticket #3's output (`Plant`/`PlantInput` types + `validatePlantInput` in `packages/domain/src/plant.ts`; Registry list + create/view/edit/delete + reference-photo upload in `apps/web/src/routes/Plants*.tsx` and `apps/web/src/plants/`) plus ticket #4's output (`TaskTrigger`/`CareTaskTemplate` types + `validateCareTaskTemplateInput` + `computeTriggerDateRange`/`dateRangeWraps` in `packages/domain/src/careTaskTemplate.ts`; add/list/remove UI in the "Care task templates" section of `apps/web/src/routes/PlantFormPage.tsx`, repository methods on `PlantsRepository`) plus ticket #5's output (`Property`/`PropertyInput`/`AddressCandidate` types + Web Mercator scale math — `metersPerPixel`/`feetPerPixel`/`pixelsPerFoot`/`lonLatToTile`/`pickBestZoom`/`aerialTileUrl` — in `packages/domain/src/property.ts`; the `/map` page in `apps/web/src/routes/PropertyPage.tsx` and `apps/web/src/property/` — `PropertiesRepository` with `get`/`search`/`create`/`remove`, and the `AddressAutocomplete.tsx` combobox that requires picking a specific geocoder candidate rather than submitting freeform text — backed by the `create-property` and `search-addresses` Edge Functions). See `apps/web/README.md` for the one-time Supabase project setup. Not throwaway — build on this. |
+| **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output (npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app, Supabase auth, auth-gated Dashboard shell) plus ticket #3's output (`Plant`/`PlantInput` types + `validatePlantInput` in `packages/domain/src/plant.ts`; Registry list + create/view/edit/delete + reference-photo upload in `apps/web/src/routes/Plants*.tsx` and `apps/web/src/plants/`) plus ticket #4's output (`TaskTrigger`/`CareTaskTemplate` types + `validateCareTaskTemplateInput` + `computeTriggerDateRange`/`dateRangeWraps` in `packages/domain/src/careTaskTemplate.ts`; add/list/remove UI in the "Care task templates" section of `apps/web/src/routes/PlantFormPage.tsx`, repository methods on `PlantsRepository`) plus ticket #5's output (`Property`/`PropertyInput`/`AddressCandidate` types + Web Mercator scale math — `metersPerPixel`/`feetPerPixel`/`pixelsPerFoot`/`lonLatToTile`/`pickBestZoom`/`aerialTileUrl` — in `packages/domain/src/property.ts`; the `/map` page in `apps/web/src/routes/PropertyPage.tsx` and `apps/web/src/property/` — `PropertiesRepository` with `get`/`search`/`create`/`remove`, and the `AddressAutocomplete.tsx` combobox that requires picking a specific geocoder candidate rather than submitting freeform text — backed by the `create-property` and `search-addresses` Edge Functions) plus ticket #7's output (`Bed`/`BedInput`/`BedTool`/`BedPoint` types + `validateBedInput` + the ADR-0001 smoothing pipeline — `decimatePoints`/`chaikinSmooth`/`smoothBedOutline` — + `feetToPixels`/`pixelsToFeet` in `packages/domain/src/bed.ts`; the Konva-based drawing surface `BedEditor.tsx` wired into `/map`, gated to desktop viewports only via `useIsDesktopViewport`/`isDesktopViewport.ts`; pure geometry helpers `penPath.ts` (bezier-pen curve flattening) and `dragShapeGeometry.ts` (rectangle/oval point sampling); `BedsRepository` with `list`/`create`/`remove`, backed directly by the `beds` table — no Edge Function needed, unlike Property, since Bed geometry touches no external adapter). See `apps/web/README.md` for the one-time Supabase project setup. Not throwaway — build on this. |
 | **Mobile app (real, built)** | `apps/mobile` | Ticket #13's output — Expo/TypeScript RN app on SDK 54, importing `@plant-app/domain` for `DASHBOARD_TILES` per ADR-0003. Mirrors (does not share code with) `apps/web`'s auth scaffold: `AuthContext`/`useCredentialsForm` in `apps/mobile/src/auth/`, `LoginScreen`/`SignUpScreen`/`DashboardScreen` in `apps/mobile/src/screens/`, `RootNavigator` (`src/navigation/`) swapping between an Auth stack and a Main stack based on auth status — the native equivalent of web's `RequireAuth` guard. `authDeepLink.ts`/`useAuthDeepLinkHandler.ts` complete Supabase's email-confirmation redirect via the `plant-app://` URL scheme (`app.json`); currently dormant since "Confirm email" is off on the linked Supabase project (see the #13 entry above), but real and tested, not a stub. Ticket #20 added `apps/mobile/src/tagScan/` (see the row below) plus `expo-image-picker`/`expo-crypto` dependencies and their `app.json` permission-plugin config. See `apps/mobile/README.md` for one-time setup (same Supabase project as web, `EXPO_PUBLIC_`-prefixed env vars, running via Expo Go — no Xcode/CocoaPods needed for day-to-day dev). Not throwaway — build on this. |
 | **Tag Scan (real, built — minus native OCR)** | `packages/domain/src/{tagScanCandidate,tagScanMatching,usdaTraits}.ts`, `apps/mobile/src/tagScan/` | Ticket #20's output. Domain: `TagOcrAdapter` seam + `manualEntryAdapter` (the real, shipped fallback) + `reviewTagOcrCandidates` in `tagScanCandidate.ts`; `checkForDuplicatePlant`/`parseScientificName` (genus+species+cultivar matching, never common name alone) in `tagScanMatching.ts`; `projectUsdaSpeciesTraits`/`deriveHardinessZoneFromMinimumTemperatureF` (never bloom window) in `usdaTraits.ts`. Mobile: `TagScanCaptureScreen` (guided two-step front/back photo capture, front required) → `TagScanReviewScreen` (manual entry, species lookup, USDA-suggested-traits accept/skip) → `TagScanAmbiguousSpeciesScreen` / `TagScanDuplicateOfferScreen`, wired through `TagScanRepository`/`TagScanRepositoryContext`. **Not built**: the on-device Vision OCR module itself — `manualEntryAdapter` is the only real `TagOcrAdapter` today; see #22. **Not yet deployed**: migrations `0009`/`0010` and the `usda-plant-traits` Edge Function (see "What to do next"). |
-| **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). `0003_care_task_templates.sql` — the `care_task_templates` table, owned by a `plant_id` FK with RLS via a join to `plants` (not a direct `user_id` column). `0004_grant_care_task_templates_table.sql` — the same follow-up GRANT `0002` needed, for the new table. `0005_plant_hardiness_zone_range.sql` — drops `hardiness_zone`, adds `hardiness_zone_min`/`hardiness_zone_max` (a plant's hardiness rating is a whole-zone range, not a single value — see "What to do next"). `0006_properties.sql` — the `properties` table (one row per account for MVP, `properties_one_per_user unique (user_id)`), RLS. `0007_grant_properties_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`, for `properties`. `0008_property_resolved_address.sql` — adds nullable `resolved_address` (what the geocoder actually matched, shown next to what the user typed so a bad match is visible — see "What to do next"). `0009_tag_photos.sql` — the `tag_photos` table (its own category, distinct from `plants.reference_photo_paths`, kept-by-default, deletable) + a private `tag-photos` storage bucket, RLS mirroring `0001`'s pattern. `0010_grant_tag_photos_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`/`0007`. `0001`–`0008` are live on the linked project (verify with `npx supabase migration list`); **`0009`/`0010` are not yet pushed** — see "What to do next". Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
+| **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). `0003_care_task_templates.sql` — the `care_task_templates` table, owned by a `plant_id` FK with RLS via a join to `plants` (not a direct `user_id` column). `0004_grant_care_task_templates_table.sql` — the same follow-up GRANT `0002` needed, for the new table. `0005_plant_hardiness_zone_range.sql` — drops `hardiness_zone`, adds `hardiness_zone_min`/`hardiness_zone_max` (a plant's hardiness rating is a whole-zone range, not a single value — see "What to do next"). `0006_properties.sql` — the `properties` table (one row per account for MVP, `properties_one_per_user unique (user_id)`), RLS. `0007_grant_properties_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`, for `properties`. `0008_property_resolved_address.sql` — adds nullable `resolved_address` (what the geocoder actually matched, shown next to what the user typed so a bad match is visible — see "What to do next"). `0009_tag_photos.sql` — the `tag_photos` table (its own category, distinct from `plants.reference_photo_paths`, kept-by-default, deletable) + a private `tag-photos` storage bucket, RLS mirroring `0001`'s pattern. `0010_grant_tag_photos_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`/`0007`. `0011_beds.sql` (ticket #7) — the `beds` table (`property_id` FK, `tool` check-constrained to the four drawing tools, `points` jsonb with a `>= 3 points` check, `smoothing_enabled`), RLS via a join to `properties` (ownership pattern matches `care_task_templates`' join to `plants`). `0012_grant_beds_table.sql` — the same follow-up GRANT pattern, for `beds`. `0001`–`0012` are all live on the linked project (verify with `npx supabase migration list`). Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
 | **Edge Functions** | `supabase/functions/` | Server-side adapter calls per ADR-0003, deployed via `npm run functions:deploy` (deploys every function found under `supabase/functions/` in one go — Docker-free, just bundles+uploads, unlike `functions serve`/`start` which need a local Docker stack). `create-property` (ticket #5) — takes a location already picked from `search-addresses`'s candidates (no longer geocodes raw text itself), probes Esri World Imagery zoom availability, and inserts the resulting Property row. `search-addresses` (added during #5's QA) — returns multiple geocoder candidates for the address-picker UI to choose from; requiring a specific pick, not stricter input validation, is what keeps a bare street ("1 main st") from silently resolving to an arbitrary global match. `usda-plant-traits` (ticket #20) — a thin, cached proxy over USDA PLANTS' characteristics-search API (no credential needed, but it's an external adapter call per ADR-0003); deliberately does *not* run the domain package's trait-projection/matching logic itself — that stays client-side, since USDA suggestions are only ever shown for accept/reject before anything's written. **Not yet deployed** — see "What to do next". `_shared/{cors,auth,nominatim}.ts` — CORS/auth/geocoding helpers shared between functions. Web Mercator math in `create-property` is hand-duplicated from `packages/domain/src/property.ts` (Deno edge functions can't import this npm workspace package) — keep the two in sync by hand, same convention as the `PlantRow`/migration "keep in sync" comments elsewhere. |
 | **Spec (current)** | [GitHub issue #1](https://github.com/annetters/plant-app/issues/1) | The real spec. 53 user stories, full implementation/testing decisions. Labeled `ready-for-agent`. |
 | Spec (superseded) | `docs/plant-app-spec.md` | The original file-based spec, written before this repo had an issue tracker. Kept for history; has a banner pointing to issue #1. Do not implement against it. |
@@ -648,8 +747,8 @@ Ticket map (dependency order; title abbreviated):
 | 4 | Care task templates on Plant — built, `4eea9e7`–`8ce7a48`, closed | 3 |
 | 5 | Property + aerial base map — built, `1380351`–`3b7fa07`, closed | 2 |
 | 6 | Property: photographed/in-app-drawn base map + Scale Reference — **frontier, unblocked** | 5 |
-| 7 | Bed drawing (desktop) — **frontier, unblocked** | 5 |
-| 8 | Planting: create + place Pin, view on tap | 3, 7 |
+| 7 | Bed drawing (desktop) — built, `6173a57`, closed | 5 |
+| 8 | Planting: create + place Pin, view on tap — **frontier, unblocked** | 3, 7 |
 | 9 | Bloom Timeline | 3, 8 |
 | 10 | Registry view | 3, 8 |
 | 11 | Dashboard (real content) | 7, 8, 9, 10 |
@@ -666,19 +765,25 @@ Ticket map (dependency order; title abbreviated):
 | 22 | Tag Scan: on-device Vision OCR + EAS dev client migration (filed during #20, `ready-for-human`) | — |
 
 **Frontier query**: open issues with `issue_dependencies_summary.blocked_by
-== 0` and no assignee. #2, #3, #4, #5, #13, and #19 are closed. **#6 and #7
-now have `blocked_by == 0`** (confirmed directly against the API on
-2026-08-22, right after closing #5) **and are genuine frontier work** —
-`ready-for-agent`, unassigned, not previously built. **#20** also has
-`blocked_by == 0` but is deliberately excluded from the frontier — it's
-built and awaiting closure, not unstarted work (see "What to do next"
-above). **#22** also has `blocked_by == 0` but is `ready-for-human`, not
-`ready-for-agent`, so it's excluded the same way #21 is (`needs-triage`).
-#14–#18 (each blocked by #13 plus at least one other still-open ticket)
-don't newly unblock from #13 alone. Closing #4 doesn't unblock #12 by
-itself either — it also needs #8 and #11, both still open. Closing #20
-doesn't unblock anything further — no other ticket lists #20 as a
-blocker.
+== 0` and no assignee. #2, #3, #4, #5, #7, #13, and #19 are closed. **#6**
+still has `blocked_by == 0` and is genuine frontier work — `ready-for-agent`,
+unassigned, not previously built. **#8 now also has `blocked_by == 0`**
+(confirmed directly against the API right after closing #7 — it needed both
+#3 and #7, both now closed) and is genuine frontier work too. **#20** also
+has `blocked_by == 0` but is deliberately excluded from the frontier — it's
+built and awaiting closure (specifically, deploying `usda-plant-traits` and
+a real-device manual QA pass — see "What to do next" above), not unstarted
+work. **#22** also has `blocked_by == 0` but is `ready-for-human`, not
+`ready-for-agent`, so it's excluded the same way #21 is (`needs-triage`) —
+note a concurrent session committed code toward it (`dc33e47`) since the
+last time this doc was updated, but #22 is still open and still labeled
+`ready-for-human` as of this update, so check it directly before assuming
+it's done. #14–#18 (each blocked by #13 plus at least one other still-open
+ticket) don't newly unblock from #13 alone. Closing #4 doesn't unblock #12
+by itself either — it also needs #8 and #11, both still open (#8 is
+frontier now, but #12 also needs #11, which isn't). Closing #7 doesn't
+unblock #9, #10, #11, #14, #15, #16, #17, or #18 by itself — each also
+needs #8 (now frontier, but not yet built) and/or other still-open tickets.
 
 ---
 
@@ -687,10 +792,11 @@ blocker.
 - **`/implement`** — the pattern used for every ticket so far. Run once per
   ticket, fresh session each time, pointed at a ticket number. Drives `/tdd`
   internally, closes with `/code-review`. Don't run `/to-tickets` again —
-  tickets #2–#20 are already published. **#6 and #7 are frontier now** (see
+  tickets #2–#20 are already published. **#6 and #8 are frontier now** (see
   "Issue tracker" above) — either is the natural next `/implement` target.
   #20 also still needs a deferred-QA/deploy pass to actually close, and #22
-  needs the Mac/Apple Developer account/iPhone it requires.
+  needs the Mac/Apple Developer account/iPhone it requires (though check its
+  actual state first — see the frontier-query note above).
 - ~~`/prototype` — what #19 actually is~~ — done; see the #19 entry in "What
   to do next" above and `docs/adr/0004-tag-scan-ocr-placement-and-usda-adapter.md`.
 - **`/codebase-design`** — for module structure once ticket-writing starts,
