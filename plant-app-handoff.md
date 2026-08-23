@@ -1,11 +1,87 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-20
+**Date:** 2026-08-22
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
+
+**#19 (Tag Scan prototype: OCR placement + USDA data pull) is done and
+closed on GitHub** — see commits `36da29d`, `9718f91`, and
+`docs/adr/0004-tag-scan-ocr-placement-and-usda-adapter.md`. Real on-device
+OCR (Apple Vision, tested against 8 real nursery tag photos) and a real
+live USDA PLANTS characteristics-search pull, both throwaway prototypes
+under `prototype/tag-scan-ocr/`. **Resolves the "Open, but not blocking"
+OCR-placement question below** — see ADR-0004: on-device Vision wins, which
+means OCR joins the shared-client-package list, not the Edge Function list,
+but also means `apps/mobile` needs a custom EAS dev client to actually run
+Vision (Expo Go can't reach it) — see the `#22` entry just below for why
+that's now its own ticket. Also sharpened the USDA-coverage picture: only
+2 of 7 real tag species had an exact USDA match — "no match" needed to be
+designed as a routine outcome, not an edge case, which the code below does.
+
+**#20 (Tag Scan build) is implemented and committed (`96e46c6`), but NOT
+closed on GitHub** — same posture as #4/#5 below: real, tested code, not a
+stub, but held open pending real-environment verification this session
+couldn't do. What's built, all behind real test coverage (94 domain + 55
+mobile tests): OCR-candidate review, common-name-ambiguity resolution
+(`resolveCommonName`), genus+species+cultivar duplicate-Plant detection
+(`checkForDuplicatePlant`), and USDA trait projection + hardiness-zone
+derivation, all in `packages/domain` behind a `TagOcrAdapter` seam; a
+`tag_photos` table + private storage bucket (migrations `0009`/`0010`,
+its own category per `CONTEXT.md`, never mixed with Plant reference
+photos); a thin `usda-plant-traits` Edge Function; and a full mobile flow
+in `apps/mobile/src/tagScan/` — guided two-step front/back photo capture
+(front required, back optional, per issue #20's own design comment,
+motivated by ADR-0004's tag2 finding that two different tags' front/back
+photographed together must never be silently treated as one tag's two
+sides) → Review (manual-entry fields, species lookup, duplicate offer,
+suggested-traits accept/skip) → an ambiguous-species picker screen → a
+duplicate-Plant offer screen.
+
+A parallel code-review pass (11 finder agents) caught and fixed several
+real bugs before this landed: picking a species on the ambiguous-species
+screen didn't actually update the Review screen it returns to (React
+Navigation reuses the already-mounted screen instance rather than pushing
+a new one — needed a `route.params`-keyed re-sync effect); a race letting
+a duplicate Plant slip through if the existing-Plants check hadn't
+finished loading before Continue was pressed; the "create anyway" override
+on the duplicate-offer screen bypassed `validatePlantInput` and name
+trimming entirely; a suggested hardiness-zone value was shown on the
+"suggested traits" screen but silently dropped when saving (fixed by
+making clear it's reference-only — USDA only gives a minimum-temperature
+zone, never an upper bound, so fabricating a max would overstate what the
+source actually knows); and Plant-creation-then-tag-photo-linking was two
+separate writes reported as one failure, which could have caused a
+resubmit-triggered duplicate Plant if only the link step failed.
+
+**Not built, and deliberately not attempted**: the real on-device Vision
+OCR module itself. `manualEntryAdapter` (always proposes zero candidates)
+is the one real, shipped `TagOcrAdapter` for now — per #20's own
+acceptance criteria, "manual entry works as a complete fallback," which is
+exactly what ships. Filed as its own ticket, **#22** (`ready-for-human`,
+not `ready-for-agent`) — building the native Vision module, migrating off
+Expo Go to a custom EAS dev client, and testing OCR against real tags all
+need a Mac, an Apple Developer account, and a physical iPhone, none of
+which a coding-agent session has access to. `#20`'s "OCR runs wherever T18
+decided" acceptance criterion is therefore only structurally satisfied
+(the seam is real and ready) — whether that's enough to close #20 now, or
+whether #20 should stay open until #22 lands, is a call for whoever's
+driving next, not decided here.
+
+**Before closing #20**, still needed (none of it done this session, same
+as #4/#5's deferred posture below):
+- Push migrations `0009`/`0010` (`npm run db:push`), confirm live via
+  `npx supabase migration list`.
+- Deploy `usda-plant-traits` (`npm run functions:deploy`), smoke-test its
+  guard paths the way `search-addresses`/`create-property` were (CORS
+  preflight, missing auth, malformed body) plus one real USDA lookup.
+- Manually verify the mobile flow on a real device via Expo Go: front/back
+  capture, manual entry, species lookup + ambiguous-species picker,
+  duplicate-Plant offer (including the "create anyway" override), and the
+  USDA-suggested-traits screen — none of this has been exercised outside
+  Jest's fake DB client.
 
 **#5 (Property + aerial base map) is implemented, committed, and has had
 substantially more real-world verification than usual** — a gardener can
@@ -184,25 +260,32 @@ open pending a final pass rather than closed prematurely.
   list for the Registry's saved-plants list (scoped so Dashboard/other
   lists stay marker-free).
 
-**Go straight to `/implement`, picking a ticket off the frontier.**
+**The frontier is currently empty of new agent-pickable work.** Every ticket
+with `blocked_by == 0` right now (#4, #5, #20) is already implemented and
+sitting open pending closure (see "What to do next" above), not unstarted
+work — re-implementing any of them would be redundant. **#22** also shows
+`blocked_by == 0` but is labeled `ready-for-human`, not `ready-for-agent`
+(see its "What to do next" entry above for why). **#21** is `needs-triage`.
 
-`/to-tickets` has already run against issue #1. Nineteen tickets are
+So the real next steps are: (a) do the deferred deploy/QA passes for #4,
+#5, and/or #20 so one of them can actually close — closing any of #4/#5
+would newly unblock real frontier work (#6/#7 for #5, #12 partially for
+#4); closing #20 unblocks nothing further downstream, since no other
+ticket lists it as a blocker; (b) triage #21; or (c) pick up #22 if you
+have a Mac/Apple Developer account/physical iPhone available.
+
+`/to-tickets` has already run against issue #1. Nineteen tickets were
 published as GitHub issues **#2–#20**, each labeled `ready-for-agent`, each
 linked to #1 as parent, with GitHub's native issue-dependency ("blocked by")
 edges wired between them — see "Issue tracker" below for the full map.
-**#21** was filed ad hoc during #4's manual QA, labeled `needs-triage`, not
-part of the original 19.
+**#21** was filed ad hoc during #4's manual QA, labeled `needs-triage`.
+**#22** was filed ad hoc during #20's implementation, labeled
+`ready-for-human` — neither is part of the original 19.
 
-**The frontier right now** (open tickets with zero open blockers, no
-assignee — safe to start immediately):
-
-- **#19** — Tag Scan prototype: OCR placement + USDA data pull — unchanged
-  since last update
-
-**#4 and #5** are both implemented but intentionally left open (see above)
-rather than listed as frontier work to pick up — don't re-implement either.
-Both still count as open blockers in GitHub's dependency graph, confirmed via
-the frontier query: **#6** and **#7** (each blocked by #5) still show
+**#4, #5, and #20** are all implemented but intentionally left open (see
+above) rather than listed as frontier work to pick up. All three still
+count as open blockers in GitHub's dependency graph, confirmed via the
+frontier query: **#6** and **#7** (each blocked by #5) still show
 `blocked_by: 1`, not `0` — they do **not** become pickable just because #5
 is implemented; #5 has to actually close first, same as #4 vs. #12 below.
 **#12** (Task completion logging) is still blocked: #4 alone isn't enough to
@@ -325,6 +408,10 @@ Domain glossary: `CONTEXT.md`
 Working tree clean as of this update. Most recent commits first:
 
 ```
+96e46c6 Add Tag Scan domain logic, USDA lookup, and mobile capture/review flow (#20)
+9718f91 Correct tag2 finding: mismatched front/back, not one plant's two sides
+36da29d Add Tag Scan OCR-placement prototype + USDA adapter validation (#19)
+b03be0b Reflect #13's closure in the handoff doc
 7d28ab0 Fix keyboard-covered buttons and missing safe-area insets on mobile
 3b7fa07 Widen the Property page so full addresses aren't cramped
 b7f01c3 Style the address-picker dropdown — reported as "not clickable"
@@ -371,19 +458,27 @@ eaf1f32 Add ADR-0003: web desktop + native mobile, cloud BaaS backend
 QA), `4eea9e7`–`91fac04` (#4, plus fixes found during manual QA, including
 the hardiness-zone-range rework in `9b74934`), `1380351`–`3b7fa07` (#5,
 plus several real rounds of fixes found during manual QA — see "What to do
-next" above for the detailed list), and `7ff1943`–`7d28ab0` (#13, RN
+next" above for the detailed list), `7ff1943`–`7d28ab0` (#13, RN
 scaffold + auth, plus the SDK downgrade, deep-link, and device-QA fix
-commits — see "What to do next" above) are the build work so far. #3 and
-#13 are closed on GitHub. #4 and #5 are implemented and partially verified
-but **not yet closed on GitHub** — see "What to do next" above and each
-ticket's "Deferred QA" section. #5's migrations (through `0008`) are
-pushed to the linked Supabase project and both its Edge Functions
-(`create-property`, `search-addresses`) are deployed — but **none of this
+commits — see "What to do next" above), `36da29d`/`9718f91` (#19, Tag Scan
+OCR-placement + USDA prototype, ADR-0004), and `96e46c6` (#20, Tag Scan
+build — domain logic, `tag_photos` migration/storage, `usda-plant-traits`
+Edge Function, and the full mobile capture/review flow, minus the native
+Vision OCR module split to #22) are the build work so far. #2, #3, #13,
+and #19 are closed on GitHub. #4, #5, and #20 are implemented (and #4/#5
+partially verified) but **not yet closed on GitHub** — see "What to do
+next" above and each ticket's "Deferred QA"/deploy notes. #5's migrations
+(through `0008`) are pushed to the linked Supabase project and both its
+Edge Functions (`create-property`, `search-addresses`) are deployed; #20's
+migrations (`0009`/`0010`) and its `usda-plant-traits` Edge Function are
+**not yet pushed/deployed** — see "What to do next" above. **None of this
 session's commits have been `git push`ed to the GitHub remote yet**, since
 pushing to a shared remote wasn't asked for in this session; do that (or
 ask first) before treating this branch as published. The remaining tickets
-(#6, #14–#20) are still unbuilt or unverified; #21 (filed during #4's QA)
-is `needs-triage`, not yet scoped for build.
+(#6, #14–#18) are still unbuilt or unverified; #21 (filed during #4's QA)
+is `needs-triage`; #22 (filed during #20, `ready-for-human`) needs a Mac,
+an Apple Developer account, and a physical iPhone this environment doesn't
+have.
 
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
 > No GPS is read and no user photo is taken — that is exactly why the work was
@@ -394,20 +489,22 @@ is `needs-triage`, not yet scoped for build.
 | Artifact | Path | Purpose |
 |---|---|---|
 | **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output (npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app, Supabase auth, auth-gated Dashboard shell) plus ticket #3's output (`Plant`/`PlantInput` types + `validatePlantInput` in `packages/domain/src/plant.ts`; Registry list + create/view/edit/delete + reference-photo upload in `apps/web/src/routes/Plants*.tsx` and `apps/web/src/plants/`) plus ticket #4's output (`TaskTrigger`/`CareTaskTemplate` types + `validateCareTaskTemplateInput` + `computeTriggerDateRange`/`dateRangeWraps` in `packages/domain/src/careTaskTemplate.ts`; add/list/remove UI in the "Care task templates" section of `apps/web/src/routes/PlantFormPage.tsx`, repository methods on `PlantsRepository`) plus ticket #5's output (`Property`/`PropertyInput`/`AddressCandidate` types + Web Mercator scale math — `metersPerPixel`/`feetPerPixel`/`pixelsPerFoot`/`lonLatToTile`/`pickBestZoom`/`aerialTileUrl` — in `packages/domain/src/property.ts`; the `/map` page in `apps/web/src/routes/PropertyPage.tsx` and `apps/web/src/property/` — `PropertiesRepository` with `get`/`search`/`create`/`remove`, and the `AddressAutocomplete.tsx` combobox that requires picking a specific geocoder candidate rather than submitting freeform text — backed by the `create-property` and `search-addresses` Edge Functions). See `apps/web/README.md` for the one-time Supabase project setup. Not throwaway — build on this. |
-| **Mobile app (real, built)** | `apps/mobile` | Ticket #13's output — Expo/TypeScript RN app on SDK 54, importing `@plant-app/domain` for `DASHBOARD_TILES` per ADR-0003. Mirrors (does not share code with) `apps/web`'s auth scaffold: `AuthContext`/`useCredentialsForm` in `apps/mobile/src/auth/`, `LoginScreen`/`SignUpScreen`/`DashboardScreen` in `apps/mobile/src/screens/`, `RootNavigator` (`src/navigation/`) swapping between an Auth stack and a Main stack based on auth status — the native equivalent of web's `RequireAuth` guard. `authDeepLink.ts`/`useAuthDeepLinkHandler.ts` complete Supabase's email-confirmation redirect via the `plant-app://` URL scheme (`app.json`); currently dormant since "Confirm email" is off on the linked Supabase project (see the #13 entry above), but real and tested, not a stub. See `apps/mobile/README.md` for one-time setup (same Supabase project as web, `EXPO_PUBLIC_`-prefixed env vars, running via Expo Go — no Xcode/CocoaPods needed for day-to-day dev). Not throwaway — build on this. |
-| **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). `0003_care_task_templates.sql` — the `care_task_templates` table, owned by a `plant_id` FK with RLS via a join to `plants` (not a direct `user_id` column). `0004_grant_care_task_templates_table.sql` — the same follow-up GRANT `0002` needed, for the new table. `0005_plant_hardiness_zone_range.sql` — drops `hardiness_zone`, adds `hardiness_zone_min`/`hardiness_zone_max` (a plant's hardiness rating is a whole-zone range, not a single value — see "What to do next"). `0006_properties.sql` — the `properties` table (one row per account for MVP, `properties_one_per_user unique (user_id)`), RLS. `0007_grant_properties_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`, for `properties`. `0008_property_resolved_address.sql` — adds nullable `resolved_address` (what the geocoder actually matched, shown next to what the user typed so a bad match is visible — see "What to do next"). All eight (`0001`–`0008`) are live on the linked project as of this update (verify with `npx supabase migration list`). Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
-| **Edge Functions** | `supabase/functions/` | Server-side adapter calls per ADR-0003, deployed via `npm run functions:deploy` (deploys every function found under `supabase/functions/` in one go — Docker-free, just bundles+uploads, unlike `functions serve`/`start` which need a local Docker stack). `create-property` (ticket #5) — takes a location already picked from `search-addresses`'s candidates (no longer geocodes raw text itself), probes Esri World Imagery zoom availability, and inserts the resulting Property row. `search-addresses` (added during #5's QA) — returns multiple geocoder candidates for the address-picker UI to choose from; requiring a specific pick, not stricter input validation, is what keeps a bare street ("1 main st") from silently resolving to an arbitrary global match. `_shared/{cors,auth,nominatim}.ts` — CORS/auth/geocoding helpers shared between the two functions, extracted once a second one existed. Web Mercator math in `create-property` is hand-duplicated from `packages/domain/src/property.ts` (Deno edge functions can't import this npm workspace package) — keep the two in sync by hand, same convention as the `PlantRow`/migration "keep in sync" comments elsewhere. |
+| **Mobile app (real, built)** | `apps/mobile` | Ticket #13's output — Expo/TypeScript RN app on SDK 54, importing `@plant-app/domain` for `DASHBOARD_TILES` per ADR-0003. Mirrors (does not share code with) `apps/web`'s auth scaffold: `AuthContext`/`useCredentialsForm` in `apps/mobile/src/auth/`, `LoginScreen`/`SignUpScreen`/`DashboardScreen` in `apps/mobile/src/screens/`, `RootNavigator` (`src/navigation/`) swapping between an Auth stack and a Main stack based on auth status — the native equivalent of web's `RequireAuth` guard. `authDeepLink.ts`/`useAuthDeepLinkHandler.ts` complete Supabase's email-confirmation redirect via the `plant-app://` URL scheme (`app.json`); currently dormant since "Confirm email" is off on the linked Supabase project (see the #13 entry above), but real and tested, not a stub. Ticket #20 added `apps/mobile/src/tagScan/` (see the row below) plus `expo-image-picker`/`expo-crypto` dependencies and their `app.json` permission-plugin config. See `apps/mobile/README.md` for one-time setup (same Supabase project as web, `EXPO_PUBLIC_`-prefixed env vars, running via Expo Go — no Xcode/CocoaPods needed for day-to-day dev). Not throwaway — build on this. |
+| **Tag Scan (real, built — minus native OCR)** | `packages/domain/src/{tagScanCandidate,tagScanMatching,usdaTraits}.ts`, `apps/mobile/src/tagScan/` | Ticket #20's output. Domain: `TagOcrAdapter` seam + `manualEntryAdapter` (the real, shipped fallback) + `reviewTagOcrCandidates` in `tagScanCandidate.ts`; `checkForDuplicatePlant`/`parseScientificName` (genus+species+cultivar matching, never common name alone) in `tagScanMatching.ts`; `projectUsdaSpeciesTraits`/`deriveHardinessZoneFromMinimumTemperatureF` (never bloom window) in `usdaTraits.ts`. Mobile: `TagScanCaptureScreen` (guided two-step front/back photo capture, front required) → `TagScanReviewScreen` (manual entry, species lookup, USDA-suggested-traits accept/skip) → `TagScanAmbiguousSpeciesScreen` / `TagScanDuplicateOfferScreen`, wired through `TagScanRepository`/`TagScanRepositoryContext`. **Not built**: the on-device Vision OCR module itself — `manualEntryAdapter` is the only real `TagOcrAdapter` today; see #22. **Not yet deployed**: migrations `0009`/`0010` and the `usda-plant-traits` Edge Function (see "What to do next"). |
+| **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). `0003_care_task_templates.sql` — the `care_task_templates` table, owned by a `plant_id` FK with RLS via a join to `plants` (not a direct `user_id` column). `0004_grant_care_task_templates_table.sql` — the same follow-up GRANT `0002` needed, for the new table. `0005_plant_hardiness_zone_range.sql` — drops `hardiness_zone`, adds `hardiness_zone_min`/`hardiness_zone_max` (a plant's hardiness rating is a whole-zone range, not a single value — see "What to do next"). `0006_properties.sql` — the `properties` table (one row per account for MVP, `properties_one_per_user unique (user_id)`), RLS. `0007_grant_properties_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`, for `properties`. `0008_property_resolved_address.sql` — adds nullable `resolved_address` (what the geocoder actually matched, shown next to what the user typed so a bad match is visible — see "What to do next"). `0009_tag_photos.sql` — the `tag_photos` table (its own category, distinct from `plants.reference_photo_paths`, kept-by-default, deletable) + a private `tag-photos` storage bucket, RLS mirroring `0001`'s pattern. `0010_grant_tag_photos_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`/`0007`. `0001`–`0008` are live on the linked project (verify with `npx supabase migration list`); **`0009`/`0010` are not yet pushed** — see "What to do next". Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
+| **Edge Functions** | `supabase/functions/` | Server-side adapter calls per ADR-0003, deployed via `npm run functions:deploy` (deploys every function found under `supabase/functions/` in one go — Docker-free, just bundles+uploads, unlike `functions serve`/`start` which need a local Docker stack). `create-property` (ticket #5) — takes a location already picked from `search-addresses`'s candidates (no longer geocodes raw text itself), probes Esri World Imagery zoom availability, and inserts the resulting Property row. `search-addresses` (added during #5's QA) — returns multiple geocoder candidates for the address-picker UI to choose from; requiring a specific pick, not stricter input validation, is what keeps a bare street ("1 main st") from silently resolving to an arbitrary global match. `usda-plant-traits` (ticket #20) — a thin, cached proxy over USDA PLANTS' characteristics-search API (no credential needed, but it's an external adapter call per ADR-0003); deliberately does *not* run the domain package's trait-projection/matching logic itself — that stays client-side, since USDA suggestions are only ever shown for accept/reject before anything's written. **Not yet deployed** — see "What to do next". `_shared/{cors,auth,nominatim}.ts` — CORS/auth/geocoding helpers shared between functions. Web Mercator math in `create-property` is hand-duplicated from `packages/domain/src/property.ts` (Deno edge functions can't import this npm workspace package) — keep the two in sync by hand, same convention as the `PlantRow`/migration "keep in sync" comments elsewhere. |
 | **Spec (current)** | [GitHub issue #1](https://github.com/annetters/plant-app/issues/1) | The real spec. 53 user stories, full implementation/testing decisions. Labeled `ready-for-agent`. |
 | Spec (superseded) | `docs/plant-app-spec.md` | The original file-based spec, written before this repo had an issue tracker. Kept for history; has a banner pointing to issue #1. Do not implement against it. |
 | Domain glossary | `CONTEXT.md` | Canonical term definitions — Plant, Planting, Property, Scale Reference, Bed, Landmark (deferred), Pin, Tag Scan, Task model, Registry, Bloom Timeline, Dashboard |
 | Agent docs | `docs/agents/` | Issue tracker setup, triage labels, domain context |
-| Decisions | `docs/adr/` | **Read these — they're normative, and win over the spec where they disagree.** ADR-0001 (bed drawing + smoothing), ADR-0002 (base layer, Property, Scale Reference — amended), ADR-0003 (platform, persistence, native app scope, domain-logic execution — amended) |
-| Research | `docs/research/plant-data-source-cultivar-level-evaluation.md` | Which external plant databases were checked for Tag Scan, and why. USDA PLANTS adopted; IPNI ruled out; Proven Winners / Missouri Botanical Garden / NC State logged as unresearched future candidates. |
+| Decisions | `docs/adr/` | **Read these — they're normative, and win over the spec where they disagree.** ADR-0001 (bed drawing + smoothing), ADR-0002 (base layer, Property, Scale Reference — amended), ADR-0003 (platform, persistence, native app scope, domain-logic execution — amended), ADR-0004 (Tag Scan OCR runs on-device/client-side; USDA adapter validated with real coverage gaps) |
+| Research | `docs/research/plant-data-source-cultivar-level-evaluation.md` | Which external plant databases were checked for Tag Scan, and why. USDA PLANTS adopted; IPNI ruled out; Proven Winners / Missouri Botanical Garden / NC State logged as unresearched future candidates. Updated alongside ADR-0004 with a real, tested USDA-coverage number (2/7 real tag species matched). |
 | Prototype | `prototype/bed-editor/` | **Throwaway.** `index.html` — Konva bed editor; pre-draw smoothing toggle is what ships. `smooth-correct.html` — three post-draw smoothing UIs, all rejected. |
 | Prototype | `prototype/satellite-base/index.html` | **Throwaway.** Aerial base layer, address → scaled map, lot boundaries. |
+| Prototype | `prototype/tag-scan-ocr/` | **Throwaway** (ticket #19). Real on-device Vision OCR run against 8 real nursery tag photos (`vision-ocr.swift`, results in `vision-ocr-results.txt`) and a real live USDA PLANTS pull (`usda-pull.mjs`, sample response saved). `cloud-ocr.mjs` was scaffolded but never run live (no API key available) — not needed, since on-device cleared the bar. Superseded by the real code in #20 above — don't build on this directory, extract learnings only. |
 
-Both prototypes are explicitly throwaway — do not build on them, extract
-learnings only. Full reasoning lives in `docs/adr/`.
+All three prototypes are explicitly throwaway — do not build on them,
+extract learnings only. Full reasoning lives in `docs/adr/`.
 
 ---
 
@@ -479,9 +576,15 @@ learnings only. Full reasoning lives in `docs/adr/`.
 - Tag photos are kept separate from Plant reference photos, never mixed;
   kept by default (a setting, not a per-scan prompt), deletable like any
   photo.
-- **Recommended before full build**: a `/prototype` pass on OCR (real tags)
-  and the USDA data pull — unlike the other three adapters, these have had
-  zero hands-on validation.
+- ~~**Recommended before full build**: a `/prototype` pass on OCR (real
+  tags) and the USDA data pull~~ — **done**, see #19/ADR-0004 above. **Built
+  for real** in #20, except the on-device Vision module itself (#22, not
+  yet built): candidate review, ambiguous-common-name resolution,
+  genus+species+cultivar duplicate detection, USDA trait projection, and
+  the tag-photo-as-own-category storage all ship now, behind a
+  `TagOcrAdapter` seam — `manualEntryAdapter` is the one real
+  implementation today (which is also exactly the "complete fallback"
+  bullet above, not a placeholder for it).
 
 **Everything else (unchanged from the original spec):**
 - One Planting = one record, `quantity` field, never one record per specimen
@@ -493,16 +596,14 @@ learnings only. Full reasoning lives in `docs/adr/`.
 
 ### Open, but not blocking
 
-- **Which OCR: on-device or a cloud API?** Raised, never answered. This
-  isn't a minor detail — ADR-0003's domain-logic-execution split assumed
-  OCR needs server-side treatment like the other adapters, which is only
-  true if it turns out to be a cloud API with a credential to protect. If
-  it's on-device (e.g. Apple's Vision framework — plausible, given
-  iPhone-first: free, offline, no credential at all), it could run in the
-  shared client package instead. **Don't build OCR integration assuming
-  either answer.** Resolve this as part of the Tag Scan prototype pass
-  above — testing on-device OCR against real nursery tags is exactly how
-  you'd find out whether it's accurate enough to skip the cloud option.
+- ~~Which OCR: on-device or a cloud API?~~ **Resolved by ADR-0004** (see the
+  #19 entry in "What to do next" above): on-device, Apple's Vision
+  framework — tested for real against 8 real nursery tag photos, 8/8
+  produced usable text. It runs in the shared client package, not an Edge
+  Function, per ADR-0003's split. Cost: `apps/mobile` needs a custom EAS
+  dev client to actually reach Vision (Expo Go can't) — tracked as **#22**,
+  not yet built. #20 shipped everything Tag Scan needs *except* that native
+  module, behind a `TagOcrAdapter` seam `#22`'s adapter plugs into later.
 
 ---
 
@@ -545,35 +646,39 @@ Ticket map (dependency order; title abbreviated):
 | 16 | Native: Registry view | 10, 13 |
 | 17 | Native: Bloom Timeline | 9, 13 |
 | 18 | Native: Plant/Planting detail, tasks & todos | 3, 8, 12, 13 |
-| 19 | Tag Scan prototype: OCR placement + USDA data pull | — |
-| 20 | Tag Scan build | 3, 13, 19 |
+| 19 | Tag Scan prototype: OCR placement + USDA data pull — done, `36da29d`/`9718f91`, closed | — |
+| 20 | Tag Scan build — built, `96e46c6`, **open** (deferred deploy/QA; OCR module split to #22) | 3, 13, 19 |
 | 21 | Care task template: single-day trigger UX (filed during #4 QA, `needs-triage`) | 4 |
+| 22 | Tag Scan: on-device Vision OCR + EAS dev client migration (filed during #20, `ready-for-human`) | — |
 
 **Frontier query**: open issues with `issue_dependencies_summary.blocked_by
-== 0` and no assignee. #2, #3, and #13 are closed. #4 and #5 both have
-`blocked_by == 0` (their blockers, #3 and #2, are closed) but are
-deliberately excluded from the frontier below — both are built and awaiting
-closure, not unstarted work. Right now the frontier is **#19** — see
-"What to do next" above. #6 and #7 (blocked by #5) still show `blocked_by:
-1`, not `0`, since #5 hasn't closed — don't start those expecting them to be
+== 0` and no assignee. #2, #3, #13, and #19 are closed. #4, #5, and #20 all
+have `blocked_by == 0` (their blockers are closed) but are deliberately
+excluded from the frontier — all three are built and awaiting closure, not
+unstarted work (see "What to do next" above). **#22** also has
+`blocked_by == 0` but is `ready-for-human`, not `ready-for-agent`, so it's
+excluded the same way #21 is (`needs-triage`). **The frontier is currently
+empty** — confirmed directly against the API on 2026-08-22, not assumed:
+every issue with zero open blockers is either closed, already-built, or not
+agent-labeled. #6 and #7 (blocked by #5) still show `blocked_by: 1`, not
+`0`, since #5 hasn't closed — don't start those expecting them to be
 unblocked. #14–#18 (each blocked by #13 plus at least one other still-open
-ticket) similarly don't newly unblock from #13 alone — confirmed via the
-API, not assumed. #21 is `needs-triage`, not `ready-for-agent`, so it's
-excluded from the frontier query by design until triaged.
+ticket) similarly don't newly unblock from #13 alone. Closing #20 doesn't
+unblock anything further — no other ticket lists #20 as a blocker.
 
 ---
 
 ## Suggested skills
 
-- **`/implement`** — the immediate next step. Run once per ticket, fresh
-  session each time, pointed at a ticket number from the frontier (see
-  "Issue tracker" above). Drives `/tdd` internally, closes with
-  `/code-review`. Don't run `/to-tickets` again — tickets #2–#20 are already
-  published.
-- **`/prototype`** — what #19 actually is. Ticket #19 already frames the
-  scope (real nursery tags through candidate OCR options, a real USDA pull);
-  running `/implement` on it should drive `/prototype` internally the way
-  `/implement` drives `/tdd` for build tickets.
+- **`/implement`** — the pattern used for every ticket so far. Run once per
+  ticket, fresh session each time, pointed at a ticket number. Drives `/tdd`
+  internally, closes with `/code-review`. Don't run `/to-tickets` again —
+  tickets #2–#20 are already published. **No ticket is currently frontier**
+  (see "Issue tracker" above) — the next `/implement` run is either a
+  deferred-QA/deploy pass on #4, #5, or #20 to actually close one, or #22
+  once someone has the Mac/Apple Developer account/iPhone it needs.
+- ~~`/prototype` — what #19 actually is~~ — done; see the #19 entry in "What
+  to do next" above and `docs/adr/0004-tag-scan-ocr-placement-and-usda-adapter.md`.
 - **`/codebase-design`** — for module structure once ticket-writing starts,
   particularly the shared-TypeScript-package boundary from ADR-0003.
 - **`/domain-modeling`** — if any term in `CONTEXT.md` needs sharpening
