@@ -1,4 +1,4 @@
-import { manualEntryAdapter, reviewTagOcrCandidates, type TagOcrCandidateFields } from '@plant-app/domain'
+import { reviewTagOcrCandidates } from '@plant-app/domain'
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import * as Crypto from 'expo-crypto'
@@ -8,6 +8,7 @@ import { Pressable, StyleSheet, Text } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import type { MainStackParamList, TagScanPhotoIds } from '../navigation/types'
 import { useTagScanRepository } from './TagScanRepositoryContext'
+import { getTagOcrAdapter } from './visionOcrAdapter'
 
 type Step = 'front' | 'back'
 
@@ -19,13 +20,11 @@ type Step = 'front' | 'back'
  * check-deposit flow), rather than one freeform photo, structurally
  * prevents that mix-up rather than trying to detect it after the fact.
  *
- * `manualEntryAdapter` is the real OCR seam for this pass (see ADR-0004 and
- * packages/domain/src/tagScanCandidate.ts) — it always resolves to no
- * candidates, so Review always renders blank, user-filled fields. The
- * on-device Vision-framework adapter is tracked separately (#22 — needs a
- * native module, an EAS dev client build, and a physical device to test
- * against real tags, none of which an AFK coding session can do) and plugs
- * into the same `TagOcrAdapter` interface without this screen changing.
+ * OCR runs once, on the front photo, after the whole capture sequence
+ * completes — see `getTagOcrAdapter()` (issue #22): Vision OCR when the
+ * native module is actually built in, `manualEntryAdapter` (proposes
+ * nothing, blank editable Review fields) everywhere else. Either way,
+ * nothing is ever auto-applied — see packages/domain/src/tagScanCandidate.ts.
  */
 export function TagScanCaptureScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>()
@@ -33,13 +32,9 @@ export function TagScanCaptureScreen() {
   const [scanId] = useState(() => Crypto.randomUUID())
   const [step, setStep] = useState<Step>('front')
   const [frontTagPhotoId, setFrontTagPhotoId] = useState<string | null>(null)
-  const [candidate, setCandidate] = useState<TagOcrCandidateFields | undefined>(undefined)
+  const [frontAssetUri, setFrontAssetUri] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  function goToReview(photoIds: TagScanPhotoIds) {
-    navigation.navigate('TagScanReview', { scanId, photoIds, candidate })
-  }
 
   async function uploadStep(result: ImagePicker.ImagePickerResult) {
     if (result.canceled || result.assets.length === 0) return null
@@ -61,26 +56,49 @@ export function TagScanCaptureScreen() {
     }
   }
 
+  /**
+   * A photo yielding more than one reading (e.g. ADR-0004's tag2 finding, or
+   * a tag with two stapled inserts giving conflicting info) routes to a
+   * disambiguation screen rather than silently taking the first candidate —
+   * doing that silently would reproduce the exact failure mode ADR-0004
+   * documented. An OCR failure (native module throws, or is unavailable)
+   * degrades to manual entry rather than blocking the scan.
+   */
+  async function finishCapture(photoIds: TagScanPhotoIds) {
+    if (!frontAssetUri) {
+      navigation.navigate('TagScanReview', { scanId, photoIds })
+      return
+    }
+    setBusy(true)
+    try {
+      const adapter = getTagOcrAdapter()
+      const candidates = await adapter.recognize({ uri: frontAssetUri })
+      const review = reviewTagOcrCandidates(adapter.source, candidates)
+      if (review.candidates.length > 1) {
+        navigation.navigate('TagScanMultipleReadings', { scanId, photoIds, candidates: review.candidates })
+        return
+      }
+      navigation.navigate('TagScanReview', { scanId, photoIds, candidate: review.candidates[0] })
+    } catch {
+      navigation.navigate('TagScanReview', { scanId, photoIds })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function handleCaptured(result: ImagePicker.ImagePickerResult) {
     const picked = await uploadStep(result)
     if (!picked) return
 
     if (step === 'front') {
-      const candidates = await manualEntryAdapter.recognize({ uri: picked.asset.uri })
-      // manualEntryAdapter never returns more than zero candidates, so taking
-      // the first is a no-op today. A real OCR adapter *could* surface more
-      // than one reading (e.g. a tag with two stapled inserts giving
-      // conflicting info, ADR-0004's tag7 finding) — deciding how to
-      // disambiguate that is left to #22, which implements that adapter.
-      const review = reviewTagOcrCandidates(manualEntryAdapter.source, candidates)
-      setCandidate(review.candidates[0])
       setFrontTagPhotoId(picked.tagPhoto.id)
+      setFrontAssetUri(picked.asset.uri)
       setStep('back')
       return
     }
 
     if (frontTagPhotoId) {
-      goToReview({ frontTagPhotoId, backTagPhotoId: picked.tagPhoto.id })
+      await finishCapture({ frontTagPhotoId, backTagPhotoId: picked.tagPhoto.id })
     }
   }
 
@@ -138,7 +156,11 @@ export function TagScanCaptureScreen() {
       </Pressable>
 
       {step === 'back' && frontTagPhotoId && (
-        <Pressable accessibilityRole="button" disabled={busy} onPress={() => goToReview({ frontTagPhotoId })}>
+        <Pressable
+          accessibilityRole="button"
+          disabled={busy}
+          onPress={() => finishCapture({ frontTagPhotoId })}
+        >
           <Text>Skip — no back photo</Text>
         </Pressable>
       )}

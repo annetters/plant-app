@@ -14,9 +14,15 @@ jest.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: jest.fn(),
 }))
 
+const mockRecognize = jest.fn().mockResolvedValue([])
+jest.mock('./visionOcrAdapter', () => ({
+  getTagOcrAdapter: () => ({ source: 'manual-entry', recognize: mockRecognize }),
+}))
+
 const originalFetch = globalThis.fetch
 
 beforeEach(() => {
+  mockRecognize.mockReset().mockResolvedValue([])
   globalThis.fetch = jest.fn().mockResolvedValue({
     arrayBuffer: () => Promise.resolve(new ArrayBuffer(8)),
   }) as unknown as typeof fetch
@@ -36,6 +42,9 @@ async function renderCaptureFlow(fake = createFakeTagScanDbClient()) {
           <Stack.Screen name="TagScanCapture" component={TagScanCaptureScreen} />
           <Stack.Screen name="TagScanReview">
             {({ route }: any) => <Text>review: {JSON.stringify(route.params)}</Text>}
+          </Stack.Screen>
+          <Stack.Screen name="TagScanMultipleReadings">
+            {({ route }: any) => <Text>multiple readings: {JSON.stringify(route.params)}</Text>}
           </Stack.Screen>
         </Stack.Navigator>
       </NavigationContainer>
@@ -79,7 +88,28 @@ describe('TagScanCaptureScreen', () => {
       frontTagPhotoId: fake.tagPhotoRows()[0].id,
       backTagPhotoId: fake.tagPhotoRows()[1].id,
     })
-    expect(params.candidate).toBeUndefined() // manual-entry adapter proposes nothing
+    expect(params.candidate).toBeUndefined() // mocked adapter proposes nothing by default
+  })
+
+  it('routes to the multiple-readings screen when OCR finds more than one distinct reading on the front photo', async () => {
+    mockRecognize.mockResolvedValueOnce([
+      { scientificName: 'Monarda didyma' },
+      { scientificName: 'Veronica spicata' },
+    ])
+    const fake = await renderCaptureFlow()
+    mockCameraCapture('file:///front.jpg', 'front.jpg')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Take photo' }))
+    await screen.findByText('Photograph the back')
+    await fireEvent.press(screen.getByRole('button', { name: 'Skip — no back photo' }))
+
+    const multipleText = await screen.findByText(/multiple readings:/)
+    const params = JSON.parse(multipleText.props.children.join('').replace('multiple readings: ', ''))
+    expect(params.candidates).toEqual([
+      { scientificName: 'Monarda didyma' },
+      { scientificName: 'Veronica spicata' },
+    ])
+    expect(params.photoIds).toEqual({ frontTagPhotoId: fake.tagPhotoRows()[0].id })
   })
 
   it('lets the user skip the back photo — it is optional, not required', async () => {

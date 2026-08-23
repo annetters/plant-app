@@ -11,6 +11,11 @@ export type TagScanPhotoIds = { frontTagPhotoId: string; backTagPhotoId?: string
 export type MainStackParamList = {
   Dashboard: undefined
   TagScanCapture: undefined
+  TagScanMultipleReadings: {
+    scanId: string
+    photoIds: TagScanPhotoIds
+    candidates: TagOcrCandidateFields[]
+  }
   TagScanReview: { scanId: string; photoIds: TagScanPhotoIds; candidate?: TagOcrCandidateFields }
   TagScanAmbiguousSpecies: {
     scanId: string

@@ -80,3 +80,6 @@ export type { DuplicatePlantCheck, ParsedScientificName, TagScanPlantIdentity } 
 
 export { deriveHardinessZoneFromMinimumTemperatureF, projectUsdaSpeciesTraits } from "./usdaTraits.js";
 export type { UsdaCharacteristic, UsdaSpeciesSuggestedTraits } from "./usdaTraits.js";
+
+export { parseOcrTextLines } from "./tagOcrParsing.js";
+export type { TagOcrTextObservation } from "./tagOcrParsing.js";
