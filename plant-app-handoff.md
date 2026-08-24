@@ -60,6 +60,10 @@ from what's actually drawn); a local variable shadowing the imported
 `pixelsPerFoot` domain function; and the photo-thumbnail loader used
 `Promise.all` (one photo's failed signed-URL request blanked out every
 other already-successful thumbnail) — switched to `Promise.allSettled`.
+Five lower-priority manual QA items were identified but deliberately
+deferred, not run — see "Deferred QA (ticket #8)" below (real drag
+gestures, touch/mobile, tapping the actual on-canvas Pin, cross-browser,
+and a couple of edge cases).
 
 **#8's closure newly unblocks #9 (Bloom Timeline), #10 (Registry view), and
 #14 (Native: Map view — it needed both #8 and #13, #13 already closed)** —
@@ -506,6 +510,47 @@ linked Supabase project — no other account's data touched. The test
 Property row was deleted afterward; the throwaway auth user itself remains
 in the project (no service-role access from this session to remove it) —
 see the closing comment on #5 for full detail.
+
+### Deferred QA (ticket #8)
+
+Not run — these need real hardware/browsers or human judgment, not the
+synthetic Playwright pass this session already ran (create/view/photo-log/
+remove a Planting, reload persistence, zero console errors — see the #8
+entry in "What to do next" above for that pass's full detail, including the
+two real bugs it caught). Lower priority than a shipping blocker, but worth
+picking up before leaning on this feature for real garden-planning use:
+
+1. **Actually dragging the Pin with a mouse/trackpad.** The automated pass
+   never simulated a real drag on the Pin marker — Konva canvas drags are
+   awkward to script reliably — so it set up the test Bed to already cover
+   the Pin's default starting position and let it resolve with no drag at
+   all. Never exercised: dragging the Pin from center to elsewhere inside a
+   Bed, dragging it outside every Bed (confirm "Drop the pin inside a Bed."
+   appears and Save disables) and back in (confirm Save re-enables), and how
+   the drag actually feels — snappy vs. laggy, any visual glitches mid-drag.
+2. **Touch/mobile behavior.** CONTEXT.md's Pin entry says placement should
+   work identically on desktop and phone (unlike Bed drawing, which stays
+   desktop-only) — `PlantingMap` is deliberately not gated to desktop for
+   this reason, but it's never been touched on an actual phone or even a
+   touch-emulated browser. Check: does a finger-drag move the Pin, does the
+   map/form layout fit reasonably on a small screen.
+3. **Tapping the actual on-canvas Pin, not the list button.** The
+   automated pass used each Planting's "View" list button — same handler as
+   tapping the rendered Pin, but easier to script. Never clicked the actual
+   circle on the canvas; worth confirming hit-testing works reliably at its
+   small radius.
+4. **Cross-browser.** Only Chromium was driven. This repo's own history
+   (#5's dropdown-not-clickable bug) found real WebKit-only rendering
+   differences Chromium missed; `PlantingMap` hasn't been checked in WebKit
+   at all.
+5. **A couple of edge cases**: removing a Bed that already has Plantings on
+   it (the FK cascade-deletes them server-side — does the Plantings list
+   go stale in the UI until a reload, or update cleanly?); two overlapping
+   Beds (a dropped Pin resolves to whichever Bed comes first in the loaded
+   list, which might not be the one visually on top); and real image files
+   for the photo log (the automated pass uploaded a 4-byte fake JPEG) —
+   actual file sizes, multiple photos in one log, and confirming they list
+   most-recent-first.
 
 ### Deferred QA (ticket #7)
 
