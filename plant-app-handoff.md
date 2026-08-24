@@ -63,8 +63,12 @@ sign up → create Property → draw and save a Bed with each of the four tools
 aerial photo → persists correctly across a full page reload → Remove a Bed
 → Delete Property (cascades its Beds via the FK) → narrow-viewport gate
 shows the correct fallback message instead of the drawing tools. Zero
-console errors throughout. Test Property/Beds deleted afterward; the
-throwaway auth user itself remains (no service-role access to remove it
+console errors throughout. Five lower-priority manual QA items were
+identified but deliberately deferred, not run — see "Deferred QA (ticket
+#7)" below (real-mouse/trackpad feel, pen-tool curve-handle dragging,
+cross-browser, a real address, and edge-case breakage attempts). Test
+Property/Beds deleted afterward; the throwaway auth user itself remains
+(no service-role access to remove it
 from this session, same limitation noted on #5's QA).
 
 **A pre-existing, unrelated bug was found and fixed along the way**: all of
@@ -434,6 +438,33 @@ linked Supabase project — no other account's data touched. The test
 Property row was deleted afterward; the throwaway auth user itself remains
 in the project (no service-role access from this session to remove it) —
 see the closing comment on #5 for full detail.
+
+### Deferred QA (ticket #7)
+
+Not run — these need human judgment or a real device/browser, not the
+synthetic Playwright pass this session already ran (all four tools drawn,
+saved, persisted across reload, removed, cascade-deleted, zero console
+errors — see the #7 entry in "What to do next" above for that pass's full
+detail). Lower priority than a shipping blocker, but worth picking up
+before leaning on this feature for real garden-planning use:
+
+1. **How drawing actually feels with a real mouse/trackpad** — the
+   Playwright pass traced a mechanical circle for freehand; a real
+   hand-traced garden-bed shape, and whether the smoothing toggle's
+   rounding looks good on it, is the real test.
+2. **Bezier-pen curve handles (click+drag)** — the automated pass only
+   clicked straight-edged corners. Dragging after a click to pull a curved
+   edge is the one pen-tool interaction never exercised.
+3. **Cross-browser** — only Chromium was driven. This repo's own history
+   (#5's dropdown-not-clickable bug) found real WebKit-only rendering
+   differences Chromium missed; Bed Editor hasn't been checked in WebKit at
+   all.
+4. **A real address the user cares about**, not just the Cambridge, MA test
+   address — confirm the aerial imagery and drawn Bed alignment look right
+   at that property's actual latitude/zoom.
+5. **Trying to break it**: a very tiny rectangle/oval drag (near the
+   8px/5px discard threshold), drawing a Bed that overlaps another Bed, and
+   clicking "Clear" mid-draw for each of the four tools.
 
 ### Deferred QA (ticket #3)
 
