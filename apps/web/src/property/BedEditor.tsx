@@ -1,14 +1,9 @@
 import type { Bed, BedInput, BedPoint, BedTool, Property } from '@plant-app/domain'
-import {
-  feetToPixels,
-  pixelsPerFoot,
-  pixelsToFeet,
-  smoothBedOutline,
-  validateBedInput,
-} from '@plant-app/domain'
+import { pixelsPerFoot, pixelsToFeet, validateBedInput } from '@plant-app/domain'
 import Konva from 'konva'
 import { useEffect, useRef, useState } from 'react'
 import { baseMapTiles, GRID_RADIUS, TILE_SIZE_PX } from './baseMapTiles'
+import { buildOutlineLine } from './bedOutline'
 import { useBedsRepository } from './BedsRepositoryContext'
 import { ovalToPoints, rectangleToPoints } from './dragShapeGeometry'
 import { flattenClosedPenPath, type PenAnchor } from './penPath'
@@ -58,23 +53,6 @@ function freshDrawState(): DrawState {
   }
 }
 
-/** Builds the Konva outline for a Bed or the in-progress draft — smoothing is always computed at render time (ADR-0001), never stored. Points already come out of `smoothBedOutline` dense enough that Konva's own curve interpolation (`tension`) would only double-smooth on top of it, so this never sets one. */
-function buildOutlineLine(
-  points: readonly BedPoint[],
-  tool: BedTool,
-  smoothingEnabled: boolean,
-  pixelsPerFootValue: number,
-  style: { stroke: string; fill: string; strokeWidth: number; dash?: number[] },
-): Konva.Line {
-  const rendered = tool === 'freehand' ? smoothBedOutline(points, smoothingEnabled) : [...points]
-  const px = feetToPixels(rendered, pixelsPerFootValue)
-  return new Konva.Line({
-    points: px.flatMap((p) => [p.x, p.y]),
-    closed: true,
-    ...style,
-  })
-}
-
 /**
  * The desktop-only Bed drawing surface (ADR-0001): freehand, rectangle,
  * oval, and bezier-pen tools, all normalizing to a raw point list in feet —
@@ -82,7 +60,14 @@ function buildOutlineLine(
  * aerial base map (ticket #5) to draw against and scale from; a
  * photographed/in-app-drawn base map is a later ticket (#6).
  */
-export function BedEditor({ property }: { property: Property }) {
+export function BedEditor({
+  property,
+  onBedsChange,
+}: {
+  property: Property
+  /** Notified with the current Bed list on every load/create/remove — lets a sibling like `PlantingMap` (which needs to resolve Pins against these same Beds) stay in sync instead of holding its own stale copy until a reload. */
+  onBedsChange?: (beds: Bed[]) => void
+}) {
   const isDesktop = useIsDesktopViewport()
   const repository = useBedsRepository()
 
@@ -124,6 +109,14 @@ export function BedEditor({ property }: { property: Property }) {
       cancelled = true
     }
   }, [property.id, repository])
+
+  useEffect(() => {
+    onBedsChange?.(beds)
+    // onBedsChange intentionally excluded: it's fired whenever `beds`
+    // itself changes, not whenever the caller happens to pass a new
+    // (possibly unstable) callback identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beds])
 
   // Mounts a real Konva stage for hands-on drawing — only while the editor
   // is open, and only once there's a scale to draw against.

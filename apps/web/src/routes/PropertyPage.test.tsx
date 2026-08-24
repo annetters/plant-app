@@ -3,20 +3,69 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
+import { PlantsRepositoryProvider } from '../plants/PlantsRepositoryContext'
+import { PlantingsRepositoryProvider } from '../plantings/PlantingsRepositoryContext'
 import { BedsRepositoryProvider } from '../property/BedsRepositoryContext'
 import { PropertiesRepositoryProvider } from '../property/PropertiesRepositoryContext'
 import { createFakeBedsDbClient } from '../test/fakeBedsDbClient'
+import { createFakePlantingsDbClient } from '../test/fakePlantingsDbClient'
+import { createFakePlantsDbClient } from '../test/fakePlantsDbClient'
 import { createFakePropertiesDbClient } from '../test/fakePropertiesDbClient'
 import { PropertyPage } from './PropertyPage'
+
+// jsdom has no real <canvas> 2D context — see BedEditor.test.tsx's identical
+// comment. PropertyPage renders both BedEditor and PlantingMap, each of
+// which mounts a real Konva Stage once a Property with imagery renders, so
+// this page's own tests need the same stub.
+vi.mock('konva', () => {
+  class FakeNode {
+    on() {}
+    off() {}
+    destroy() {}
+  }
+  class FakeContainer extends FakeNode {
+    add() {}
+    destroyChildren() {}
+    batchDraw() {}
+  }
+  class FakeStage extends FakeContainer {
+    getPointerPosition() {
+      return null
+    }
+  }
+  class FakeShape extends FakeNode {
+    attrs: Record<string, unknown>
+    constructor(attrs: Record<string, unknown> = {}) {
+      super()
+      this.attrs = attrs
+    }
+  }
+  return {
+    default: {
+      Stage: FakeStage,
+      Layer: FakeContainer,
+      Line: FakeShape,
+      Rect: FakeShape,
+      Ellipse: FakeShape,
+      Circle: FakeShape,
+    },
+  }
+})
 
 function renderPage(initialRow: PropertyRow | null = null) {
   const fake = createFakePropertiesDbClient(initialRow)
   const beds = createFakeBedsDbClient([])
+  const plants = createFakePlantsDbClient([])
+  const plantings = createFakePlantingsDbClient([])
   render(
     <MemoryRouter>
       <PropertiesRepositoryProvider client={fake.client}>
         <BedsRepositoryProvider client={beds.client}>
-          <PropertyPage />
+          <PlantsRepositoryProvider client={plants.client}>
+            <PlantingsRepositoryProvider client={plantings.client}>
+              <PropertyPage />
+            </PlantingsRepositoryProvider>
+          </PlantsRepositoryProvider>
         </BedsRepositoryProvider>
       </PropertiesRepositoryProvider>
     </MemoryRouter>,
@@ -66,11 +115,17 @@ describe('PropertyPage — no Property yet', () => {
   it('surfaces a failure from the edge function as a form error', async () => {
     const fake = createFakePropertiesDbClient(null)
     const beds = createFakeBedsDbClient([])
+    const plants = createFakePlantsDbClient([])
+    const plantings = createFakePlantingsDbClient([])
     render(
       <MemoryRouter>
         <PropertiesRepositoryProvider client={fake.client}>
           <BedsRepositoryProvider client={beds.client}>
-            <PropertyPage />
+            <PlantsRepositoryProvider client={plants.client}>
+              <PlantingsRepositoryProvider client={plantings.client}>
+                <PropertyPage />
+              </PlantingsRepositoryProvider>
+            </PlantsRepositoryProvider>
           </BedsRepositoryProvider>
         </PropertiesRepositoryProvider>
       </MemoryRouter>,

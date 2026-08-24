@@ -103,3 +103,25 @@ export type { UsdaCharacteristic, UsdaSpeciesSuggestedTraits } from "./usdaTrait
 
 export { parseOcrTextLines } from "./tagOcrParsing.js";
 export type { TagOcrTextObservation } from "./tagOcrParsing.js";
+
+export {
+  findBedContainingPoint,
+  plantingFromRow,
+  plantingInputToRow,
+  plantingPhotoFromRow,
+  plantingPhotoInputToRow,
+  validatePlantingInput,
+  validatePlantingPhotoInput,
+} from "./planting.js";
+export type {
+  Planting,
+  PlantingInput,
+  PlantingPhoto,
+  PlantingPhotoInput,
+  PlantingPhotoRow,
+  PlantingPhotoValidationErrors,
+  PlantingPhotoValidationResult,
+  PlantingRow,
+  PlantingValidationErrors,
+  PlantingValidationResult,
+} from "./planting.js";

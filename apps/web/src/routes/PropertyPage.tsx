@@ -1,6 +1,7 @@
-import type { Property } from '@plant-app/domain'
+import type { Bed, Property } from '@plant-app/domain'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { PlantingMap } from '../plantings/PlantingMap'
 import { AddressAutocomplete } from '../property/AddressAutocomplete'
 import { baseMapTiles, GRID_RADIUS } from '../property/baseMapTiles'
 import { BedEditor } from '../property/BedEditor'
@@ -15,6 +16,10 @@ export function PropertyPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // Shared with PlantingMap below, via BedEditor's onBedsChange — so a Bed
+  // drawn and saved in the editor is immediately visible for Pin placement,
+  // not just after a reload.
+  const [beds, setBeds] = useState<Bed[]>([])
 
   useEffect(() => {
     let cancelled = false
@@ -125,7 +130,8 @@ export function PropertyPage() {
                   <img key={tile.key} src={tile.url} alt="Aerial base map imagery" />
                 ))}
               </div>
-              <BedEditor property={property} />
+              <BedEditor property={property} onBedsChange={setBeds} />
+              <PlantingMap property={property} beds={beds} />
             </>
           ) : (
             <p>

@@ -1,4 +1,4 @@
-import type { BedRow, PropertyRow } from '@plant-app/domain'
+import type { Bed, BedRow, PropertyRow } from '@plant-app/domain'
 import { propertyFromRow } from '@plant-app/domain'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -73,12 +73,12 @@ function setViewport(width: number, coarsePointer: boolean) {
   )
 }
 
-function renderEditor(bedRows: BedRow[] = []) {
+function renderEditor(bedRows: BedRow[] = [], onBedsChange?: (beds: Bed[]) => void) {
   const property = propertyFromRow(AVAILABLE_ROW)
   const beds = createFakeBedsDbClient(bedRows)
   render(
     <BedsRepositoryProvider client={beds.client}>
-      <BedEditor property={property} />
+      <BedEditor property={property} onBedsChange={onBedsChange} />
     </BedsRepositoryProvider>,
   )
   return beds
@@ -148,6 +148,23 @@ describe('BedEditor', () => {
       renderEditor([bedRow])
       await userEvent.click(await screen.findByRole('button', { name: 'Remove Front border' }))
       expect(screen.queryByText('Front border')).not.toBeInTheDocument()
+    })
+
+    it('notifies onBedsChange as Beds load, so a sibling like PlantingMap can stay in sync', async () => {
+      const bedRow: BedRow = {
+        id: 'bed-1',
+        property_id: 'property-1',
+        name: 'Front border',
+        tool: 'freehand',
+        points: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 5 }],
+        smoothing_enabled: false,
+        created_at: '2026-01-01T00:00:00.000Z',
+      }
+      const onBedsChange = vi.fn()
+      renderEditor([bedRow], onBedsChange)
+
+      await screen.findByText('Front border')
+      expect(onBedsChange).toHaveBeenLastCalledWith([expect.objectContaining({ id: 'bed-1' })])
     })
   })
 
