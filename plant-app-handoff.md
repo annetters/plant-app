@@ -353,23 +353,29 @@ join, reload persistence, in-browser validation errors — all passed).
   list for the Registry's saved-plants list (scoped so Dashboard/other
   lists stay marker-free).
 
-**#5 closed this update, and that newly unblocks real frontier work: #6 and
-#7 both now show `blocked_by: 0`** (confirmed directly against the API),
-are `ready-for-agent`, and have no assignee — genuine unstarted work,
-unlike #20 below. **#20** also shows `blocked_by == 0` but is already
-implemented and sitting open pending closure (see "What to do next"
+**#5 closed a previous update, which unblocked #6 and #7 as frontier work —
+#7 has since been built and closed this update** (see its entry at the top
+of "What to do next"), which in turn unblocked **#8** (confirmed directly
+against the API right after #7 closed: `blocked_by: 0`, `ready-for-agent`,
+unassigned — it needed both #3 and #7). **#6** remains frontier,
+unaffected by #7's closure. **#20** also shows `blocked_by == 0` but is
+already implemented and sitting open pending closure (see "What to do next"
 above) — re-implementing it would be redundant. **#22** also shows
 `blocked_by == 0` but is labeled `ready-for-human`, not `ready-for-agent`
-(see its "What to do next" entry above for why). **#21** is `needs-triage`.
-**#4 closed a previous update** (deferred QA all verified — see its entry
-above) but didn't change the frontier: #12, the only ticket that lists #4
-as a blocker, also needs #8 and #11, both still open.
+(see its "What to do next" entry above for why — and note it has a
+commit, `dc33e47`, but is still open as of this update). **#21** is
+`needs-triage`. **#4 closed an earlier update** (deferred QA all verified —
+see its entry above) but didn't change the frontier: #12, the only ticket
+that lists #4 as a blocker, also needs #8 (frontier now, but not yet built)
+and #11, still open.
 
-So the real next steps are: (a) pick up **#6** or **#7** — both are
-genuine, unstarted frontier work now; (b) do the deferred deploy/QA pass
-for #20 so it can actually close, though nothing downstream is waiting on
-it; (c) triage #21; or (d) pick up #22 if you have a Mac/Apple Developer
-account/physical iPhone available.
+So the real next steps are: (a) pick up **#6** or **#8** — both are
+genuine, unstarted frontier work now (confirmed directly against the API);
+(b) do the deferred deploy/QA pass for #20 so it can actually close, though
+nothing downstream is waiting on it; (c) triage #21; or (d) pick up #22 if
+you have a Mac/Apple Developer account/physical iPhone available — though
+check its actual GitHub state first, since a concurrent session's commit
+toward it isn't reflected here.
 
 `/to-tickets` has already run against issue #1. Nineteen tickets were
 published as GitHub issues **#2–#20**, each labeled `ready-for-agent`, each
