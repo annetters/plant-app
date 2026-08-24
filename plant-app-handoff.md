@@ -7,6 +7,68 @@
 
 ## What to do next
 
+**#8 (Planting: create + place Pin, view on tap) is implemented, manually
+verified end-to-end against the real linked Supabase project, and closed on
+GitHub** — see commit `3041ca3` and the closing comment on the issue for
+full QA detail. A gardener can create a Planting against a Plant (quantity,
+year acquired, source/nursery), place its Pin by dragging directly onto the
+map with no manual coordinates (a point-in-polygon check against each Bed's
+own outline resolves which Bed it landed in — `findBedContainingPoint` in
+`packages/domain/src/planting.ts`), tap an existing Pin's list entry to view
+its details, and attach a dated photo log. New `plantings`/`planting_photos`
+tables (migrations `0013`-`0016`, pushed and live), RLS via ownership-through-
+join (Planting -> Bed -> Property, matching Beds' own join to Properties), a
+private `planting-photos` storage bucket, and `PlantingMap.tsx`
+(`apps/web/src/plantings/`) wired into `/map` alongside `BedEditor` — unlike
+Bed drawing, Pin placement is **not** gated to desktop, per CONTEXT.md's Pin
+entry ("works identically on desktop and phone"). Domain-logic test matching
+the ticket's own acceptance criterion: a Planting with quantity 24 maps to
+exactly one row with `quantity: 24`, never 24 rows.
+
+A real, Playwright-driven QA pass against the real linked Supabase project
+(fresh throwaway account, same pattern as prior tickets) caught and fixed
+two real bugs before this landed, the kind unit tests (which mock Supabase
+and stub Konva entirely) couldn't have caught:
+- **PlantingMap's canvas never actually resolved any Pin** — its container
+  div was conditionally rendered behind `beds.length > 0`, but the Konva
+  stage-mount effect only depends on the Property's scale (`pixelsPerFootValue`),
+  not on Beds, so it ran once on mount, found the container still absent
+  whenever the Property's Beds hadn't loaded yet, and left its stage/layer
+  refs permanently null even after Beds arrived — no Pin could ever resolve
+  into a Bed, since the effect that resolves one never re-ran. Surfaced as
+  "Save Planting" staying disabled no matter where the pin was dropped.
+  Fixed by always mounting the map surface once there's a scale to draw
+  against, and gating only the "Draw a Bed first" messaging on `beds.length`.
+- **Beds drawn in the sibling `BedEditor` were invisible to `PlantingMap`
+  until a full page reload** — the two components independently fetched
+  their own Bed list with no shared state, so a Bed drawn and saved in the
+  editor didn't unlock Pin placement until reloading the page. Fixed by
+  lifting the Bed list to `PropertyPage`: `BedEditor` now takes an optional
+  `onBedsChange` callback, and `PlantingMap` accepts an optional `beds` prop
+  to use instead of self-fetching (falls back to self-fetching when omitted,
+  which is what its own unit tests rely on).
+
+Also fixed, from a parallel code-review pass: removing a Planting orphaned
+its uploaded photo files in storage (the `planting_photos` rows cascade-
+deleted via the FK, but nothing ever cleaned up the files they pointed at —
+`PlantingsRepository.remove()` now deletes storage objects first, mirroring
+`PlantsRepository.removeReferencePhoto`'s storage-first ordering); a
+duplicated Bed-outline-smoothing branch between `BedEditor` and
+`PlantingMap` (extracted to a shared `renderedOutlinePoints` helper in
+`apps/web/src/property/bedOutline.ts`, so Pin-drop containment can't drift
+from what's actually drawn); a local variable shadowing the imported
+`pixelsPerFoot` domain function; and the photo-thumbnail loader used
+`Promise.all` (one photo's failed signed-URL request blanked out every
+other already-successful thumbnail) — switched to `Promise.allSettled`.
+
+**#8's closure newly unblocks #9 (Bloom Timeline), #10 (Registry view), and
+#14 (Native: Map view — it needed both #8 and #13, #13 already closed)** —
+confirmed directly against the API (`blocked_by: 0`, unassigned, on all
+three). **#6** remains frontier, unaffected by #8. **#12** (Task completion
+logging) still needs #11 (Dashboard) in addition to #8, so it's not
+frontier yet. **#18** (Native: Plant/Planting detail) still needs #12,
+still not frontier. See "Issue tracker" below for the full updated map.
+
 **#7 (Bed drawing, desktop) is implemented, manually verified end-to-end
 against the real linked Supabase project, and closed on GitHub** — see
 commit `6173a57`. A gardener can draw a Bed outline on their Property's
@@ -539,9 +601,13 @@ Domain glossary: `CONTEXT.md`
 
 ## Current state
 
-Working tree clean as of this update. Most recent commits first:
+Working tree has one uncommitted change as of this update —
+`apps/mobile/README.md`, pre-existing/unrelated to #8, left as found per
+this repo's shared-working-tree convention (see the note near the bottom of
+this doc). Most recent commits first:
 
 ```
+3041ca3 Add Planting: create + place Pin, view on tap (#8)
 6173a57 Add Bed drawing on the aerial base map (#7)
 dc33e47 Add on-device Vision OCR module and adapter (#22)
 4464cac Reflect #5's closure and #6/#7's new frontier status in the handoff doc
@@ -605,30 +671,37 @@ Edge Function, and the full mobile capture/review flow, minus the native
 Vision OCR module split to #22), `dc33e47` (#22, on-device Vision OCR
 module + adapter — **committed by a concurrent session this repo shares;
 not otherwise reflected in this doc, and this update did not review or
-verify its contents**), and `6173a57` (#7, Bed drawing — see "What to do
-next" above for full detail) are the build work so far. #2, #3, #4, #5,
-#7, #13, and #19 are closed on GitHub. #20 is implemented but **not yet
-closed on GitHub** — see "What to do next" above and its "Deferred
-QA"/deploy notes. **#22 is still open on GitHub, still labeled
-`ready-for-human`, still unassigned** (confirmed directly against the API
-right after #7 closed) — so despite `dc33e47` landing code, #22 evidently
-still needs the Mac/Apple Developer account/physical iPhone device-testing
-step this environment doesn't have; whoever picks this up next should read
-`dc33e47`'s diff before assuming it's a finished, tested module.
+verify its contents**), `6173a57` (#7, Bed drawing — see "What to do
+next" above for full detail), and `3041ca3` (#8, Planting create + place
+Pin + view on tap — domain logic, `plantings`/`planting_photos`
+migrations/storage, and `PlantingMap.tsx` — see "What to do next" above for
+full detail, including two real bugs a Playwright QA pass caught) are the
+build work so far. #2, #3, #4, #5, #7, #8, #13, and #19 are closed on
+GitHub. #20 is implemented but **not yet closed on GitHub** — see "What to
+do next" above and its "Deferred QA"/deploy notes. **#22 is still open on
+GitHub, still labeled `ready-for-human`, still unassigned** (confirmed
+directly against the API right after #7 closed) — so despite `dc33e47`
+landing code, #22 evidently still needs the Mac/Apple Developer
+account/physical iPhone device-testing step this environment doesn't have;
+whoever picks this up next should read `dc33e47`'s diff before assuming
+it's a finished, tested module.
 #5's migrations (through `0008`) are pushed to the linked Supabase project
 and both its Edge Functions (`create-property`, `search-addresses`) are
 deployed; #7's migrations (`0011`/`0012`) are pushed; #20's migrations
 (`0009`/`0010`, pushed alongside #7's in the same `db push`) and its
 `usda-plant-traits` Edge Function — **the Edge Function itself is still not
 deployed**, so #20 still can't fully close on that front — see "What to do
-next" above. **None of this session's commits have been `git push`ed to the
-GitHub remote yet**, since pushing to a shared remote wasn't asked for in
-this session; do that (or ask first) before treating this branch as
-published. The remaining tickets (#6, #14–#18) are still unbuilt or
-unverified — #6 is genuine frontier work (unblocked since #5 closed); #8 is
-now also frontier, newly unblocked by #7's closure (it needed both #3 and
-#7); #21 (filed during #4's QA) is `needs-triage`; #22's status needs a
-direct GitHub check per the note above.
+next" above. #8's migrations (`0013`–`0016`) are pushed and live (confirmed
+via `npx supabase migration list`); #8 needed no Edge Function (Planting
+touches no external adapter). **None of this session's commits have been
+`git push`ed to the GitHub remote yet**, since pushing to a shared remote
+wasn't asked for in this session; do that (or ask first) before treating
+this branch as published. The remaining tickets (#6, #9, #10, #11, #12,
+#14–#18) are still unbuilt or unverified — #6, #9, #10, and #14 are genuine
+frontier work (see "Issue tracker" below for the full dependency detail);
+#11, #12, #15–#18 each still need at least one other still-open ticket;
+#21 (filed during #4's QA) is `needs-triage`; #22's status needs a direct
+GitHub check per the note above.
 
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
 > No GPS is read and no user photo is taken — that is exactly why the work was
@@ -638,10 +711,10 @@ direct GitHub check per the note above.
 
 | Artifact | Path | Purpose |
 |---|---|---|
-| **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output (npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app, Supabase auth, auth-gated Dashboard shell) plus ticket #3's output (`Plant`/`PlantInput` types + `validatePlantInput` in `packages/domain/src/plant.ts`; Registry list + create/view/edit/delete + reference-photo upload in `apps/web/src/routes/Plants*.tsx` and `apps/web/src/plants/`) plus ticket #4's output (`TaskTrigger`/`CareTaskTemplate` types + `validateCareTaskTemplateInput` + `computeTriggerDateRange`/`dateRangeWraps` in `packages/domain/src/careTaskTemplate.ts`; add/list/remove UI in the "Care task templates" section of `apps/web/src/routes/PlantFormPage.tsx`, repository methods on `PlantsRepository`) plus ticket #5's output (`Property`/`PropertyInput`/`AddressCandidate` types + Web Mercator scale math — `metersPerPixel`/`feetPerPixel`/`pixelsPerFoot`/`lonLatToTile`/`pickBestZoom`/`aerialTileUrl` — in `packages/domain/src/property.ts`; the `/map` page in `apps/web/src/routes/PropertyPage.tsx` and `apps/web/src/property/` — `PropertiesRepository` with `get`/`search`/`create`/`remove`, and the `AddressAutocomplete.tsx` combobox that requires picking a specific geocoder candidate rather than submitting freeform text — backed by the `create-property` and `search-addresses` Edge Functions) plus ticket #7's output (`Bed`/`BedInput`/`BedTool`/`BedPoint` types + `validateBedInput` + the ADR-0001 smoothing pipeline — `decimatePoints`/`chaikinSmooth`/`smoothBedOutline` — + `feetToPixels`/`pixelsToFeet` in `packages/domain/src/bed.ts`; the Konva-based drawing surface `BedEditor.tsx` wired into `/map`, gated to desktop viewports only via `useIsDesktopViewport`/`isDesktopViewport.ts`; pure geometry helpers `penPath.ts` (bezier-pen curve flattening) and `dragShapeGeometry.ts` (rectangle/oval point sampling); `BedsRepository` with `list`/`create`/`remove`, backed directly by the `beds` table — no Edge Function needed, unlike Property, since Bed geometry touches no external adapter). See `apps/web/README.md` for the one-time Supabase project setup. Not throwaway — build on this. |
+| **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output (npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app, Supabase auth, auth-gated Dashboard shell) plus ticket #3's output (`Plant`/`PlantInput` types + `validatePlantInput` in `packages/domain/src/plant.ts`; Registry list + create/view/edit/delete + reference-photo upload in `apps/web/src/routes/Plants*.tsx` and `apps/web/src/plants/`) plus ticket #4's output (`TaskTrigger`/`CareTaskTemplate` types + `validateCareTaskTemplateInput` + `computeTriggerDateRange`/`dateRangeWraps` in `packages/domain/src/careTaskTemplate.ts`; add/list/remove UI in the "Care task templates" section of `apps/web/src/routes/PlantFormPage.tsx`, repository methods on `PlantsRepository`) plus ticket #5's output (`Property`/`PropertyInput`/`AddressCandidate` types + Web Mercator scale math — `metersPerPixel`/`feetPerPixel`/`pixelsPerFoot`/`lonLatToTile`/`pickBestZoom`/`aerialTileUrl` — in `packages/domain/src/property.ts`; the `/map` page in `apps/web/src/routes/PropertyPage.tsx` and `apps/web/src/property/` — `PropertiesRepository` with `get`/`search`/`create`/`remove`, and the `AddressAutocomplete.tsx` combobox that requires picking a specific geocoder candidate rather than submitting freeform text — backed by the `create-property` and `search-addresses` Edge Functions) plus ticket #7's output (`Bed`/`BedInput`/`BedTool`/`BedPoint` types + `validateBedInput` + the ADR-0001 smoothing pipeline — `decimatePoints`/`chaikinSmooth`/`smoothBedOutline` — + `feetToPixels`/`pixelsToFeet` in `packages/domain/src/bed.ts`; the Konva-based drawing surface `BedEditor.tsx` wired into `/map`, gated to desktop viewports only via `useIsDesktopViewport`/`isDesktopViewport.ts`; pure geometry helpers `penPath.ts` (bezier-pen curve flattening) and `dragShapeGeometry.ts` (rectangle/oval point sampling); `BedsRepository` with `list`/`create`/`remove`, backed directly by the `beds` table — no Edge Function needed, unlike Property, since Bed geometry touches no external adapter) plus ticket #8's output (`Planting`/`PlantingInput`/`PlantingPhoto` types + `validatePlantingInput`/`validatePlantingPhotoInput` + `findBedContainingPoint` (ray-casting point-in-polygon) in `packages/domain/src/planting.ts`; `PlantingMap.tsx` in `apps/web/src/plantings/` wired into `/map` alongside `BedEditor` — renders every Bed's outline and Planting's Pin, lets a Pin be placed by dragging directly onto the map (no Bed picker, no manual coordinates), and opens a details panel with the dated photo log on tap; `renderedOutlinePoints`/`buildOutlineLine` extracted to `apps/web/src/property/bedOutline.ts`, shared between `BedEditor` and `PlantingMap` so Pin-drop containment can't drift from what's actually drawn; `PlantingsRepository` with `listByBeds`/`create`/`remove`/`listPhotos`/`addPhoto`/`getPhotoUrl`/`removePhoto`, backed by the `plantings`/`planting_photos` tables and the `planting-photos` storage bucket — no Edge Function needed, same reasoning as Bed). See `apps/web/README.md` for the one-time Supabase project setup. Not throwaway — build on this. |
 | **Mobile app (real, built)** | `apps/mobile` | Ticket #13's output — Expo/TypeScript RN app on SDK 54, importing `@plant-app/domain` for `DASHBOARD_TILES` per ADR-0003. Mirrors (does not share code with) `apps/web`'s auth scaffold: `AuthContext`/`useCredentialsForm` in `apps/mobile/src/auth/`, `LoginScreen`/`SignUpScreen`/`DashboardScreen` in `apps/mobile/src/screens/`, `RootNavigator` (`src/navigation/`) swapping between an Auth stack and a Main stack based on auth status — the native equivalent of web's `RequireAuth` guard. `authDeepLink.ts`/`useAuthDeepLinkHandler.ts` complete Supabase's email-confirmation redirect via the `plant-app://` URL scheme (`app.json`); currently dormant since "Confirm email" is off on the linked Supabase project (see the #13 entry above), but real and tested, not a stub. Ticket #20 added `apps/mobile/src/tagScan/` (see the row below) plus `expo-image-picker`/`expo-crypto` dependencies and their `app.json` permission-plugin config. See `apps/mobile/README.md` for one-time setup (same Supabase project as web, `EXPO_PUBLIC_`-prefixed env vars, running via Expo Go — no Xcode/CocoaPods needed for day-to-day dev). Not throwaway — build on this. |
 | **Tag Scan (real, built — minus native OCR)** | `packages/domain/src/{tagScanCandidate,tagScanMatching,usdaTraits}.ts`, `apps/mobile/src/tagScan/` | Ticket #20's output. Domain: `TagOcrAdapter` seam + `manualEntryAdapter` (the real, shipped fallback) + `reviewTagOcrCandidates` in `tagScanCandidate.ts`; `checkForDuplicatePlant`/`parseScientificName` (genus+species+cultivar matching, never common name alone) in `tagScanMatching.ts`; `projectUsdaSpeciesTraits`/`deriveHardinessZoneFromMinimumTemperatureF` (never bloom window) in `usdaTraits.ts`. Mobile: `TagScanCaptureScreen` (guided two-step front/back photo capture, front required) → `TagScanReviewScreen` (manual entry, species lookup, USDA-suggested-traits accept/skip) → `TagScanAmbiguousSpeciesScreen` / `TagScanDuplicateOfferScreen`, wired through `TagScanRepository`/`TagScanRepositoryContext`. **Not built**: the on-device Vision OCR module itself — `manualEntryAdapter` is the only real `TagOcrAdapter` today; see #22. **Not yet deployed**: migrations `0009`/`0010` and the `usda-plant-traits` Edge Function (see "What to do next"). |
-| **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). `0003_care_task_templates.sql` — the `care_task_templates` table, owned by a `plant_id` FK with RLS via a join to `plants` (not a direct `user_id` column). `0004_grant_care_task_templates_table.sql` — the same follow-up GRANT `0002` needed, for the new table. `0005_plant_hardiness_zone_range.sql` — drops `hardiness_zone`, adds `hardiness_zone_min`/`hardiness_zone_max` (a plant's hardiness rating is a whole-zone range, not a single value — see "What to do next"). `0006_properties.sql` — the `properties` table (one row per account for MVP, `properties_one_per_user unique (user_id)`), RLS. `0007_grant_properties_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`, for `properties`. `0008_property_resolved_address.sql` — adds nullable `resolved_address` (what the geocoder actually matched, shown next to what the user typed so a bad match is visible — see "What to do next"). `0009_tag_photos.sql` — the `tag_photos` table (its own category, distinct from `plants.reference_photo_paths`, kept-by-default, deletable) + a private `tag-photos` storage bucket, RLS mirroring `0001`'s pattern. `0010_grant_tag_photos_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`/`0007`. `0011_beds.sql` (ticket #7) — the `beds` table (`property_id` FK, `tool` check-constrained to the four drawing tools, `points` jsonb with a `>= 3 points` check, `smoothing_enabled`), RLS via a join to `properties` (ownership pattern matches `care_task_templates`' join to `plants`). `0012_grant_beds_table.sql` — the same follow-up GRANT pattern, for `beds`. `0001`–`0012` are all live on the linked project (verify with `npx supabase migration list`). Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
+| **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). `0003_care_task_templates.sql` — the `care_task_templates` table, owned by a `plant_id` FK with RLS via a join to `plants` (not a direct `user_id` column). `0004_grant_care_task_templates_table.sql` — the same follow-up GRANT `0002` needed, for the new table. `0005_plant_hardiness_zone_range.sql` — drops `hardiness_zone`, adds `hardiness_zone_min`/`hardiness_zone_max` (a plant's hardiness rating is a whole-zone range, not a single value — see "What to do next"). `0006_properties.sql` — the `properties` table (one row per account for MVP, `properties_one_per_user unique (user_id)`), RLS. `0007_grant_properties_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`, for `properties`. `0008_property_resolved_address.sql` — adds nullable `resolved_address` (what the geocoder actually matched, shown next to what the user typed so a bad match is visible — see "What to do next"). `0009_tag_photos.sql` — the `tag_photos` table (its own category, distinct from `plants.reference_photo_paths`, kept-by-default, deletable) + a private `tag-photos` storage bucket, RLS mirroring `0001`'s pattern. `0010_grant_tag_photos_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`/`0007`. `0011_beds.sql` (ticket #7) — the `beds` table (`property_id` FK, `tool` check-constrained to the four drawing tools, `points` jsonb with a `>= 3 points` check, `smoothing_enabled`), RLS via a join to `properties` (ownership pattern matches `care_task_templates`' join to `plants`). `0012_grant_beds_table.sql` — the same follow-up GRANT pattern, for `beds`. `0013_plantings.sql` (ticket #8) — the `plantings` table (`plant_id`/`bed_id` FKs, `quantity` check `>= 1`, `pin_x`/`pin_y` in the same Property-relative real-world-feet space as the parent Bed's own outline points), RLS via a join to `beds` -> `properties` (insert additionally checks the referenced Plant's own ownership, since a Planting has two parent references). `0014_grant_plantings_table.sql` — the same follow-up GRANT pattern, for `plantings`. `0015_planting_photos.sql` — the `planting_photos` table (its own category/table, not an array column, since each dated photo carries its own `taken_on` date) + a private `planting-photos` storage bucket, RLS via a join to `plantings` -> `beds` -> `properties`. `0016_grant_planting_photos_table.sql` — the same follow-up GRANT pattern, for `planting_photos`. `0001`–`0016` are all live on the linked project (verify with `npx supabase migration list`). Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
 | **Edge Functions** | `supabase/functions/` | Server-side adapter calls per ADR-0003, deployed via `npm run functions:deploy` (deploys every function found under `supabase/functions/` in one go — Docker-free, just bundles+uploads, unlike `functions serve`/`start` which need a local Docker stack). `create-property` (ticket #5) — takes a location already picked from `search-addresses`'s candidates (no longer geocodes raw text itself), probes Esri World Imagery zoom availability, and inserts the resulting Property row. `search-addresses` (added during #5's QA) — returns multiple geocoder candidates for the address-picker UI to choose from; requiring a specific pick, not stricter input validation, is what keeps a bare street ("1 main st") from silently resolving to an arbitrary global match. `usda-plant-traits` (ticket #20) — a thin, cached proxy over USDA PLANTS' characteristics-search API (no credential needed, but it's an external adapter call per ADR-0003); deliberately does *not* run the domain package's trait-projection/matching logic itself — that stays client-side, since USDA suggestions are only ever shown for accept/reject before anything's written. **Not yet deployed** — see "What to do next". `_shared/{cors,auth,nominatim}.ts` — CORS/auth/geocoding helpers shared between functions. Web Mercator math in `create-property` is hand-duplicated from `packages/domain/src/property.ts` (Deno edge functions can't import this npm workspace package) — keep the two in sync by hand, same convention as the `PlantRow`/migration "keep in sync" comments elsewhere. |
 | **Spec (current)** | [GitHub issue #1](https://github.com/annetters/plant-app/issues/1) | The real spec. 53 user stories, full implementation/testing decisions. Labeled `ready-for-agent`. |
 | Spec (superseded) | `docs/plant-app-spec.md` | The original file-based spec, written before this repo had an issue tracker. Kept for history; has a banner pointing to issue #1. Do not implement against it. |
@@ -785,13 +858,13 @@ Ticket map (dependency order; title abbreviated):
 | 5 | Property + aerial base map — built, `1380351`–`3b7fa07`, closed | 2 |
 | 6 | Property: photographed/in-app-drawn base map + Scale Reference — **frontier, unblocked** | 5 |
 | 7 | Bed drawing (desktop) — built, `6173a57`, closed | 5 |
-| 8 | Planting: create + place Pin, view on tap — **frontier, unblocked** | 3, 7 |
-| 9 | Bloom Timeline | 3, 8 |
-| 10 | Registry view | 3, 8 |
+| 8 | Planting: create + place Pin, view on tap — built, `3041ca3`, closed | 3, 7 |
+| 9 | Bloom Timeline — **frontier, unblocked** | 3, 8 |
+| 10 | Registry view — **frontier, unblocked** | 3, 8 |
 | 11 | Dashboard (real content) | 7, 8, 9, 10 |
 | 12 | Task completion logging, history, one-off todos | 4, 8, 11 |
 | 13 | React Native app scaffold + auth — built and verified, `7ff1943`–`7d28ab0`, closed | 2 |
-| 14 | Native: Map view | 8, 13 |
+| 14 | Native: Map view — **frontier, unblocked** | 8, 13 |
 | 15 | Native: Scale Reference calibration | 6, 13 |
 | 16 | Native: Registry view | 10, 13 |
 | 17 | Native: Bloom Timeline | 9, 13 |
@@ -802,25 +875,29 @@ Ticket map (dependency order; title abbreviated):
 | 22 | Tag Scan: on-device Vision OCR + EAS dev client migration (filed during #20, `ready-for-human`) | — |
 
 **Frontier query**: open issues with `issue_dependencies_summary.blocked_by
-== 0` and no assignee. #2, #3, #4, #5, #7, #13, and #19 are closed. **#6**
-still has `blocked_by == 0` and is genuine frontier work — `ready-for-agent`,
-unassigned, not previously built. **#8 now also has `blocked_by == 0`**
-(confirmed directly against the API right after closing #7 — it needed both
-#3 and #7, both now closed) and is genuine frontier work too. **#20** also
-has `blocked_by == 0` but is deliberately excluded from the frontier — it's
-built and awaiting closure (specifically, deploying `usda-plant-traits` and
-a real-device manual QA pass — see "What to do next" above), not unstarted
-work. **#22** also has `blocked_by == 0` but is `ready-for-human`, not
-`ready-for-agent`, so it's excluded the same way #21 is (`needs-triage`) —
-note a concurrent session committed code toward it (`dc33e47`) since the
-last time this doc was updated, but #22 is still open and still labeled
-`ready-for-human` as of this update, so check it directly before assuming
-it's done. #14–#18 (each blocked by #13 plus at least one other still-open
-ticket) don't newly unblock from #13 alone. Closing #4 doesn't unblock #12
-by itself either — it also needs #8 and #11, both still open (#8 is
-frontier now, but #12 also needs #11, which isn't). Closing #7 doesn't
-unblock #9, #10, #11, #14, #15, #16, #17, or #18 by itself — each also
-needs #8 (now frontier, but not yet built) and/or other still-open tickets.
+== 0` and no assignee. #2, #3, #4, #5, #7, #8, #13, and #19 are closed.
+**#6** still has `blocked_by == 0` and is genuine frontier work —
+`ready-for-agent`, unassigned, not previously built. **#8 has closed**
+(confirmed via commit `3041ca3` and the closing comment on the issue),
+which newly unblocks **#9** (Bloom Timeline) and **#10** (Registry view) —
+each needed only #3 (already closed) and #8, confirmed `blocked_by == 0` on
+both directly against the API. It also newly unblocks **#14** (Native: Map
+view), which needed both #8 and #13 (#13 already closed) — also confirmed
+`blocked_by == 0`. **#11** (Dashboard) still needs #9 and #10 in addition to
+#7/#8, both still open, so it's not frontier yet. **#12** (Task completion
+logging) still needs #11 in addition to #4/#8, so it's not frontier either.
+**#18** (Native: Plant/Planting detail) still needs #12, so it's not
+frontier. **#20** also has `blocked_by == 0` but is deliberately excluded
+from the frontier — it's built and awaiting closure (specifically, deploying
+`usda-plant-traits` and a real-device manual QA pass — see "What to do next"
+above), not unstarted work. **#22** also has `blocked_by == 0` but is
+`ready-for-human`, not `ready-for-agent`, so it's excluded the same way #21
+is (`needs-triage`) — check it directly before assuming it's done, since a
+concurrent session may have touched it since this doc was last updated.
+**#15**–**#17** (each blocked by #13 plus at least one other still-open
+ticket — #6, #10, #9 respectively) don't newly unblock from #8's closure —
+#15 needs #6 (still open), #16 needs #10 (now frontier, but not yet built),
+#17 needs #9 (now frontier, but not yet built).
 
 ---
 
@@ -829,11 +906,11 @@ needs #8 (now frontier, but not yet built) and/or other still-open tickets.
 - **`/implement`** — the pattern used for every ticket so far. Run once per
   ticket, fresh session each time, pointed at a ticket number. Drives `/tdd`
   internally, closes with `/code-review`. Don't run `/to-tickets` again —
-  tickets #2–#20 are already published. **#6 and #8 are frontier now** (see
-  "Issue tracker" above) — either is the natural next `/implement` target.
-  #20 also still needs a deferred-QA/deploy pass to actually close, and #22
-  needs the Mac/Apple Developer account/iPhone it requires (though check its
-  actual state first — see the frontier-query note above).
+  tickets #2–#20 are already published. **#6, #9, #10, and #14 are frontier
+  now** (see "Issue tracker" above) — any is a natural next `/implement`
+  target. #20 also still needs a deferred-QA/deploy pass to actually close,
+  and #22 needs the Mac/Apple Developer account/iPhone it requires (though
+  check its actual state first — see the frontier-query note above).
 - ~~`/prototype` — what #19 actually is~~ — done; see the #19 entry in "What
   to do next" above and `docs/adr/0004-tag-scan-ocr-placement-and-usda-adapter.md`.
 - **`/codebase-design`** — for module structure once ticket-writing starts,
