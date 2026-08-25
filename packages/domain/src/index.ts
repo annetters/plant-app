@@ -125,3 +125,12 @@ export type {
   PlantingValidationErrors,
   PlantingValidationResult,
 } from "./planting.js";
+
+export {
+  bloomWindowIncludesMonth,
+  bloomWindowWraps,
+  buildBloomTimelineBars,
+  dayOfYear,
+  filterBloomTimelineBarsByMonth,
+} from "./bloomTimeline.js";
+export type { BloomTimelineBar } from "./bloomTimeline.js";

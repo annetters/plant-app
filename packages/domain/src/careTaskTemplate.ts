@@ -1,4 +1,4 @@
-import { isValidMonthDay, type MonthDay } from "./plant.js";
+import { isValidMonthDay, monthDayRangeWraps, type MonthDay } from "./plant.js";
 
 export interface DateRangeTrigger {
   type: "date-range";
@@ -64,10 +64,7 @@ export function validateCareTaskTemplateInput(
  * from a plain within-year range.
  */
 export function dateRangeWraps(trigger: DateRangeTrigger): boolean {
-  return (
-    trigger.start.month > trigger.end.month ||
-    (trigger.start.month === trigger.end.month && trigger.start.day > trigger.end.day)
-  );
+  return monthDayRangeWraps(trigger.start, trigger.end);
 }
 
 /**

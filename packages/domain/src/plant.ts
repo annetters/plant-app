@@ -94,6 +94,11 @@ export function isValidMonthDay(value: MonthDay): boolean {
   return value.day <= DAYS_IN_MONTH[value.month - 1];
 }
 
+/** True when a month/day range's start falls later in the calendar than its end (e.g. Nov 15 -> Feb 15) — a range that wraps into the following year. Shared by care task triggers (`dateRangeWraps`) and Bloom windows (`bloomWindowWraps`), which are both just a start/end `MonthDay` pair under different names. */
+export function monthDayRangeWraps(start: MonthDay, end: MonthDay): boolean {
+  return start.month > end.month || (start.month === end.month && start.day > end.day);
+}
+
 /** A required free-text field: blank first, then must contain a letter. */
 function requiredTextError(value: string, fieldName: string): string | undefined {
   if (!value.trim()) return `${fieldName} is required.`;

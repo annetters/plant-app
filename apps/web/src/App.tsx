@@ -11,6 +11,7 @@ import { asBedsDbClient } from './property/bedsRepository'
 import { BedsRepositoryProvider } from './property/BedsRepositoryContext'
 import { PropertiesRepositoryProvider } from './property/PropertiesRepositoryContext'
 import { asPropertiesDbClient } from './property/propertiesRepository'
+import { BloomTimelinePage } from './routes/BloomTimelinePage'
 import { ComingSoonPage } from './routes/ComingSoonPage'
 import { DashboardPage } from './routes/DashboardPage'
 import { LoginPage } from './routes/LoginPage'
@@ -18,6 +19,9 @@ import { PlantFormPage } from './routes/PlantFormPage'
 import { PlantsPage } from './routes/PlantsPage'
 import { PropertyPage } from './routes/PropertyPage'
 import { SignUpPage } from './routes/SignUpPage'
+
+/** Dashboard tiles with their own explicit `<Route>` below, rather than falling through to `ComingSoonPage`. */
+const ROUTED_TILE_IDS = new Set(['registry', 'map', 'bloom-timeline'])
 
 export function App() {
   return (
@@ -70,19 +74,25 @@ export function App() {
                     </RequireAuth>
                   }
                 />
-                {DASHBOARD_TILES.filter((tile) => tile.id !== 'registry' && tile.id !== 'map').map(
-                  (tile) => (
-                    <Route
-                      key={tile.id}
-                      path={tile.path}
-                      element={
-                        <RequireAuth>
-                          <ComingSoonPage title={tile.label} />
-                        </RequireAuth>
-                      }
-                    />
-                  ),
-                )}
+                <Route
+                  path="/bloom-timeline"
+                  element={
+                    <RequireAuth>
+                      <BloomTimelinePage />
+                    </RequireAuth>
+                  }
+                />
+                {DASHBOARD_TILES.filter((tile) => !ROUTED_TILE_IDS.has(tile.id)).map((tile) => (
+                  <Route
+                    key={tile.id}
+                    path={tile.path}
+                    element={
+                      <RequireAuth>
+                        <ComingSoonPage title={tile.label} />
+                      </RequireAuth>
+                    }
+                  />
+                ))}
               </Routes>
             </PlantingsRepositoryProvider>
           </BedsRepositoryProvider>
