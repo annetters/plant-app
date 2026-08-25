@@ -1,11 +1,89 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-23
+**Date:** 2026-08-24
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
+
+**⏸ #22 (Tag Scan: on-device Vision OCR) device setup is in progress,
+paused mid-session for a break — resume here first.** The native module
+code (`dc33e47`, plus a follow-up commit `01b0c36` documenting the setup
+path and fixing a bug in the setup wizard script) was written but
+unverified as of the last update to this doc. Since then, real
+device-testing progress happened for the first time — a genuinely long
+troubleshooting arc, now fully documented in `apps/mobile/README.md`'s
+"Native dev client" section and baked into
+`apps/mobile/scripts/setup-tag-ocr-dev-client.sh` so it isn't repeated from
+scratch next time:
+
+- The developer's macOS account isn't an admin, and Homebrew on this Mac
+  was originally set up by a different (admin) account — every early
+  attempt (`sudo gem install cocoapods`, `brew install cocoapods`) hit
+  permission walls.
+- Resolved **without working from the admin account day-to-day**: one
+  brief admin-authenticated session (via Fast User Switching, back to the
+  original account right after) ran a one-time `chgrp -R staff` +
+  `chmod -R g+w` on `/opt/homebrew` — grants write access via a group every
+  local account already belongs to, so the admin account keeps full access
+  too; nothing was taken from it.
+- A second wall that looked like real Homebrew corruption (`brew` failing
+  internally with "fatal: not in a git directory" / "unknown install step:
+  remove") was actually Git's "dubious ownership" safety check silently
+  blocking Homebrew's own internal git calls, since `/opt/homebrew`'s
+  `.git` files are still *owned* by the admin account even after the
+  group-write fix (`chgrp` changes group, not owner). Fixed with
+  `git config --global --add safe.directory /opt/homebrew`.
+- `brew install cocoapods` then completed cleanly. Xcode's license turned
+  out to already be accepted system-wide (`xcodebuild -license check` →
+  exit code `0`), so that wasn't actually a blocker despite being flagged
+  as a likely one going in.
+- `npx expo prebuild --clean` generated `apps/mobile/ios/`/`android/` for
+  the first time (gitignored, as intended — not committed).
+  `app.json`/`package.json`'s `android.package` field and `npm run
+  ios`/`npm run android` script rewrites *from that same run* **are**
+  committed (in `01b0c36`), since those are real project config prebuild
+  updates in place, not the generated native folders themselves.
+- Opened `apps/mobile/ios/mobile.xcworkspace` in Xcode, configured
+  automatic signing with the developer's own free Apple ID (Personal
+  Team) — no paid Apple Developer Program account needed, confirming
+  ADR-0004/#22's original cost assessment.
+- Hit one more real wall: the connected iPhone's iOS version was older
+  than this Xcode build expected. Fixed with a normal iOS update on the
+  phone (Settings → General → Software Update).
+
+**Exactly where this was paused**: the iPhone just finished its iOS
+update; about to press Xcode's ▶ Run button again (should now succeed,
+since the version mismatch that blocked the previous attempt is resolved)
+— but the actual build/install/launch result was never confirmed before
+the session paused for a break.
+
+**When resuming**:
+1. Open Xcode (should still have `mobile.xcworkspace` open). Confirm the
+   iPhone is selected as the run destination (not a Simulator) and
+   Signing & Capabilities still shows "Automatically manage signing" with
+   the Personal Team set.
+2. Press ▶ Run. If it errors, paste the exact error back before trying
+   anything else — don't guess at a fix blind.
+3. If it succeeds (installs and launches on the phone): from
+   `apps/mobile/`, run `npx expo start --dev-client`, open the newly
+   installed dev client app on the phone (not Expo Go), and from the
+   Dashboard tap "Scan a tag" to reach the real capture flow.
+4. Photograph a real nursery tag. **This will be the first time any of
+   #22's actual code runs against real Vision output** — treat the first
+   attempt as informative, not necessarily correct. In particular,
+   `parseOcrTextLines` (`packages/domain/src/tagOcrParsing.ts`) was tuned
+   against a text transcript from the ADR-0004 prototype, never against
+   this native module's actual live output shape — if recognized text
+   looks right in Xcode's console but candidates come out wrong on the
+   Review screen, that function is the first place to check.
+5. Once a real end-to-end scan works, decide whether to close #20/#22 (see
+   each ticket's existing "what's left" notes elsewhere in this doc) and
+   whether to push these commits to the GitHub remote (nothing from this
+   whole session has been pushed yet).
+
+---
 
 **#8 (Planting: create + place Pin, view on tap) is implemented, manually
 verified end-to-end against the real linked Supabase project, and closed on
@@ -729,7 +807,10 @@ directly against the API right after #7 closed) — so despite `dc33e47`
 landing code, #22 evidently still needs the Mac/Apple Developer
 account/physical iPhone device-testing step this environment doesn't have;
 whoever picks this up next should read `dc33e47`'s diff before assuming
-it's a finished, tested module.
+it's a finished, tested module. **Update from a later session the same
+day**: that device-testing step is now genuinely underway — see the
+paused-session entry at the very top of "What to do next" for exactly
+where it stands and how to resume.
 #5's migrations (through `0008`) are pushed to the linked Supabase project
 and both its Edge Functions (`create-property`, `search-addresses`) are
 deployed; #7's migrations (`0011`/`0012`) are pushed; #20's migrations
