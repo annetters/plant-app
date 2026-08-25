@@ -171,7 +171,7 @@ export function BloomTimelinePage() {
   )
 
   return (
-    <main>
+    <main className="bloom-timeline-page">
       <header>
         <h1>Bloom Timeline</h1>
       </header>

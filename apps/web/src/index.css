@@ -397,3 +397,28 @@ main ol.bloom-timeline-chart li {
   font-size: 13px;
   white-space: nowrap;
 }
+
+/*
+ * Phone-width fixes (#9 QA follow-up): bare `<main>` gets no horizontal
+ * padding anywhere else in this file (only `main:has(form)` does), so
+ * without its own rule Bloom Timeline's content ran flush to the screen
+ * edge below the width `#root`'s max-width stops constraining it. And a
+ * fixed 160px label column leaves too little track width to fit all 12
+ * month ticks without them running together — thinning to every other
+ * month (Jan/Mar/May/Jul/Sep/Nov) is chosen over shrinking the font
+ * further, which stopped being legible in practice.
+ */
+main.bloom-timeline-page {
+  padding-inline: 16px;
+}
+
+@media (max-width: 480px) {
+  .bloom-timeline-axis,
+  main ol.bloom-timeline-chart li {
+    grid-template-columns: 100px 1fr;
+  }
+
+  .bloom-timeline-axis-track span:nth-child(even) {
+    display: none;
+  }
+}
