@@ -5,14 +5,44 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { PlantsRepositoryProvider } from '../plants/PlantsRepositoryContext'
 import { PlantingsRepositoryProvider } from '../plantings/PlantingsRepositoryContext'
+import type { BedsDbClient } from '../property/bedsRepository'
 import { BedsRepositoryProvider } from '../property/BedsRepositoryContext'
 import { PropertiesRepositoryProvider } from '../property/PropertiesRepositoryContext'
+import type { PropertiesDbClient } from '../property/propertiesRepository'
 import { createFakeBedsDbClient } from '../test/fakeBedsDbClient'
 import { createFakePlantingsDbClient } from '../test/fakePlantingsDbClient'
 import { createFakePlantsDbClient } from '../test/fakePlantsDbClient'
 import { createFakePropertiesDbClient } from '../test/fakePropertiesDbClient'
 import { plantRow as row } from '../test/plantRowFixture'
 import { BloomTimelinePage } from './BloomTimelinePage'
+
+/** A `PropertiesDbClient` whose every `properties` query rejects with an error — for exercising the Property-fetch failure path, which none of the fakes support. */
+function createFailingPropertiesDbClient(): PropertiesDbClient {
+  const failingChain = {
+    select: () => failingChain,
+    eq: () => failingChain,
+    maybeSingle: () => failingChain,
+    then: (onfulfilled: (value: { data: null; error: { message: string } }) => unknown) =>
+      Promise.resolve(onfulfilled({ data: null, error: { message: 'boom' } })),
+  }
+  return {
+    from: () => failingChain,
+    functions: { invoke: () => Promise.reject(new Error('not used in this test')) },
+  } as unknown as PropertiesDbClient
+}
+
+/** A `BedsDbClient` whose every `beds` query rejects with an error — for exercising the Beds-fetch failure path, once a Property already resolved. */
+function createFailingBedsDbClient(): BedsDbClient {
+  const failingChain = {
+    select: () => failingChain,
+    eq: () => failingChain,
+    order: () => failingChain,
+    single: () => failingChain,
+    then: (onfulfilled: (value: { data: null; error: { message: string } }) => unknown) =>
+      Promise.resolve(onfulfilled({ data: null, error: { message: 'boom' } })),
+  }
+  return { from: () => failingChain } as unknown as BedsDbClient
+}
 
 const PROPERTY_ROW: PropertyRow = {
   id: 'property-1',
@@ -190,5 +220,95 @@ describe('BloomTimelinePage — month-filtered list', () => {
     expect(within(list).getByText(/Coneflower/)).toBeInTheDocument()
     expect(within(list).getByText(/Aster/)).toBeInTheDocument()
     expect(within(list).getByText(/Winterberry/)).toBeInTheDocument()
+  })
+})
+
+describe('BloomTimelinePage — Property/Beds load errors', () => {
+  it('reports a Property-fetch failure distinctly from a Beds-fetch failure', async () => {
+    const plants = createFakePlantsDbClient([])
+    const beds = createFakeBedsDbClient([])
+    const plantings = createFakePlantingsDbClient([])
+    render(
+      <MemoryRouter>
+        <PlantsRepositoryProvider client={plants.client}>
+          <PropertiesRepositoryProvider client={createFailingPropertiesDbClient()}>
+            <BedsRepositoryProvider client={beds.client}>
+              <PlantingsRepositoryProvider client={plantings.client}>
+                <BloomTimelinePage />
+              </PlantingsRepositoryProvider>
+            </BedsRepositoryProvider>
+          </PropertiesRepositoryProvider>
+        </PlantsRepositoryProvider>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText('Could not load your Property.')).toBeInTheDocument()
+  })
+
+  it("reports a Beds-fetch failure once the Property itself resolved", async () => {
+    const plants = createFakePlantsDbClient([])
+    const properties = createFakePropertiesDbClient(PROPERTY_ROW)
+    const plantings = createFakePlantingsDbClient([])
+    render(
+      <MemoryRouter>
+        <PlantsRepositoryProvider client={plants.client}>
+          <PropertiesRepositoryProvider client={properties.client}>
+            <BedsRepositoryProvider client={createFailingBedsDbClient()}>
+              <PlantingsRepositoryProvider client={plantings.client}>
+                <BloomTimelinePage />
+              </PlantingsRepositoryProvider>
+            </BedsRepositoryProvider>
+          </PropertiesRepositoryProvider>
+        </PlantsRepositoryProvider>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByText("Could not load this Property's Beds.")).toBeInTheDocument()
+  })
+})
+
+describe('BloomTimelinePage — month axis', () => {
+  it('shows an abbreviated month label for every month in chart view', async () => {
+    renderPage({ plants: [CONEFLOWER, ASTER] })
+    await screen.findByText('Coneflower')
+
+    for (const month of ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']) {
+      expect(screen.getByText(month)).toBeInTheDocument()
+    }
+  })
+
+  it('is absent in list view', async () => {
+    renderPage({ plants: [CONEFLOWER, ASTER] })
+    await userEvent.click(await screen.findByRole('button', { name: 'List view' }))
+
+    expect(screen.queryByText('Jan')).not.toBeInTheDocument()
+  })
+
+  it('is absent in the empty state (no blooming Plants)', async () => {
+    renderPage({ plants: [FERN_NO_BLOOM] })
+    await screen.findByText(/No bloom windows to show/)
+
+    expect(screen.queryByText('Jan')).not.toBeInTheDocument()
+  })
+})
+
+describe('BloomTimelinePage — no Beds yet hint', () => {
+  it('links to the Map page when there are no Beds', async () => {
+    renderPage({ plants: [CONEFLOWER] })
+    await screen.findByText('Coneflower')
+
+    expect(await screen.findByText(/No Beds yet/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'draw one on the Map' })).toHaveAttribute('href', '/map')
+  })
+
+  it('is absent once at least one Bed exists', async () => {
+    renderPage({
+      plants: [CONEFLOWER],
+      property: PROPERTY_ROW,
+      beds: [FRONT_BED],
+    })
+    await screen.findByText('Coneflower')
+
+    expect(screen.queryByText(/No Beds yet/)).not.toBeInTheDocument()
   })
 })

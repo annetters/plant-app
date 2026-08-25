@@ -59,6 +59,31 @@ function BarTrack({ bar }: { bar: BloomTimelineBar }) {
 }
 
 /**
+ * A month-label ruler above the chart, aligned to the same 160px-label /
+ * 1fr-track grid the bars below it use (`main ol.bloom-timeline-chart li`
+ * in index.css) — so a bar's position can be read directly off the axis
+ * instead of only via hover. Reuses `BarTrack`'s own day-of-year formula
+ * for each month's start, rather than a second positioning scheme.
+ */
+function MonthAxis() {
+  return (
+    <div className="bloom-timeline-axis">
+      <div className="bloom-timeline-axis-spacer" />
+      <div className="bloom-timeline-axis-track">
+        {MONTH_NAMES.map((name, index) => {
+          const pct = ((dayOfYear({ month: index + 1, day: 1 }) - 1) / DAYS_IN_YEAR) * 100
+          return (
+            <span key={name} style={{ left: `${pct}%` }}>
+              {name.slice(0, 3)}
+            </span>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/**
  * Bloom Timeline (#9): a year-view bar chart of Plant bloom windows and a
  * month-filtered list view of the same underlying data (CONTEXT.md — "no
  * separate data model"), both filterable by Bed. `buildBloomTimelineBars`
@@ -102,12 +127,17 @@ export function BloomTimelinePage() {
       .get()
       .then((property) => {
         if (cancelled || !property) return undefined
-        return bedsRepository.list(property.id).then((result) => {
-          if (!cancelled) setBeds(result)
-        })
+        return bedsRepository
+          .list(property.id)
+          .then((result) => {
+            if (!cancelled) setBeds(result)
+          })
+          .catch(() => {
+            if (!cancelled) setError("Could not load this Property's Beds.")
+          })
       })
       .catch(() => {
-        if (!cancelled) setError('Could not load your Beds.')
+        if (!cancelled) setError('Could not load your Property.')
       })
     return () => {
       cancelled = true
@@ -175,6 +205,12 @@ export function BloomTimelinePage() {
         </div>
       )}
 
+      {beds.length === 0 && plants !== null && (
+        <p>
+          No Beds yet — <Link to="/map">draw one on the Map</Link> to filter by Bed.
+        </p>
+      )}
+
       {plants === null && !error && <p>Loading…</p>}
 
       {plants !== null && bars.length === 0 && (
@@ -182,17 +218,20 @@ export function BloomTimelinePage() {
       )}
 
       {bars.length > 0 && view === 'chart' && (
-        <ol className="bloom-timeline-chart" aria-label="Year view">
-          {bars.map((bar) => (
-            <li key={bar.plantId}>
-              <span>
-                {bar.commonName}
-                {bar.cultivar && ` (${bar.cultivar})`}
-              </span>
-              <BarTrack bar={bar} />
-            </li>
-          ))}
-        </ol>
+        <>
+          <MonthAxis />
+          <ol className="bloom-timeline-chart" aria-label="Year view">
+            {bars.map((bar) => (
+              <li key={bar.plantId}>
+                <span>
+                  {bar.commonName}
+                  {bar.cultivar && ` (${bar.cultivar})`}
+                </span>
+                <BarTrack bar={bar} />
+              </li>
+            ))}
+          </ol>
+        </>
       )}
 
       {bars.length > 0 && view === 'list' && (

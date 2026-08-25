@@ -370,3 +370,30 @@ main ol.bloom-timeline-chart li {
   background: var(--accent);
   border-radius: 4px;
 }
+
+/*
+ * The month ruler above the chart (#9 QA follow-up): a label per calendar
+ * month, positioned with the exact formula BarTrack itself uses, so a
+ * bar's position is readable without hovering for its tooltip. Shares the
+ * chart row's own 160px/1fr split (`main ol.bloom-timeline-chart li`
+ * above) so a tick lines up with the bars underneath it.
+ */
+.bloom-timeline-axis {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 12px;
+  margin: 16px 0 4px;
+}
+
+.bloom-timeline-axis-track {
+  position: relative;
+  height: 16px;
+}
+
+.bloom-timeline-axis-track span {
+  position: absolute;
+  top: 0;
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+}
