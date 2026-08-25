@@ -33,14 +33,75 @@ No Xcode/CocoaPods install is required for day-to-day development — this is
 a managed Expo project with no native code of its own, so **Expo Go** (the
 free app from the App Store/Play Store) can run it by scanning the QR code
 `npm start` prints. A simulator (`npm run ios`/`npm run android`) needs the
-full platform SDK installed locally.
+full platform SDK installed locally. **Exception**: Tag Scan's on-device OCR
+module needs a custom dev client instead of Expo Go — see "Native dev
+client" below.
 
 ```
 npm start          # expo start — prints a QR code for Expo Go
-npm run ios         # expo start --ios — requires Xcode + iOS Simulator
-npm run android      # expo start --android — requires Android Studio + emulator
+npm run ios         # expo run:ios — builds + runs the native project (Xcode/CocoaPods required)
+npm run android      # expo run:android — builds + runs the native project (Android Studio required)
 npm run web           # expo start --web — runs the same app in a browser tab
 ```
+
+`ios`/`android` point at `expo run:*` rather than `expo start --ios`/`--android`
+because `npx expo prebuild` (see "Native dev client" below) generated real
+`ios/`/`android/` projects — `expo prebuild` rewrites these scripts
+automatically as part of that. `ios/`/`android/` are gitignored (`/ios`,
+`/android` in `.gitignore`) — regenerate them locally with
+`npx expo prebuild --clean` rather than expecting them checked in.
+
+## Native dev client (Tag Scan OCR — issue #22)
+
+Tag Scan's on-device Vision OCR module (`modules/tag-ocr`) needs a custom
+EAS dev client, not Expo Go — see `scripts/setup-tag-ocr-dev-client.sh` for
+a guided walkthrough of building and installing it on a physical iPhone
+with a free Apple ID (no paid Apple Developer Program account required).
+
+**Non-admin macOS accounts**: several of that walkthrough's underlying
+tools (`gem install`/`brew install`, accepting the Xcode license) normally
+want admin rights. If your macOS user account isn't an admin (`sudo` fails
+with "is not in the sudoers file"), here's what actually worked, worked
+around from a real non-admin account on a Homebrew install originally set
+up by a different (admin) user on the same Mac:
+
+- **CocoaPods**: installed cleanly via `brew install cocoapods` once
+  Homebrew's own directories were made writable (see below) — no need to
+  fight the system Ruby (which on an unupdated Mac may be an old version,
+  e.g. 2.6.x, too old for modern CocoaPods' dependencies) or use
+  `gem install --user-install`.
+- **Homebrew directories owned by a different user**: `brew install`
+  refuses to write to `/opt/homebrew` if it's not owned/writable by the
+  current account. Fix (needs to be run once, briefly, as the actual admin
+  account — e.g. via Fast User Switching, not by working from that account
+  day-to-day): make the directories group-writable rather than transferring
+  ownership outright, so *every* local account (both the admin one and this
+  one) keeps full access going forward:
+  ```
+  sudo chgrp -R staff /opt/homebrew /opt/homebrew/Cellar /opt/homebrew/Frameworks /opt/homebrew/bin /opt/homebrew/etc /opt/homebrew/etc/bash_completion.d /opt/homebrew/include /opt/homebrew/lib /opt/homebrew/lib/pkgconfig /opt/homebrew/opt /opt/homebrew/sbin /opt/homebrew/share /opt/homebrew/share/aclocal /opt/homebrew/share/doc /opt/homebrew/share/man /opt/homebrew/share/man/man1 /opt/homebrew/share/man/man3 /opt/homebrew/share/man/man5 /opt/homebrew/share/man/man7 /opt/homebrew/share/zsh /opt/homebrew/share/zsh/site-functions /opt/homebrew/var/homebrew/linked /opt/homebrew/var/homebrew/locks
+  sudo chmod -R g+w /opt/homebrew /opt/homebrew/Cellar /opt/homebrew/Frameworks /opt/homebrew/bin /opt/homebrew/etc /opt/homebrew/etc/bash_completion.d /opt/homebrew/include /opt/homebrew/lib /opt/homebrew/lib/pkgconfig /opt/homebrew/opt /opt/homebrew/sbin /opt/homebrew/share /opt/homebrew/share/aclocal /opt/homebrew/share/doc /opt/homebrew/share/man /opt/homebrew/share/man/man1 /opt/homebrew/share/man/man3 /opt/homebrew/share/man/man5 /opt/homebrew/share/man/man7 /opt/homebrew/share/zsh /opt/homebrew/share/zsh/site-functions /opt/homebrew/var/homebrew/linked /opt/homebrew/var/homebrew/locks
+  ```
+  (`staff` is a group every local macOS account belongs to by default —
+  admin or not — so this doesn't require creating a new group.)
+- **"fatal: not in a git directory" / "unknown install step" errors from
+  `brew`**: looked like Homebrew itself was broken, but wasn't — Git's
+  "dubious ownership" safety check was silently blocking Homebrew's
+  internal git calls, because `/opt/homebrew`'s `.git` files are still
+  *owned* by the admin account even after the group-write fix above (`chgrp`
+  changes group, not owner). Fix, run once as the affected account:
+  ```
+  git config --global --add safe.directory /opt/homebrew
+  ```
+- **Xcode license**: normally needs `sudo xcodebuild -license accept`. Check
+  first whether it's already accepted system-wide (e.g. by whoever set up
+  this Mac) before assuming it's a blocker:
+  ```
+  xcodebuild -license check   # exit code 0 (check with `echo $?`) = already accepted, nothing to do
+  ```
+- **iOS version mismatch**: Xcode may refuse to build for a connected
+  iPhone running an older iOS than it expects. Fix is a normal iOS update
+  on the phone (Settings → General → Software Update) — no project-side
+  workaround.
 
 ## Commands
 

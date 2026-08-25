@@ -280,7 +280,7 @@ fi
 # ── 6. Sign and run from Xcode (free personal-team signing) ────────────
 stage "Sign with your free Apple ID and run on your iPhone"
 say "This is the one stage that has to happen in Xcode's UI, not this script."
-WORKSPACE=$(ls ios/*.xcworkspace 2>/dev/null | head -n1 || true)
+WORKSPACE=$(ls -d ios/*.xcworkspace 2>/dev/null | head -n1 || true)
 if [[ -n "$WORKSPACE" ]]; then
   step "Opening $WORKSPACE in Xcode..."
   open "$WORKSPACE"
