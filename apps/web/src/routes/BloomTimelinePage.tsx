@@ -195,7 +195,11 @@ export function BloomTimelinePage() {
             value={selectedBedId}
             onChange={(event) => setSelectedBedId(event.target.value)}
           >
-            <option value="">All Beds</option>
+            {/* "Bed" is a filter — its unselected state should read as "nothing
+                picked," not as "All Beds" (which sounds like the union of every
+                Bed's Plants, when it actually means unfiltered: every blooming
+                Plant in the Registry, planted or not — see #9 QA follow-up). */}
+            <option value="">None selected</option>
             {beds.map((bed) => (
               <option key={bed.id} value={bed.id}>
                 {bed.name}
