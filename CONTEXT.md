@@ -157,7 +157,11 @@ Planting location(s) on the Property's map.
 ### Bloom Timeline
 Year-view bar chart of Plant bloom windows, filterable by Bed. A
 month-filtered list view is a secondary presentation of the same data —
-no separate data model.
+no separate data model. Unfiltered (no Bed selected), both views show
+every Plant with a bloom window, planted or not — the Bed filter narrows
+to only Plants actually planted in that Bed. It is not a "planted
+somewhere" toggle: there is no filter state that means "every Planting
+across every Bed" as distinct from "every Plant in the Registry."
 
 ### Dashboard
 The home screen. Quick access to Map, Registry, and Bloom Timeline. Task
