@@ -332,3 +332,41 @@ main:has(form) hr {
   border: none;
   border-top: 1px solid var(--border);
 }
+
+/*
+ * Bloom Timeline's year-view chart (#9): each row is a Plant, its bloom
+ * window drawn as a filled segment along a full-year track. It's an <ol>
+ * (bars read top-to-bottom in bloom-start order), so the `main ul` reset
+ * above doesn't reach it — redone here for just this one list.
+ */
+main ol.bloom-timeline-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 16px 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+}
+
+main ol.bloom-timeline-chart li {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.bloom-bar-track {
+  position: relative;
+  height: 20px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.bloom-bar {
+  position: absolute;
+  inset-block: 0;
+  background: var(--accent);
+  border-radius: 4px;
+}
