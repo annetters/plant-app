@@ -7,6 +7,86 @@
 
 ## What to do next
 
+**⏸ #9 (Bloom Timeline) is implemented and mostly QA'd — one specific
+change is still unverified by the user, resume here first if this is the
+thread you're on.** A gardener can view a year-view horizontal bar chart
+of Plant bloom windows (`BarTrack` in
+`apps/web/src/routes/BloomTimelinePage.tsx`) and an equivalent
+month-filtered list view — the same underlying `BloomTimelineBar[]`
+(`buildBloomTimelineBars` + `filterBloomTimelineBarsByMonth` in
+`packages/domain/src/bloomTimeline.ts`), no separate data model — both
+filterable by Bed.
+Domain-logic test matches the ticket's own acceptance criterion: a bar's
+start/end always equals its Plant's actual bloom window.
+
+Built across one implementation commit plus six follow-up commits, all
+but the first from a live QA round — an automated Playwright-driven pass
+against the real linked Supabase project, then the user's own manual
+click-through, the pattern this repo now leans on for every ticket:
+
+- `08d3851` — initial implementation.
+- `81ad8eb` — the chart's own CSS didn't exist yet (caught before any QA
+  even started, by rendering the real markup against the real
+  `index.css` in a standalone Playwright screenshot rather than trusting
+  the code) — bars would have rendered as invisible zero-height `<div>`s.
+- `c7eccb0` — three real bugs found by live QA: a single `.catch()`
+  mislabeled a Property-fetch failure as "Could not load your Beds."
+  (split into two accurate messages, matching `PropertyPage`/
+  `BedEditor`'s existing wording); the chart had no visible date
+  reference beyond a hover tooltip (added a month-label axis, reusing the
+  bar's own day-of-year math); nothing pointed to where Beds are created
+  when none exist yet (added a "No Beds yet — draw one on the Map" link).
+- `f70eb38` + `c41c5be` — the user found "All Beds" (the filter's default
+  option) confusingly implied "union of every Bed's Plants," when
+  unfiltered actually means "every blooming Plant in the Registry,
+  planted or not." Relabeled to "None selected," and pinned the
+  underlying semantics down in `CONTEXT.md`'s Bloom Timeline entry via
+  `/domain-modeling`, so a future #17 (Native: Bloom Timeline) or #11
+  (Dashboard) implementer doesn't assume the opposite.
+- `01e1868` — phone-width (~375px) manual QA found the chart running
+  flush to the screen edges (bare `<main>` gets no padding anywhere else
+  in `index.css`; only `main:has(form)` does) and all 12 month-axis
+  labels overlapping into unreadable mush. Fixed with a scoped
+  `.bloom-timeline-page` padding rule and a `<=480px` media query that
+  narrows the label column and thins the axis to every other month.
+- `24cf78e` — **user feedback, not yet re-checked by them.** Even with
+  the thinned axis, text labels alone (especially only 6 of them on
+  mobile) don't give a visual grid to judge a bar against — hard to tell
+  how many month-blocks a bar spans just by eyeballing it against distant
+  axis text. Added month tick marks directly on each bar's own track (all
+  12, reusing the axis's day-of-year percentages), so counting works
+  right against the bar itself at any width. I verified this via the
+  standalone Playwright-screenshot technique (375px/900px, light/dark) —
+  **but the user has not yet looked at this specific change themselves.**
+
+**Manual QA checklist status** (the user ran this by hand in a real
+browser against the dev server, `localhost:5183`):
+- **A. Bed filter narrows the chart/list to only that Bed's Plants** —
+  passes.
+- **B. Filter carries over between Chart view and List view** — passes.
+- **C. Phone-width layout** — failed twice during QA (padding/overlap,
+  then "hard to tell month-blocks without ticks"), fixed both times (see
+  `01e1868`/`24cf78e` above). **The second fix (tick marks) is the one
+  thing still unverified.**
+- **D. Cross-browser (Safari)** — passes.
+
+**Exactly where this was paused**: the user asked to update this doc and
+take a break, explicitly flagging that they have not yet checked the
+`24cf78e` tick-marks change. When resuming: restart the dev server if
+it's not still running (`npm run dev --workspace apps/web`), reload
+`/bloom-timeline`, and check the tick marks at both a normal and a
+phone-width viewport (DevTools' device toolbar, or an actual narrow
+window) — confirm they make it easy to count how many months a bar
+spans. If that looks right, the manual QA checklist above is complete.
+
+**Not yet done**: closing #9 on GitHub (`gh issue close 9 --comment
+"..."` once QA is confirmed complete) and pushing this branch to the
+remote — this session's commits (12 of them, spanning #9 and a
+concurrent session's #22 work) are all still local only; confirm with
+`git status -sb` before assuming otherwise.
+
+---
+
 **⏸ #22 (Tag Scan: on-device Vision OCR) device setup is in progress,
 paused mid-session for a break — resume here first.** The native module
 code (`dc33e47`, plus a follow-up commit `01b0c36` documenting the setup
@@ -724,12 +804,22 @@ Domain glossary: `CONTEXT.md`
 
 ## Current state
 
-Working tree has one uncommitted change as of this update —
-`apps/mobile/README.md`, pre-existing/unrelated to #8, left as found per
-this repo's shared-working-tree convention (see the note near the bottom of
-this doc). Most recent commits first:
+Working tree is clean as of this update (`git status` — nothing
+uncommitted); 12 local commits ahead of `origin/main`, none pushed yet.
+Most recent commits first:
 
 ```
+24cf78e Bloom Timeline: add month tick marks to each bar's track (#9)
+5272556 Record #22's paused device-setup session in the handoff doc
+01b0c36 Document Tag Scan dev-client setup and fix wizard workspace glob (#22)
+01e1868 Bloom Timeline: fix phone-width chart layout (#9)
+c41c5be Pin down Bloom Timeline's unfiltered-view semantics in CONTEXT.md (#9)
+f70eb38 Bloom Timeline: reword Bed filter's default option (#9)
+c7eccb0 Bloom Timeline: fix QA findings — error attribution, month axis, Bed hint (#9)
+81ad8eb Style the Bloom Timeline year-view chart (#9)
+08d3851 Add Bloom Timeline: year-view chart + month-filtered list, filterable by Bed (#9)
+67d3126 Record ticket #8's deferred manual QA items in the handoff doc
+f96a43e Reflect #8's closure and #9/#10/#14's new frontier status in the handoff doc
 3041ca3 Add Planting: create + place Pin, view on tap (#8)
 6173a57 Add Bed drawing on the aerial base map (#7)
 dc33e47 Add on-device Vision OCR module and adapter (#22)
@@ -837,7 +927,7 @@ GitHub check per the note above.
 
 | Artifact | Path | Purpose |
 |---|---|---|
-| **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output (npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app, Supabase auth, auth-gated Dashboard shell) plus ticket #3's output (`Plant`/`PlantInput` types + `validatePlantInput` in `packages/domain/src/plant.ts`; Registry list + create/view/edit/delete + reference-photo upload in `apps/web/src/routes/Plants*.tsx` and `apps/web/src/plants/`) plus ticket #4's output (`TaskTrigger`/`CareTaskTemplate` types + `validateCareTaskTemplateInput` + `computeTriggerDateRange`/`dateRangeWraps` in `packages/domain/src/careTaskTemplate.ts`; add/list/remove UI in the "Care task templates" section of `apps/web/src/routes/PlantFormPage.tsx`, repository methods on `PlantsRepository`) plus ticket #5's output (`Property`/`PropertyInput`/`AddressCandidate` types + Web Mercator scale math — `metersPerPixel`/`feetPerPixel`/`pixelsPerFoot`/`lonLatToTile`/`pickBestZoom`/`aerialTileUrl` — in `packages/domain/src/property.ts`; the `/map` page in `apps/web/src/routes/PropertyPage.tsx` and `apps/web/src/property/` — `PropertiesRepository` with `get`/`search`/`create`/`remove`, and the `AddressAutocomplete.tsx` combobox that requires picking a specific geocoder candidate rather than submitting freeform text — backed by the `create-property` and `search-addresses` Edge Functions) plus ticket #7's output (`Bed`/`BedInput`/`BedTool`/`BedPoint` types + `validateBedInput` + the ADR-0001 smoothing pipeline — `decimatePoints`/`chaikinSmooth`/`smoothBedOutline` — + `feetToPixels`/`pixelsToFeet` in `packages/domain/src/bed.ts`; the Konva-based drawing surface `BedEditor.tsx` wired into `/map`, gated to desktop viewports only via `useIsDesktopViewport`/`isDesktopViewport.ts`; pure geometry helpers `penPath.ts` (bezier-pen curve flattening) and `dragShapeGeometry.ts` (rectangle/oval point sampling); `BedsRepository` with `list`/`create`/`remove`, backed directly by the `beds` table — no Edge Function needed, unlike Property, since Bed geometry touches no external adapter) plus ticket #8's output (`Planting`/`PlantingInput`/`PlantingPhoto` types + `validatePlantingInput`/`validatePlantingPhotoInput` + `findBedContainingPoint` (ray-casting point-in-polygon) in `packages/domain/src/planting.ts`; `PlantingMap.tsx` in `apps/web/src/plantings/` wired into `/map` alongside `BedEditor` — renders every Bed's outline and Planting's Pin, lets a Pin be placed by dragging directly onto the map (no Bed picker, no manual coordinates), and opens a details panel with the dated photo log on tap; `renderedOutlinePoints`/`buildOutlineLine` extracted to `apps/web/src/property/bedOutline.ts`, shared between `BedEditor` and `PlantingMap` so Pin-drop containment can't drift from what's actually drawn; `PlantingsRepository` with `listByBeds`/`create`/`remove`/`listPhotos`/`addPhoto`/`getPhotoUrl`/`removePhoto`, backed by the `plantings`/`planting_photos` tables and the `planting-photos` storage bucket — no Edge Function needed, same reasoning as Bed). See `apps/web/README.md` for the one-time Supabase project setup. Not throwaway — build on this. |
+| **App (real, built)** | `packages/domain`, `apps/web` | Ticket #2's output (npm-workspaces monorepo, shared TS `domain` package, Vite/React/TS web app, Supabase auth, auth-gated Dashboard shell) plus ticket #3's output (`Plant`/`PlantInput` types + `validatePlantInput` in `packages/domain/src/plant.ts`; Registry list + create/view/edit/delete + reference-photo upload in `apps/web/src/routes/Plants*.tsx` and `apps/web/src/plants/`) plus ticket #4's output (`TaskTrigger`/`CareTaskTemplate` types + `validateCareTaskTemplateInput` + `computeTriggerDateRange`/`dateRangeWraps` in `packages/domain/src/careTaskTemplate.ts`; add/list/remove UI in the "Care task templates" section of `apps/web/src/routes/PlantFormPage.tsx`, repository methods on `PlantsRepository`) plus ticket #5's output (`Property`/`PropertyInput`/`AddressCandidate` types + Web Mercator scale math — `metersPerPixel`/`feetPerPixel`/`pixelsPerFoot`/`lonLatToTile`/`pickBestZoom`/`aerialTileUrl` — in `packages/domain/src/property.ts`; the `/map` page in `apps/web/src/routes/PropertyPage.tsx` and `apps/web/src/property/` — `PropertiesRepository` with `get`/`search`/`create`/`remove`, and the `AddressAutocomplete.tsx` combobox that requires picking a specific geocoder candidate rather than submitting freeform text — backed by the `create-property` and `search-addresses` Edge Functions) plus ticket #7's output (`Bed`/`BedInput`/`BedTool`/`BedPoint` types + `validateBedInput` + the ADR-0001 smoothing pipeline — `decimatePoints`/`chaikinSmooth`/`smoothBedOutline` — + `feetToPixels`/`pixelsToFeet` in `packages/domain/src/bed.ts`; the Konva-based drawing surface `BedEditor.tsx` wired into `/map`, gated to desktop viewports only via `useIsDesktopViewport`/`isDesktopViewport.ts`; pure geometry helpers `penPath.ts` (bezier-pen curve flattening) and `dragShapeGeometry.ts` (rectangle/oval point sampling); `BedsRepository` with `list`/`create`/`remove`, backed directly by the `beds` table — no Edge Function needed, unlike Property, since Bed geometry touches no external adapter) plus ticket #8's output (`Planting`/`PlantingInput`/`PlantingPhoto` types + `validatePlantingInput`/`validatePlantingPhotoInput` + `findBedContainingPoint` (ray-casting point-in-polygon) in `packages/domain/src/planting.ts`; `PlantingMap.tsx` in `apps/web/src/plantings/` wired into `/map` alongside `BedEditor` — renders every Bed's outline and Planting's Pin, lets a Pin be placed by dragging directly onto the map (no Bed picker, no manual coordinates), and opens a details panel with the dated photo log on tap; `renderedOutlinePoints`/`buildOutlineLine` extracted to `apps/web/src/property/bedOutline.ts`, shared between `BedEditor` and `PlantingMap` so Pin-drop containment can't drift from what's actually drawn; `PlantingsRepository` with `listByBeds`/`create`/`remove`/`listPhotos`/`addPhoto`/`getPhotoUrl`/`removePhoto`, backed by the `plantings`/`planting_photos` tables and the `planting-photos` storage bucket — no Edge Function needed, same reasoning as Bed) plus ticket #9's output (`BloomTimelineBar` type + `buildBloomTimelineBars`/`filterBloomTimelineBarsByMonth`/`dayOfYear`/`bloomWindowIncludesMonth` in `packages/domain/src/bloomTimeline.ts`, plus a shared `monthDayRangeWraps` extracted out of `careTaskTemplate.ts`'s `dateRangeWraps` so both features use one wrap-detection rule; `BloomTimelinePage.tsx` in `apps/web/src/routes/` wired into `/bloom-timeline` — a Chart/List view toggle, a Bed filter, a month filter, a month-axis ruler, and per-bar tick marks, all reusing the same `BloomTimelineBar[]` — no new tables/Edge Functions, since it reads existing Plant/Bed/Planting data only). See `apps/web/README.md` for the one-time Supabase project setup. Not throwaway — build on this. |
 | **Mobile app (real, built)** | `apps/mobile` | Ticket #13's output — Expo/TypeScript RN app on SDK 54, importing `@plant-app/domain` for `DASHBOARD_TILES` per ADR-0003. Mirrors (does not share code with) `apps/web`'s auth scaffold: `AuthContext`/`useCredentialsForm` in `apps/mobile/src/auth/`, `LoginScreen`/`SignUpScreen`/`DashboardScreen` in `apps/mobile/src/screens/`, `RootNavigator` (`src/navigation/`) swapping between an Auth stack and a Main stack based on auth status — the native equivalent of web's `RequireAuth` guard. `authDeepLink.ts`/`useAuthDeepLinkHandler.ts` complete Supabase's email-confirmation redirect via the `plant-app://` URL scheme (`app.json`); currently dormant since "Confirm email" is off on the linked Supabase project (see the #13 entry above), but real and tested, not a stub. Ticket #20 added `apps/mobile/src/tagScan/` (see the row below) plus `expo-image-picker`/`expo-crypto` dependencies and their `app.json` permission-plugin config. See `apps/mobile/README.md` for one-time setup (same Supabase project as web, `EXPO_PUBLIC_`-prefixed env vars, running via Expo Go — no Xcode/CocoaPods needed for day-to-day dev). Not throwaway — build on this. |
 | **Tag Scan (real, built — minus native OCR)** | `packages/domain/src/{tagScanCandidate,tagScanMatching,usdaTraits}.ts`, `apps/mobile/src/tagScan/` | Ticket #20's output. Domain: `TagOcrAdapter` seam + `manualEntryAdapter` (the real, shipped fallback) + `reviewTagOcrCandidates` in `tagScanCandidate.ts`; `checkForDuplicatePlant`/`parseScientificName` (genus+species+cultivar matching, never common name alone) in `tagScanMatching.ts`; `projectUsdaSpeciesTraits`/`deriveHardinessZoneFromMinimumTemperatureF` (never bloom window) in `usdaTraits.ts`. Mobile: `TagScanCaptureScreen` (guided two-step front/back photo capture, front required) → `TagScanReviewScreen` (manual entry, species lookup, USDA-suggested-traits accept/skip) → `TagScanAmbiguousSpeciesScreen` / `TagScanDuplicateOfferScreen`, wired through `TagScanRepository`/`TagScanRepositoryContext`. **Not built**: the on-device Vision OCR module itself — `manualEntryAdapter` is the only real `TagOcrAdapter` today; see #22. **Not yet deployed**: migrations `0009`/`0010` and the `usda-plant-traits` Edge Function (see "What to do next"). |
 | **DB schema** | `supabase/migrations/` | SQL migrations, applied via the Supabase CLI (`npm run db:push`) against the linked remote project — no local Docker stack, by explicit preference. `0001_plants.sql` — the `plants` table, RLS, `plant-reference-photos` storage bucket. `0002_grant_plants_table.sql` — follow-up GRANT the API roles need on newer Supabase projects (RLS alone isn't enough; see the migration's own comment). `0003_care_task_templates.sql` — the `care_task_templates` table, owned by a `plant_id` FK with RLS via a join to `plants` (not a direct `user_id` column). `0004_grant_care_task_templates_table.sql` — the same follow-up GRANT `0002` needed, for the new table. `0005_plant_hardiness_zone_range.sql` — drops `hardiness_zone`, adds `hardiness_zone_min`/`hardiness_zone_max` (a plant's hardiness rating is a whole-zone range, not a single value — see "What to do next"). `0006_properties.sql` — the `properties` table (one row per account for MVP, `properties_one_per_user unique (user_id)`), RLS. `0007_grant_properties_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`, for `properties`. `0008_property_resolved_address.sql` — adds nullable `resolved_address` (what the geocoder actually matched, shown next to what the user typed so a bad match is visible — see "What to do next"). `0009_tag_photos.sql` — the `tag_photos` table (its own category, distinct from `plants.reference_photo_paths`, kept-by-default, deletable) + a private `tag-photos` storage bucket, RLS mirroring `0001`'s pattern. `0010_grant_tag_photos_table.sql` — the same follow-up GRANT pattern as `0002`/`0004`/`0007`. `0011_beds.sql` (ticket #7) — the `beds` table (`property_id` FK, `tool` check-constrained to the four drawing tools, `points` jsonb with a `>= 3 points` check, `smoothing_enabled`), RLS via a join to `properties` (ownership pattern matches `care_task_templates`' join to `plants`). `0012_grant_beds_table.sql` — the same follow-up GRANT pattern, for `beds`. `0013_plantings.sql` (ticket #8) — the `plantings` table (`plant_id`/`bed_id` FKs, `quantity` check `>= 1`, `pin_x`/`pin_y` in the same Property-relative real-world-feet space as the parent Bed's own outline points), RLS via a join to `beds` -> `properties` (insert additionally checks the referenced Plant's own ownership, since a Planting has two parent references). `0014_grant_plantings_table.sql` — the same follow-up GRANT pattern, for `plantings`. `0015_planting_photos.sql` — the `planting_photos` table (its own category/table, not an array column, since each dated photo carries its own `taken_on` date) + a private `planting-photos` storage bucket, RLS via a join to `plantings` -> `beds` -> `properties`. `0016_grant_planting_photos_table.sql` — the same follow-up GRANT pattern, for `planting_photos`. `0001`–`0016` are all live on the linked project (verify with `npx supabase migration list`). Apply new ones with `npm run db:push`, diff with `npm run db:diff`, regenerate row types with `npm run db:types`. |
@@ -985,7 +1075,7 @@ Ticket map (dependency order; title abbreviated):
 | 6 | Property: photographed/in-app-drawn base map + Scale Reference — **frontier, unblocked** | 5 |
 | 7 | Bed drawing (desktop) — built, `6173a57`, closed | 5 |
 | 8 | Planting: create + place Pin, view on tap — built, `3041ca3`, closed | 3, 7 |
-| 9 | Bloom Timeline — **frontier, unblocked** | 3, 8 |
+| 9 | Bloom Timeline — built, `08d3851`–`24cf78e`, **open** (one manual QA item unverified — see "What to do next") | 3, 8 |
 | 10 | Registry view — **frontier, unblocked** | 3, 8 |
 | 11 | Dashboard (real content) | 7, 8, 9, 10 |
 | 12 | Task completion logging, history, one-off todos | 4, 8, 11 |
@@ -1013,7 +1103,11 @@ view), which needed both #8 and #13 (#13 already closed) — also confirmed
 #7/#8, both still open, so it's not frontier yet. **#12** (Task completion
 logging) still needs #11 in addition to #4/#8, so it's not frontier either.
 **#18** (Native: Plant/Planting detail) still needs #12, so it's not
-frontier. **#20** also has `blocked_by == 0` but is deliberately excluded
+frontier. **#9 has since been built** (see "What to do next") but, same
+posture as #20 below, is deliberately excluded from the frontier while
+one manual QA item is unconfirmed — it hasn't newly unblocked #17
+(Native: Bloom Timeline) or #11 (Dashboard) until it actually closes.
+**#20** also has `blocked_by == 0` but is deliberately excluded
 from the frontier — it's built and awaiting closure (specifically, deploying
 `usda-plant-traits` and a real-device manual QA pass — see "What to do next"
 above), not unstarted work. **#22** also has `blocked_by == 0` but is
@@ -1032,11 +1126,13 @@ ticket — #6, #10, #9 respectively) don't newly unblock from #8's closure —
 - **`/implement`** — the pattern used for every ticket so far. Run once per
   ticket, fresh session each time, pointed at a ticket number. Drives `/tdd`
   internally, closes with `/code-review`. Don't run `/to-tickets` again —
-  tickets #2–#20 are already published. **#6, #9, #10, and #14 are frontier
+  tickets #2–#20 are already published. **#6, #10, and #14 are frontier
   now** (see "Issue tracker" above) — any is a natural next `/implement`
-  target. #20 also still needs a deferred-QA/deploy pass to actually close,
-  and #22 needs the Mac/Apple Developer account/iPhone it requires (though
-  check its actual state first — see the frontier-query note above).
+  target. **#9 is built, not frontier** — one manual QA item is unverified
+  (see "What to do next"); resume that rather than re-implementing. #20
+  also still needs a deferred-QA/deploy pass to actually close, and #22
+  needs the Mac/Apple Developer account/iPhone it requires (though check
+  its actual state first — see the frontier-query note above).
 - ~~`/prototype` — what #19 actually is~~ — done; see the #19 entry in "What
   to do next" above and `docs/adr/0004-tag-scan-ocr-placement-and-usda-adapter.md`.
 - **`/codebase-design`** — for module structure once ticket-writing starts,
