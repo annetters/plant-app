@@ -371,6 +371,16 @@ main ol.bloom-timeline-chart li {
   border-radius: 4px;
 }
 
+/* One per month boundary, rendered behind the bar (see BarTrack's DOM
+   order) — lets a viewer count month-blocks directly against the bar
+   itself, not just against the axis above the whole chart. */
+.bloom-month-tick {
+  position: absolute;
+  inset-block: 0;
+  width: 1px;
+  background: var(--border);
+}
+
 /*
  * The month ruler above the chart (#9 QA follow-up): a label per calendar
  * month, positioned with the exact formula BarTrack itself uses, so a

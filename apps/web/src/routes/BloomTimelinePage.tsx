@@ -26,6 +26,15 @@ const MONTH_NAMES = [
 // denominator a bar's day-of-year position is a fraction of.
 const DAYS_IN_YEAR = 366
 
+// Every month's start, as the same left% a bar's own start/end use — one
+// fixed set of positions, computed once rather than per row, since it
+// doesn't depend on any particular bar. Drives the tick marks each
+// bloom-bar-track draws behind its bar, so a viewer can count month-blocks
+// directly against the bar itself, not just against the axis above it.
+const MONTH_START_PERCENTAGES = MONTH_NAMES.map(
+  (_, index) => ((dayOfYear({ month: index + 1, day: 1 }) - 1) / DAYS_IN_YEAR) * 100,
+)
+
 type BloomTimelineView = 'chart' | 'list'
 
 function formatMonthDay(value: { month: number; day: number }): string {
@@ -36,7 +45,9 @@ function formatMonthDay(value: { month: number; day: number }): string {
  * The year-view chart's horizontal track for one bar. A wrapping bloom
  * window (e.g. Nov 15 -> Feb 15) is drawn as two segments — one running to
  * the year's end, one resuming at its start — rather than one bar that
- * would otherwise run backwards across the track.
+ * would otherwise run backwards across the track. Month tick marks render
+ * first so the bar (added after, in DOM order) paints over them where they
+ * overlap, rather than the ticks showing through the bar's fill.
  */
 function BarTrack({ bar }: { bar: BloomTimelineBar }) {
   const startPct = ((dayOfYear(bar.bloomWindow.start) - 1) / DAYS_IN_YEAR) * 100
@@ -46,6 +57,9 @@ function BarTrack({ bar }: { bar: BloomTimelineBar }) {
 
   return (
     <div className="bloom-bar-track" title={title}>
+      {MONTH_START_PERCENTAGES.map((pct, index) => (
+        <div key={index} className="bloom-month-tick" style={{ left: `${pct}%` }} />
+      ))}
       {wraps ? (
         <>
           <div className="bloom-bar" style={{ left: `${startPct}%`, width: `${100 - startPct}%` }} />
