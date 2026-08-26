@@ -1112,7 +1112,7 @@ Ticket map (dependency order; title abbreviated):
 | 19 | Tag Scan prototype: OCR placement + USDA data pull — done, `36da29d`/`9718f91`, closed | — |
 | 20 | Tag Scan build — built, `96e46c6`, **open** (deferred deploy/QA; OCR module split to #22) | 3, 13, 19 |
 | 21 | Care task template: single-day trigger UX (filed during #4 QA, `needs-triage`) | 4 |
-| 22 | Tag Scan: on-device Vision OCR + EAS dev client migration (filed during #20, `ready-for-human`) | — |
+| 22 | Tag Scan: on-device Vision OCR + EAS dev client migration — verified end-to-end and closed, `9fd6d6f`–`83565dc` | — |
 
 **Frontier query**: open issues with `issue_dependencies_summary.blocked_by
 == 0` and no assignee. #2, #3, #4, #5, #7, #8, #9, #13, and #19 are closed.
