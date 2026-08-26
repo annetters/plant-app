@@ -118,6 +118,13 @@ export function TagScanCaptureScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <Pressable
+        accessibilityRole="button"
+        disabled={busy}
+        onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] })}
+      >
+        <Text style={styles.cancelText}>Cancel</Text>
+      </Pressable>
       <Text style={styles.title}>{step === 'front' ? 'Photograph the front' : 'Photograph the back'}</Text>
       <Text>
         {step === 'front'
@@ -199,5 +206,8 @@ const styles = StyleSheet.create({
   },
   error: {
     color: '#b00020',
+  },
+  cancelText: {
+    color: '#2e7d32',
   },
 })

@@ -183,11 +183,18 @@ export function TagScanReviewScreen() {
     }
   }
 
+  function cancelScan() {
+    navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] })
+  }
+
   if (pendingCreation) {
     const { input, traits } = pendingCreation
     return (
       <SafeAreaView style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.container}>
+          <Pressable accessibilityRole="button" disabled={busy} onPress={cancelScan}>
+            <Text style={styles.cancelText}>Cancel</Text>
+          </Pressable>
           <Text style={styles.title}>Suggested traits</Text>
           <Text>
             USDA PLANTS suggests the following species-level traits. Bloom window is never
@@ -229,6 +236,9 @@ export function TagScanReviewScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
+        <Pressable accessibilityRole="button" disabled={busy} onPress={cancelScan}>
+          <Text style={styles.cancelText}>Cancel</Text>
+        </Pressable>
         <Text style={styles.title}>Review tag scan</Text>
         <Text>Nothing is saved until you confirm — check these against the physical tag.</Text>
 
@@ -244,6 +254,7 @@ export function TagScanReviewScreen() {
         <Pressable
           accessibilityRole="button"
           disabled={busy || !commonName.trim()}
+          style={[styles.buttonSecondary, (busy || !commonName.trim()) && styles.buttonSecondaryDisabled]}
           onPress={handleLookupSpecies}
         >
           <Text>Look up species</Text>
@@ -323,6 +334,14 @@ const styles = StyleSheet.create({
   },
   error: {
     color: '#b00020',
+  },
+  cancelText: {
+    color: '#2e7d32',
+    marginBottom: 8,
+  },
+  buttonSecondaryDisabled: {
+    borderColor: '#ccc',
+    opacity: 0.5,
   },
   note: {
     fontStyle: 'italic',
