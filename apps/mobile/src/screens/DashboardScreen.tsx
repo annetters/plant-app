@@ -7,7 +7,7 @@ import { useAuth } from '../auth/AuthContext'
 import type { MainStackParamList } from '../navigation/types'
 
 export function DashboardScreen() {
-  const { logOut } = useAuth()
+  const { user, logOut } = useAuth()
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>()
 
   return (
@@ -18,6 +18,7 @@ export function DashboardScreen() {
           <Text>Log out</Text>
         </Pressable>
       </View>
+      {user?.email && <Text style={styles.accountEmail}>Signed in as {user.email}</Text>}
       {/* Mobile-only entry point — Tag Scan's on-device OCR placement (ADR-0004)
           makes this a mobile feature, unlike DASHBOARD_TILES below, which is
           shared with a future web dashboard. */}
@@ -53,6 +54,10 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '600',
+  },
+  accountEmail: {
+    color: '#666',
+    marginBottom: 16,
   },
   scanButton: {
     backgroundColor: '#2e7d32',

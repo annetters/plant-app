@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 
 export function DashboardPage() {
-  const { logOut } = useAuth()
+  const { user, logOut } = useAuth()
 
   return (
     <main>
@@ -11,6 +11,7 @@ export function DashboardPage() {
         <h1>Dashboard</h1>
         <button onClick={() => logOut()}>Log out</button>
       </header>
+      {user?.email && <p>Signed in as {user.email}</p>}
       <ul>
         {DASHBOARD_TILES.map((tile) => (
           <li key={tile.id}>
