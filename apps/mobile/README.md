@@ -102,6 +102,57 @@ up by a different (admin) user on the same Mac:
   iPhone running an older iOS than it expects. Fix is a normal iOS update
   on the phone (Settings → General → Software Update) — no project-side
   workaround.
+- **"Signing for 'mobile' requires a development team" / stuck on a dead
+  "Apple Development" certificate**: if Xcode's automatic signing can't
+  create a fresh certificate — `Manage Certificates` → `+` fails with "You
+  already have a current certificate or a pending request," even after
+  deleting the old key+certificate pair from Keychain Access (Access
+  Control tab already lists `codesign` as allowed — that's not the cause)
+  and signing out/back into the Apple ID in Xcode's Accounts settings —
+  the free/Personal Team account has hit Apple's small certificate quota
+  with no self-service way to revoke the orphaned one:
+  `developer.apple.com`'s certificate list is gated behind the *paid*
+  Developer Program and returns "Unable to find a team..." for a free
+  account. No fix found beyond clearing local caches
+  (`~/Library/Developer/Xcode/DerivedData`,
+  `~/Library/MobileDevice/Provisioning Profiles`) and waiting — Apple
+  expires a stuck "pending request" server-side on its own, but not
+  immediately (could be hours). A second Apple ID, if you have one,
+  sidesteps it entirely since the quota is per Apple ID.
+- The **"codesign wants to access key... in your keychain"** prompt wants
+  your **Mac login password** (the one that unlocks the machine), not your
+  Apple ID password.
+- The **Team** dropdown in Signing & Capabilities can silently reset to
+  "None" after signing out/back into the Apple ID account in Xcode —
+  reselect your Personal Team there before pressing Run again.
+
+## Day-to-day workflow, once the dev client is installed
+
+Two separate tools are involved here, doing different jobs — worth keeping
+straight:
+
+- **Xcode** builds the native "shell" app and installs it onto the phone.
+  This is a rare step — only needed when *native* code changes (e.g.
+  `modules/tag-ocr` itself, or a new native dependency/config-plugin).
+- **Metro** (`npx expo start --dev-client`) serves the app's actual
+  JavaScript to that already-installed shell live, over Wi-Fi, every time
+  it opens. This is the everyday step.
+
+So every normal session working on this app:
+
+1. `cd apps/mobile && npx expo start --dev-client` — leave it running.
+2. Confirm the iPhone is on the **same Wi-Fi network** as the Mac.
+3. Open the already-installed app on the phone directly (swipe down on the
+   Home Screen → search "mobile" — it uses a custom icon, not the generic
+   Expo one). **Not** the separate Expo Go app.
+4. If it can't connect (a red error screen, "No script URL provided"):
+   check Settings → Privacy & Security → Local Network on the phone and
+   make sure this app is allowed — iOS blocks local-network access by
+   default until granted, which is a more common culprit than Metro
+   actually not running.
+
+You do **not** need to open Xcode or press ▶ Run again for routine work —
+screens, styling, business logic — only when native code changes.
 
 ## Commands
 
