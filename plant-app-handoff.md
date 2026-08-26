@@ -1,15 +1,15 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-24
+**Date:** 2026-08-25
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
 
-**⏸ #9 (Bloom Timeline) is implemented and mostly QA'd — one specific
-change is still unverified by the user, resume here first if this is the
-thread you're on.** A gardener can view a year-view horizontal bar chart
+**#9 (Bloom Timeline) is implemented, fully manually verified by the user,
+closed on GitHub, and pushed to the remote.** A gardener can view a
+year-view horizontal bar chart
 of Plant bloom windows (`BarTrack` in
 `apps/web/src/routes/BloomTimelinePage.tsx`) and an equivalent
 month-filtered list view — the same underlying `BloomTimelineBar[]`
@@ -49,46 +49,42 @@ click-through, the pattern this repo now leans on for every ticket:
   labels overlapping into unreadable mush. Fixed with a scoped
   `.bloom-timeline-page` padding rule and a `<=480px` media query that
   narrows the label column and thins the axis to every other month.
-- `24cf78e` — **user feedback, not yet re-checked by them.** Even with
-  the thinned axis, text labels alone (especially only 6 of them on
-  mobile) don't give a visual grid to judge a bar against — hard to tell
-  how many month-blocks a bar spans just by eyeballing it against distant
-  axis text. Added month tick marks directly on each bar's own track (all
-  12, reusing the axis's day-of-year percentages), so counting works
-  right against the bar itself at any width. I verified this via the
-  standalone Playwright-screenshot technique (375px/900px, light/dark) —
-  **but the user has not yet looked at this specific change themselves.**
+- `24cf78e` — Even with the thinned axis, text labels alone (especially
+  only 6 of them on mobile) don't give a visual grid to judge a bar
+  against — hard to tell how many month-blocks a bar spans just by
+  eyeballing it against distant axis text. Added month tick marks
+  directly on each bar's own track (all 12, reusing the axis's
+  day-of-year percentages), so counting works right against the bar
+  itself at any width. Verified via the standalone Playwright-screenshot
+  technique (375px/900px, light/dark), **and confirmed by the user
+  themselves afterward** — "the tick marks look better."
 
 **Manual QA checklist status** (the user ran this by hand in a real
-browser against the dev server, `localhost:5183`):
+browser against the dev server, `localhost:5183`) — **all items now
+pass**:
 - **A. Bed filter narrows the chart/list to only that Bed's Plants** —
   passes.
 - **B. Filter carries over between Chart view and List view** — passes.
 - **C. Phone-width layout** — failed twice during QA (padding/overlap,
   then "hard to tell month-blocks without ticks"), fixed both times (see
-  `01e1868`/`24cf78e` above). **The second fix (tick marks) is the one
-  thing still unverified.**
+  `01e1868`/`24cf78e` above), **and the tick-marks fix is now confirmed
+  by the user directly.**
 - **D. Cross-browser (Safari)** — passes.
 
-**Exactly where this was paused**: the user asked to update this doc and
-take a break, explicitly flagging that they have not yet checked the
-`24cf78e` tick-marks change. When resuming: restart the dev server if
-it's not still running (`npm run dev --workspace apps/web`), reload
-`/bloom-timeline`, and check the tick marks at both a normal and a
-phone-width viewport (DevTools' device toolbar, or an actual narrow
-window) — confirm they make it easy to count how many months a bar
-spans. If that looks right, the manual QA checklist above is complete.
-
-**Not yet done**: closing #9 on GitHub (`gh issue close 9 --comment
-"..."` once QA is confirmed complete) and pushing this branch to the
-remote — this session's commits (12 of them, spanning #9 and a
-concurrent session's #22 work) are all still local only; confirm with
-`git status -sb` before assuming otherwise.
+**#9 is closed on GitHub and pushed to `origin/main`** — `git log
+origin/main..HEAD` is empty as of this update, confirmed directly. Its
+closure newly unblocks **#17** (Native: Bloom Timeline, which needed #9
+and #13, #13 already closed) — confirmed `blocked_by: 0` directly against
+the API. It does not yet unblock **#11** (Dashboard), which also still
+needs #10 (Registry view, frontier but not yet built). See "Issue
+tracker" below for the full updated map.
 
 ---
 
 **⏸ #22 (Tag Scan: on-device Vision OCR) device setup is in progress,
-paused mid-session for a break — resume here first.** The native module
+paused mid-session for a break — resume here first if this is the thread
+you're on; #9 above is fully resolved and needs no further action.** The
+native module
 code (`dc33e47`, plus a follow-up commit `01b0c36` documenting the setup
 path and fixing a bug in the setup wizard script) was written but
 unverified as of the last update to this doc. Since then, real
@@ -805,8 +801,9 @@ Domain glossary: `CONTEXT.md`
 ## Current state
 
 Working tree is clean as of this update (`git status` — nothing
-uncommitted); 12 local commits ahead of `origin/main`, none pushed yet.
-Most recent commits first:
+uncommitted); `main` is even with `origin/main` — the 12 commits that were
+local-only as of the last update (spanning #9 and a concurrent session's
+#22 work) have since been pushed. Most recent commits first:
 
 ```
 24cf78e Bloom Timeline: add month tick marks to each bar's track (#9)
@@ -909,15 +906,14 @@ deployed; #7's migrations (`0011`/`0012`) are pushed; #20's migrations
 deployed**, so #20 still can't fully close on that front — see "What to do
 next" above. #8's migrations (`0013`–`0016`) are pushed and live (confirmed
 via `npx supabase migration list`); #8 needed no Edge Function (Planting
-touches no external adapter). **None of this session's commits have been
-`git push`ed to the GitHub remote yet**, since pushing to a shared remote
-wasn't asked for in this session; do that (or ask first) before treating
-this branch as published. The remaining tickets (#6, #9, #10, #11, #12,
-#14–#18) are still unbuilt or unverified — #6, #9, #10, and #14 are genuine
-frontier work (see "Issue tracker" below for the full dependency detail);
-#11, #12, #15–#18 each still need at least one other still-open ticket;
-#21 (filed during #4's QA) is `needs-triage`; #22's status needs a direct
-GitHub check per the note above.
+touches no external adapter). **All of this session's commits, including
+#9's, have now been pushed to the GitHub remote** — confirmed via `git log
+origin/main..HEAD` returning empty. The remaining tickets (#6, #10, #11,
+#12, #14–#18) are still unbuilt or unverified — #6, #10, #14, and #17 are
+genuine frontier work (see "Issue tracker" below for the full dependency
+detail); #11, #12, #15, #16, and #18 each still need at least one other
+still-open ticket; #21 (filed during #4's QA) is `needs-triage`; #22's
+status needs a direct GitHub check per the note above.
 
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
 > No GPS is read and no user photo is taken — that is exactly why the work was
@@ -1075,7 +1071,7 @@ Ticket map (dependency order; title abbreviated):
 | 6 | Property: photographed/in-app-drawn base map + Scale Reference — **frontier, unblocked** | 5 |
 | 7 | Bed drawing (desktop) — built, `6173a57`, closed | 5 |
 | 8 | Planting: create + place Pin, view on tap — built, `3041ca3`, closed | 3, 7 |
-| 9 | Bloom Timeline — built, `08d3851`–`24cf78e`, **open** (one manual QA item unverified — see "What to do next") | 3, 8 |
+| 9 | Bloom Timeline — built and verified, `08d3851`–`24cf78e`, closed | 3, 8 |
 | 10 | Registry view — **frontier, unblocked** | 3, 8 |
 | 11 | Dashboard (real content) | 7, 8, 9, 10 |
 | 12 | Task completion logging, history, one-off todos | 4, 8, 11 |
@@ -1091,33 +1087,32 @@ Ticket map (dependency order; title abbreviated):
 | 22 | Tag Scan: on-device Vision OCR + EAS dev client migration (filed during #20, `ready-for-human`) | — |
 
 **Frontier query**: open issues with `issue_dependencies_summary.blocked_by
-== 0` and no assignee. #2, #3, #4, #5, #7, #8, #13, and #19 are closed.
-**#6** still has `blocked_by == 0` and is genuine frontier work —
-`ready-for-agent`, unassigned, not previously built. **#8 has closed**
-(confirmed via commit `3041ca3` and the closing comment on the issue),
-which newly unblocks **#9** (Bloom Timeline) and **#10** (Registry view) —
-each needed only #3 (already closed) and #8, confirmed `blocked_by == 0` on
-both directly against the API. It also newly unblocks **#14** (Native: Map
-view), which needed both #8 and #13 (#13 already closed) — also confirmed
-`blocked_by == 0`. **#11** (Dashboard) still needs #9 and #10 in addition to
-#7/#8, both still open, so it's not frontier yet. **#12** (Task completion
-logging) still needs #11 in addition to #4/#8, so it's not frontier either.
-**#18** (Native: Plant/Planting detail) still needs #12, so it's not
-frontier. **#9 has since been built** (see "What to do next") but, same
-posture as #20 below, is deliberately excluded from the frontier while
-one manual QA item is unconfirmed — it hasn't newly unblocked #17
-(Native: Bloom Timeline) or #11 (Dashboard) until it actually closes.
-**#20** also has `blocked_by == 0` but is deliberately excluded
-from the frontier — it's built and awaiting closure (specifically, deploying
-`usda-plant-traits` and a real-device manual QA pass — see "What to do next"
-above), not unstarted work. **#22** also has `blocked_by == 0` but is
-`ready-for-human`, not `ready-for-agent`, so it's excluded the same way #21
-is (`needs-triage`) — check it directly before assuming it's done, since a
-concurrent session may have touched it since this doc was last updated.
-**#15**–**#17** (each blocked by #13 plus at least one other still-open
-ticket — #6, #10, #9 respectively) don't newly unblock from #8's closure —
-#15 needs #6 (still open), #16 needs #10 (now frontier, but not yet built),
-#17 needs #9 (now frontier, but not yet built).
+== 0` and no assignee. #2, #3, #4, #5, #7, #8, #9, #13, and #19 are closed.
+**#6** and **#10** still have `blocked_by == 0` and are genuine frontier
+work — `ready-for-agent`, unassigned, not previously built (unchanged by
+#9's closure). **#9 has closed** (user-confirmed manual QA, `gh issue
+close`, and pushed — see "What to do next"), which newly unblocks **#17**
+(Native: Bloom Timeline, which needed #9 and #13, #13 already closed) —
+confirmed `blocked_by: 0` directly against the API. **#14** (Native: Map
+view) remains frontier from #8's earlier closure (needed #8 and #13, both
+closed). **#11** (Dashboard) still needs #10 in addition to #7/#8/#9 (now
+all closed) — confirmed `blocked_by: 1` directly against the API, so it's
+not frontier yet. **#12** (Task completion logging) still needs #11 in
+addition to #4/#8, so it's not frontier either. **#18** (Native:
+Plant/Planting detail) still needs #12, so it's not frontier. **#20** has
+`blocked_by == 0` but is deliberately excluded from the frontier — it's
+built and awaiting closure (specifically, deploying `usda-plant-traits` and
+a real-device manual QA pass — see "What to do next" above), not unstarted
+work. **#22** also has `blocked_by == 0` but is `ready-for-human`, not
+`ready-for-agent`, so it's excluded the same way #21 is (`needs-triage`) —
+check it directly before assuming it's done, since a concurrent session may
+have touched it since this doc was last updated. **#15**/**#16** (each
+blocked by #13 plus one other still-open ticket) remain non-frontier — #15
+needs #6 (still open), #16 needs #10 (frontier, but not yet built).
+
+So the frontier as of this update is: **#6**, **#10**, **#14**, and
+**#17** — all `blocked_by: 0`, unassigned, confirmed directly against the
+API.
 
 ---
 
@@ -1126,13 +1121,12 @@ ticket — #6, #10, #9 respectively) don't newly unblock from #8's closure —
 - **`/implement`** — the pattern used for every ticket so far. Run once per
   ticket, fresh session each time, pointed at a ticket number. Drives `/tdd`
   internally, closes with `/code-review`. Don't run `/to-tickets` again —
-  tickets #2–#20 are already published. **#6, #10, and #14 are frontier
-  now** (see "Issue tracker" above) — any is a natural next `/implement`
-  target. **#9 is built, not frontier** — one manual QA item is unverified
-  (see "What to do next"); resume that rather than re-implementing. #20
-  also still needs a deferred-QA/deploy pass to actually close, and #22
-  needs the Mac/Apple Developer account/iPhone it requires (though check
-  its actual state first — see the frontier-query note above).
+  tickets #2–#20 are already published. **#6, #10, #14, and #17 are
+  frontier now** (see "Issue tracker" above) — any is a natural next
+  `/implement` target. #20 still needs a deferred-QA/deploy pass to
+  actually close, and #22 needs the Mac/Apple Developer account/iPhone it
+  requires (though check its actual state first — see the frontier-query
+  note above).
 - ~~`/prototype` — what #19 actually is~~ — done; see the #19 entry in "What
   to do next" above and `docs/adr/0004-tag-scan-ocr-placement-and-usda-adapter.md`.
 - **`/codebase-design`** — for module structure once ticket-writing starts,
