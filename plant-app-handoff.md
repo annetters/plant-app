@@ -81,83 +81,93 @@ tracker" below for the full updated map.
 
 ---
 
-**⏸ #22 (Tag Scan: on-device Vision OCR) device setup is in progress,
-paused mid-session for a break — resume here first if this is the thread
-you're on; #9 above is fully resolved and needs no further action.** The
-native module
-code (`dc33e47`, plus a follow-up commit `01b0c36` documenting the setup
-path and fixing a bug in the setup wizard script) was written but
-unverified as of the last update to this doc. Since then, real
-device-testing progress happened for the first time — a genuinely long
-troubleshooting arc, now fully documented in `apps/mobile/README.md`'s
-"Native dev client" section and baked into
-`apps/mobile/scripts/setup-tag-ocr-dev-client.sh` so it isn't repeated from
-scratch next time:
+**#22 (Tag Scan: on-device Vision OCR + EAS dev client migration) is
+implemented, verified end-to-end on a real iPhone against the real linked
+Supabase project, and committed** (`9fd6d6f`, `b75dafd`, `675ea1f`,
+`83565dc`, on top of the earlier `dc33e47`/`01b0c36`) — **not yet closed on
+GitHub, that decision is still open, see below.** A gardener can
+photograph a real nursery tag on a real device, have Apple's on-device
+Vision framework read real text off the photo, and reach a working Review
+screen — this session took that from "written but never run" all the way
+through a real Plant actually being saved. Device setup itself (macOS
+non-admin/Homebrew permissions, Xcode signing, the custom dev client
+build) is fully documented in `apps/mobile/README.md`'s "Native dev
+client" and new "Day-to-day workflow" sections — not repeated here.
 
-- The developer's macOS account isn't an admin, and Homebrew on this Mac
-  was originally set up by a different (admin) account — every early
-  attempt (`sudo gem install cocoapods`, `brew install cocoapods`) hit
-  permission walls.
-- Resolved **without working from the admin account day-to-day**: one
-  brief admin-authenticated session (via Fast User Switching, back to the
-  original account right after) ran a one-time `chgrp -R staff` +
-  `chmod -R g+w` on `/opt/homebrew` — grants write access via a group every
-  local account already belongs to, so the admin account keeps full access
-  too; nothing was taken from it.
-- A second wall that looked like real Homebrew corruption (`brew` failing
-  internally with "fatal: not in a git directory" / "unknown install step:
-  remove") was actually Git's "dubious ownership" safety check silently
-  blocking Homebrew's own internal git calls, since `/opt/homebrew`'s
-  `.git` files are still *owned* by the admin account even after the
-  group-write fix (`chgrp` changes group, not owner). Fixed with
-  `git config --global --add safe.directory /opt/homebrew`.
-- `brew install cocoapods` then completed cleanly. Xcode's license turned
-  out to already be accepted system-wide (`xcodebuild -license check` →
-  exit code `0`), so that wasn't actually a blocker despite being flagged
-  as a likely one going in.
-- `npx expo prebuild --clean` generated `apps/mobile/ios/`/`android/` for
-  the first time (gitignored, as intended — not committed).
-  `app.json`/`package.json`'s `android.package` field and `npm run
-  ios`/`npm run android` script rewrites *from that same run* **are**
-  committed (in `01b0c36`), since those are real project config prebuild
-  updates in place, not the generated native folders themselves.
-- Opened `apps/mobile/ios/mobile.xcworkspace` in Xcode, configured
-  automatic signing with the developer's own free Apple ID (Personal
-  Team) — no paid Apple Developer Program account needed, confirming
-  ADR-0004/#22's original cost assessment.
-- Hit one more real wall: the connected iPhone's iOS version was older
-  than this Xcode build expected. Fixed with a normal iOS update on the
-  phone (Settings → General → Software Update).
+**Two real bugs in the original `dc33e47` implementation, found only by
+actually running it on a device** (neither was, or could have been, caught
+by the unit test suite, which mocks the native module entirely):
 
-**Exactly where this was paused**: the iPhone just finished its iOS
-update; about to press Xcode's ▶ Run button again (should now succeed,
-since the version mismatch that blocked the previous attempt is resolved)
-— but the actual build/install/launch result was never confirmed before
-the session paused for a break.
+- **The native module never actually linked into the compiled app at
+  all** — `getTagOcrAdapter()` silently fell back to `manualEntryAdapter`
+  every time, with zero indication anything was wrong (blank Review-screen
+  fields look identical whether OCR is unavailable or just found nothing).
+  Root cause was two separate gaps: `modules/tag-ocr` had no `package.json`,
+  so npm never made it a discoverable local package for CocoaPods
+  autolinking to find (fixed by adding one and registering it as an
+  `apps/mobile` dependency via `"tag-ocr": "file:./modules/tag-ocr"`); and
+  its podspec declared a 16.4 iOS minimum against the project's actual 15.1
+  deployment target, so even once discoverable, CocoaPods silently excluded
+  it with no warning printed anywhere in `pod install`'s output. Nothing in
+  `TagOcr.swift` actually requires iOS 16.4 — lowered to 15.1 to match.
+  Diagnosing this took genuinely deep tracing (temporary debug logging in
+  the JS adapter, then patching the gitignored `Podfile` itself to dump
+  CocoaPods' internal resolved-package list) before the platform-mismatch
+  root cause surfaced — worth knowing this class of "silently excluded,
+  no error anywhere" failure exists in Expo's autolinking if a future local
+  module has the same problem.
+- **No way to leave the Capture/Review screens once entered** — the whole
+  app has `headerShown: false` (deliberately, fixes a real notch/safe-area
+  bug from #13 — not reverted), and neither screen had its own Cancel.
+  Fixed with a Cancel button on each, back to Dashboard.
 
-**When resuming**:
-1. Open Xcode (should still have `mobile.xcworkspace` open). Confirm the
-   iPhone is selected as the run destination (not a Simulator) and
-   Signing & Capabilities still shows "Automatically manage signing" with
-   the Personal Team set.
-2. Press ▶ Run. If it errors, paste the exact error back before trying
-   anything else — don't guess at a fix blind.
-3. If it succeeds (installs and launches on the phone): from
-   `apps/mobile/`, run `npx expo start --dev-client`, open the newly
-   installed dev client app on the phone (not Expo Go), and from the
-   Dashboard tap "Scan a tag" to reach the real capture flow.
-4. Photograph a real nursery tag. **This will be the first time any of
-   #22's actual code runs against real Vision output** — treat the first
-   attempt as informative, not necessarily correct. In particular,
-   `parseOcrTextLines` (`packages/domain/src/tagOcrParsing.ts`) was tuned
-   against a text transcript from the ADR-0004 prototype, never against
-   this native module's actual live output shape — if recognized text
-   looks right in Xcode's console but candidates come out wrong on the
-   Review screen, that function is the first place to check.
-5. Once a real end-to-end scan works, decide whether to close #20/#22 (see
-   each ticket's existing "what's left" notes elsewhere in this doc) and
-   whether to push these commits to the GitHub remote (nothing from this
-   whole session has been pushed yet).
+**Also fixed, smaller UI gaps found live**: "Look up species" had no
+visual styling at all (unlike every other button on the screen), reading
+as plain unstyled black text easy to mistake for a disabled label — now
+matches the app's existing secondary-button outline style. Neither app had
+any way to see which account was currently logged in — added "Signed in as
+[email]" to both Dashboards (needed mid-session to confirm the phone and
+the browser were on the same account).
+
+**What real Vision OCR actually produced**, first attempt, photographing a
+real Agastache 'Blue Fortune' tag (front side only, per the guided
+capture's own design — OCR only ever reads the front photo): 8/8 lines
+recognized correctly and legibly ("US NATIVE", "PERENNIAL", "FULL SUN",
+"ATTRACTS BUTTERFLIES", "DEER RESISTANT", "DROUGHT TOLERANT", and
+`¡BLUE FORTUNE•` — Vision misread the cultivar's actual surrounding quote
+marks as an inverted exclamation point and a bullet). Zero Tag Scan
+candidates resulted — `parseOcrTextLines` only ever extracts a scientific
+name from a strict, isolated "Genus species" line, by deliberate ADR-0004
+design (common-name text was found too unreliable across the original
+8-tag prototype sample to guess), and this real tag's front side never
+printed an isolated scientific-name line for it to match. **Filed as
+`#23`** (`needs-triage`, blocked by #22, not linked as a GitHub sub-issue
+of #1 — same ad hoc pattern as #21) with a follow-up comment once the
+quote-misread detail was noticed: `STANDALONE_CULTIVAR_PATTERN` already
+supports extracting a quoted cultivar from its own line, so the gap isn't
+only "no scientific name" but also that its accepted quote-character class
+doesn't cover what Vision produced here. Not blocking #22 — manual entry
+(the designed complete fallback) is exactly what got exercised instead,
+successfully: typed the real common name and scientific name by hand,
+tapped Continue, and a real Plant row was confirmed saved via the web
+app's own Registry page against the same Supabase project.
+
+**Not exercised this session** (would need another real tag or more
+time): a tag whose front side *does* print an isolated scientific-name
+line (to confirm auto-population actually works, not just the manual
+fallback); the ambiguous-species picker and duplicate-Plant-offer screens
+against real data; the suggested-USDA-traits screen (the one lookup
+attempted this session failed — see #23's context, a genus name was typed
+into Common name by mistake before the cultivar-vs-common-name confusion
+was caught).
+
+**Still open: whether to close #22 on GitHub.** The core acceptance bar —
+native Vision OCR built, linked, and proven against real device output,
+with manual entry as a genuinely working fallback — is met. **#20** is a
+separate ticket and still has its own unresolved "before closing" items
+(migrations `0009`/`0010` push status and the `usda-plant-traits` Edge
+Function deploy — neither touched this session; verify before assuming
+either is done) — don't conflate the two when deciding what to close.
 
 ---
 
@@ -800,12 +810,30 @@ Domain glossary: `CONTEXT.md`
 
 ## Current state
 
-Working tree is clean as of this update (`git status` — nothing
-uncommitted); `main` is even with `origin/main` — the 12 commits that were
-local-only as of the last update (spanning #9 and a concurrent session's
-#22 work) have since been pushed. Most recent commits first:
+**Working tree is not clean** — a concurrent session has in-progress,
+uncommitted work sitting in it (`apps/web/src/property/BaseMapBackground.tsx`,
+`BaseMapSetup.tsx`/`.test.tsx`, `packages/domain/src/scaleReference.ts`/
+`.test.ts`, `supabase/migrations/0017_property_base_map.sql`, plus
+modifications to `BedEditor`/`PlantingMap`/`PropertiesRepositoryContext`/
+`propertiesRepository`/`property.ts` and a few route files) — almost
+certainly ticket #6 (Property: photographed/in-app-drawn base map + Scale
+Reference), **not touched, reviewed, or committed by this session**. Leave
+it alone; `git status -sb` before any broad `git add` remains essential,
+same standing warning this doc keeps repeating.
+
+`main` is 5 commits ahead of `origin/main`, all local-only as of this
+update (the 12 from the last update, spanning #9 and #22's native module
+commit `dc33e47`, were already pushed; this update adds 4 new #22 fix
+commits plus this doc's own #9-closure commit — **not yet pushed**, pending
+what's decided about closing #22, see above). Most recent commits first:
 
 ```
+83565dc Document the Xcode/Metro dev-client workflow and a real signing dead-end (#22)
+675ea1f Show the signed-in account's email on both Dashboards
+b75dafd Tag Scan: add Cancel navigation and style the "Look up species" button (#22)
+9fd6d6f Fix Tag Scan's native Vision OCR module never actually linking into the app (#22)
+6aa6775 Record #9's closure and #17's new frontier status in the handoff doc
+a0de8dd Record #9's QA status in the handoff doc — one item unverified
 24cf78e Bloom Timeline: add month tick marks to each bar's track (#9)
 5272556 Record #22's paused device-setup session in the handoff doc
 01b0c36 Document Tag Scan dev-client setup and fix wizard workspace glob (#22)
