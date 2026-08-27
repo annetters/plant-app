@@ -22,6 +22,10 @@ const PROPERTY_ROW: PropertyRow = {
   longitude: -71.1266,
   imagery_zoom: 20,
   imagery_available: true,
+  base_map_source: 'aerial',
+  base_map_photo_path: null,
+  base_map_drawing: null,
+  scale_reference: null,
   created_at: '2026-01-01T00:00:00.000Z',
 }
 
