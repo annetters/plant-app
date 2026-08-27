@@ -6,12 +6,15 @@ import {
   metersPerPixel,
   pickBestZoom,
   pixelsPerFoot,
+  pixelsPerFootForProperty,
   propertyFromRow,
   propertyInputToRow,
   validatePropertyInput,
+  type Property,
   type PropertyInput,
   type PropertyRow,
 } from "./property.js";
+import type { ScaleReferenceInput } from "./scaleReference.js";
 
 function validInput(overrides: Partial<PropertyInput> = {}): PropertyInput {
   return {
@@ -21,6 +24,19 @@ function validInput(overrides: Partial<PropertyInput> = {}): PropertyInput {
     longitude: -77.0365,
     imageryZoom: 20,
     imageryAvailable: true,
+    baseMapSource: "aerial",
+    baseMapPhotoPath: null,
+    baseMapDrawing: null,
+    scaleReference: null,
+    ...overrides,
+  };
+}
+
+function validProperty(overrides: Partial<Property> = {}): Property {
+  return {
+    id: "property-1",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    ...validInput(),
     ...overrides,
   };
 }
@@ -75,6 +91,10 @@ describe("propertyInputToRow / propertyFromRow", () => {
       longitude: input.longitude,
       imageryZoom: input.imageryZoom,
       imageryAvailable: input.imageryAvailable,
+      baseMapSource: input.baseMapSource,
+      baseMapPhotoPath: input.baseMapPhotoPath,
+      baseMapDrawing: input.baseMapDrawing,
+      scaleReference: input.scaleReference,
     });
   });
 
@@ -177,5 +197,56 @@ describe("aerialTileUrl", () => {
     expect(aerialTileUrl(20, 301829, 385146)).toBe(
       "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/20/385146/301829",
     );
+  });
+});
+
+describe("pixelsPerFootForProperty", () => {
+  it("derives from latitude/zoom for an aerial Property", () => {
+    const property = validProperty({ baseMapSource: "aerial", imageryZoom: 20 });
+    expect(pixelsPerFootForProperty(property)).toBe(pixelsPerFoot(property.latitude, 20));
+  });
+
+  it("returns null for an aerial Property with no imagery available", () => {
+    const property = validProperty({
+      baseMapSource: "aerial",
+      imageryZoom: null,
+      imageryAvailable: false,
+    });
+    expect(pixelsPerFootForProperty(property)).toBeNull();
+  });
+
+  it("derives from the Scale Reference for a photo Property", () => {
+    const scaleReference: ScaleReferenceInput = {
+      pointA: { x: 0, y: 0 },
+      pointB: { x: 300, y: 0 },
+      realDistanceFeet: 25,
+      mode: "known-measurement",
+    };
+    const property = validProperty({
+      baseMapSource: "photo",
+      baseMapPhotoPath: "user-1/property-1/plan.jpg",
+      scaleReference,
+    });
+    expect(pixelsPerFootForProperty(property)).toBe(12);
+  });
+
+  it("derives from the Scale Reference for a drawn Property", () => {
+    const scaleReference: ScaleReferenceInput = {
+      pointA: { x: 10, y: 10 },
+      pointB: { x: 10, y: 60 },
+      realDistanceFeet: 5,
+      mode: "measured-object",
+    };
+    const property = validProperty({
+      baseMapSource: "drawn",
+      baseMapDrawing: [[{ x: 0, y: 0 }, { x: 100, y: 0 }]],
+      scaleReference,
+    });
+    expect(pixelsPerFootForProperty(property)).toBe(10);
+  });
+
+  it("returns null for a photo/drawn Property with no Scale Reference calibrated yet", () => {
+    const property = validProperty({ baseMapSource: "photo", baseMapPhotoPath: "path.jpg" });
+    expect(pixelsPerFootForProperty(property)).toBeNull();
   });
 });

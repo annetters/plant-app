@@ -50,12 +50,14 @@ export {
   metersPerPixel,
   pickBestZoom,
   pixelsPerFoot,
+  pixelsPerFootForProperty,
   propertyFromRow,
   propertyInputToRow,
   validatePropertyInput,
 } from "./property.js";
 export type {
   AddressCandidate,
+  BaseMapSource,
   Property,
   PropertyInput,
   PropertyRow,
@@ -63,6 +65,18 @@ export type {
   PropertyValidationResult,
   ZoomProbeResult,
 } from "./property.js";
+
+export {
+  derivePixelsPerFootFromScaleReference,
+  validateScaleReferenceInput,
+} from "./scaleReference.js";
+export type {
+  ScalePoint,
+  ScaleReferenceInput,
+  ScaleReferenceMode,
+  ScaleReferenceValidationErrors,
+  ScaleReferenceValidationResult,
+} from "./scaleReference.js";
 
 export {
   bedFromRow,

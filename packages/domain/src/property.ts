@@ -5,6 +5,12 @@
  * edge-function runtime, which can't import this npm workspace package —
  * keep the two in sync.
  */
+import type { BedPoint } from "./bed.js";
+import {
+  derivePixelsPerFootFromScaleReference,
+  type ScaleReferenceInput,
+} from "./scaleReference.js";
+
 const TILE_SIZE = 256;
 const EARTH_CIRCUMFERENCE_METERS = 40075016.686;
 const METERS_PER_FOOT = 0.3048;
@@ -80,6 +86,15 @@ export interface AddressCandidate {
   longitude: number;
 }
 
+/**
+ * Which of the three sources (CONTEXT.md's Property entry) a Property's base
+ * map comes from — one per Property, never mixed (ticket #6's own
+ * acceptance criterion). Every Property starts `'aerial'` (set by
+ * `create-property`, per ticket #5); `'photo'`/`'drawn'` are chosen
+ * afterward, only when aerial imagery isn't available there.
+ */
+export type BaseMapSource = "aerial" | "photo" | "drawn";
+
 export interface PropertyInput {
   /** What the user typed in. Never re-derived — always shown alongside `resolvedAddress` so a bad geocoder match is visible, not silent. */
   address: string;
@@ -90,6 +105,13 @@ export interface PropertyInput {
   /** Highest zoom with confirmed imagery, or `null` if none was available anywhere probed. */
   imageryZoom: number | null;
   imageryAvailable: boolean;
+  baseMapSource: BaseMapSource;
+  /** Storage path of an uploaded plot plan/survey photo — set only when `baseMapSource === 'photo'`. */
+  baseMapPhotoPath: string | null;
+  /** Hand-drawn structural plan (ticket #6), one polyline per stroke, in the drawing canvas's own pixel space — set only when `baseMapSource === 'drawn'`. */
+  baseMapDrawing: BedPoint[][] | null;
+  /** Calibrates `baseMapPhotoPath`/`baseMapDrawing` to real-world feet (see `scaleReference.ts`) — always `null` for `baseMapSource === 'aerial'`, which derives its scale from latitude/zoom instead (see `pixelsPerFoot` below). */
+  scaleReference: ScaleReferenceInput | null;
 }
 
 export interface Property extends PropertyInput {
@@ -128,6 +150,10 @@ export interface PropertyRow {
   longitude: number;
   imagery_zoom: number | null;
   imagery_available: boolean;
+  base_map_source: BaseMapSource;
+  base_map_photo_path: string | null;
+  base_map_drawing: BedPoint[][] | null;
+  scale_reference: ScaleReferenceInput | null;
   created_at: string;
 }
 
@@ -141,6 +167,10 @@ export function propertyInputToRow(
     longitude: input.longitude,
     imagery_zoom: input.imageryZoom,
     imagery_available: input.imageryAvailable,
+    base_map_source: input.baseMapSource,
+    base_map_photo_path: input.baseMapPhotoPath,
+    base_map_drawing: input.baseMapDrawing,
+    scale_reference: input.scaleReference,
   };
 }
 
@@ -154,5 +184,28 @@ export function propertyFromRow(row: PropertyRow): Property {
     longitude: row.longitude,
     imageryZoom: row.imagery_zoom,
     imageryAvailable: row.imagery_available,
+    baseMapSource: row.base_map_source,
+    baseMapPhotoPath: row.base_map_photo_path,
+    baseMapDrawing: row.base_map_drawing,
+    scaleReference: row.scale_reference,
   };
+}
+
+/**
+ * The scale (pixels-per-foot) to render this Property's Beds/Pins against,
+ * regardless of which of the three base-map sources it uses — `null` when
+ * there's no scale to draw against yet (no aerial imagery and no Scale
+ * Reference calibrated). This is the one seam `BedEditor`/`PlantingMap`
+ * should call instead of reaching for `pixelsPerFoot`/`imageryZoom` directly,
+ * so a photo/drawn Property draws Beds and Pins exactly like an aerial one.
+ */
+export function pixelsPerFootForProperty(property: Property): number | null {
+  if (property.baseMapSource === "aerial") {
+    return property.imageryZoom !== null
+      ? pixelsPerFoot(property.latitude, property.imageryZoom)
+      : null;
+  }
+  return property.scaleReference
+    ? derivePixelsPerFootFromScaleReference(property.scaleReference)
+    : null;
 }

@@ -25,3 +25,14 @@ export function usePropertiesRepository(): PropertiesRepository {
   }
   return repository
 }
+
+/**
+ * Same context, without the throw — for a component like `BaseMapBackground`
+ * that's mounted from both `PropertyPage` (always within the provider) and
+ * from `BedEditor`/`PlantingMap`'s own isolated unit tests (which render
+ * them without one, since neither test's fixtures use a `'photo'`
+ * `baseMapSource` — the only branch that actually needs the repository).
+ */
+export function useOptionalPropertiesRepository(): PropertiesRepository | null {
+  return useContext(PropertiesRepositoryContext)
+}

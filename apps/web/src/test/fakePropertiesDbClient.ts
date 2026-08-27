@@ -54,13 +54,17 @@ export function createFakePropertiesDbClient(initialRow: PropertyRow | null = nu
       longitude: body.longitude,
       imagery_zoom: 20,
       imagery_available: true,
+      base_map_source: 'aerial',
+      base_map_photo_path: null,
+      base_map_drawing: null,
+      scale_reference: null,
       created_at: '2026-01-01T00:00:00.000Z',
     }
     row = created
     return { data: created, error: null }
   })
 
-  function builder(op: 'select' | 'delete') {
+  function builder(op: 'select' | 'update' | 'delete', payload?: Record<string, unknown>) {
     const filters: Record<string, string> = {}
 
     const chain = {
@@ -72,6 +76,9 @@ export function createFakePropertiesDbClient(initialRow: PropertyRow | null = nu
         return chain
       },
       maybeSingle() {
+        return chain
+      },
+      single() {
         return chain
       },
       then<T1 = unknown, T2 = never>(
@@ -93,6 +100,11 @@ export function createFakePropertiesDbClient(initialRow: PropertyRow | null = nu
       if (op === 'select') {
         return { data: row, error: null }
       }
+      if (op === 'update') {
+        if (!row || !matches()) return { data: null, error: { message: 'Property not found.' } }
+        row = { ...row, ...payload } as PropertyRow
+        return { data: row, error: null }
+      }
       // delete
       if (row && matches()) row = null
       return { data: null, error: null }
@@ -101,12 +113,27 @@ export function createFakePropertiesDbClient(initialRow: PropertyRow | null = nu
     return chain
   }
 
+  const storage = {
+    upload: vi.fn().mockResolvedValue({ data: { path: 'fake/base-map.jpg' }, error: null }),
+    createSignedUrl: vi
+      .fn()
+      .mockResolvedValue({ data: { signedUrl: 'https://example.com/signed-base-map.jpg' }, error: null }),
+  }
+  const userId = 'user-1'
+
   const client: PropertiesDbClient = {
     from(_table: 'properties') {
       return {
         select: () => builder('select'),
+        update: (values: Record<string, unknown>) => builder('update', values),
         delete: () => builder('delete'),
       }
+    },
+    storage: {
+      from: () => storage,
+    },
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: { id: userId } }, error: null }),
     },
     functions: { invoke },
   }
@@ -114,6 +141,7 @@ export function createFakePropertiesDbClient(initialRow: PropertyRow | null = nu
   return {
     client,
     invoke,
+    storage,
     setRow: (next: PropertyRow | null) => {
       row = next
     },

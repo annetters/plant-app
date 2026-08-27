@@ -1,15 +1,15 @@
 import type { Bed, BedInput, BedPoint, BedTool, Property } from '@plant-app/domain'
-import { pixelsPerFoot, pixelsToFeet, validateBedInput } from '@plant-app/domain'
+import { pixelsPerFootForProperty, pixelsToFeet, validateBedInput } from '@plant-app/domain'
 import Konva from 'konva'
 import { useEffect, useRef, useState } from 'react'
-import { baseMapTiles, GRID_RADIUS, TILE_SIZE_PX } from './baseMapTiles'
+import { BaseMapBackground } from './BaseMapBackground'
+import { STAGE_SIZE_PX } from './baseMapTiles'
 import { buildOutlineLine } from './bedOutline'
 import { useBedsRepository } from './BedsRepositoryContext'
 import { ovalToPoints, rectangleToPoints } from './dragShapeGeometry'
 import { flattenClosedPenPath, type PenAnchor } from './penPath'
 import { useIsDesktopViewport } from './useIsDesktopViewport'
 
-const STAGE_SIZE_PX = TILE_SIZE_PX * (GRID_RADIUS * 2 + 1)
 const BED_STROKE = '#52b788'
 const BED_FILL = 'rgba(82,183,136,0.2)'
 const DRAFT_STROKE = '#1b4332'
@@ -88,8 +88,7 @@ export function BedEditor({
   const toolRef = useRef(tool)
   const drawStateRef = useRef<DrawState>(freshDrawState())
 
-  const pixelsPerFootValue =
-    property.imageryZoom !== null ? pixelsPerFoot(property.latitude, property.imageryZoom) : null
+  const pixelsPerFootValue = pixelsPerFootForProperty(property)
 
   useEffect(() => {
     toolRef.current = tool
@@ -446,9 +445,9 @@ export function BedEditor({
     }
   }
 
-  if (!property.imageryAvailable || pixelsPerFootValue === null) {
-    // No scale to draw against yet — a photographed/in-app-drawn base map
-    // (ticket #6) will cover this case.
+  if (pixelsPerFootValue === null) {
+    // No scale to draw against yet — either no aerial imagery and no
+    // photo/drawn base map calibrated via Scale Reference (ticket #6) yet.
     return null
   }
 
@@ -493,29 +492,13 @@ export function BedEditor({
             <p>Click to place points; click near the first point to close the shape.</p>
           )}
 
-          {/* The aerial imagery renders again here, at native tile
-              resolution and pixel-for-pixel behind the Konva stage, so the
-              two share one coordinate space — the always-visible thumbnail
-              above (in PropertyPage) is CSS-capped to 512px and isn't
-              usable as a drawing reference. */}
+          {/* The base map renders again here, at native/full resolution and
+              pixel-for-pixel behind the Konva stage, so the two share one
+              coordinate space — the always-visible thumbnail above (in
+              PropertyPage) is CSS-capped to 512px and isn't usable as a
+              drawing reference. */}
           <div style={{ position: 'relative', width: STAGE_SIZE_PX, height: STAGE_SIZE_PX }}>
-            <div
-              style={{
-                position: 'absolute',
-                inset: 0,
-                display: 'grid',
-                gridTemplateColumns: `repeat(${GRID_RADIUS * 2 + 1}, 1fr)`,
-              }}
-            >
-              {baseMapTiles(property).map((tile) => (
-                <img
-                  key={tile.key}
-                  src={tile.url}
-                  alt=""
-                  style={{ width: '100%', height: '100%', display: 'block' }}
-                />
-              ))}
-            </div>
+            <BaseMapBackground property={property} />
             <div
               ref={containerRef}
               data-testid="bed-drawing-surface"

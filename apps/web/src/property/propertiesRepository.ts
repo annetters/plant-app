@@ -1,7 +1,8 @@
-import type { AddressCandidate, Property, PropertyRow } from '@plant-app/domain'
+import type { AddressCandidate, Property, PropertyInput, PropertyRow } from '@plant-app/domain'
 import { propertyFromRow } from '@plant-app/domain'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+type Row = Record<string, unknown>
 type DbResult<T> = { data: T; error: { message: string } | null }
 
 /** The slice of a Postgrest filter builder the repository actually calls. */
@@ -9,13 +10,33 @@ interface PropertiesQuery extends PromiseLike<DbResult<unknown>> {
   select(columns?: string): PropertiesQuery
   eq(column: string, value: string): PropertiesQuery
   maybeSingle(): PropertiesQuery
+  single(): PropertiesQuery
 }
 
 /** The narrow shape of a Supabase client the repository needs — mirrors PlantsDbClient's pattern. */
 export interface PropertiesDbClient {
   from(table: 'properties'): {
     select(columns?: string): PropertiesQuery
+    update(values: Row): PropertiesQuery
     delete(): PropertiesQuery
+  }
+  storage: {
+    from(bucket: string): {
+      upload(
+        path: string,
+        file: File,
+      ): Promise<{ data: { path: string } | null; error: { message: string } | null }>
+      createSignedUrl(
+        path: string,
+        expiresIn: number,
+      ): Promise<{ data: { signedUrl: string } | null; error: { message: string } | null }>
+    }
+  }
+  auth: {
+    getUser(): Promise<{
+      data: { user: { id: string } | null }
+      error: { message: string } | null
+    }>
   }
   functions: {
     invoke(
@@ -37,6 +58,19 @@ export function asPropertiesDbClient(client: SupabaseClient): PropertiesDbClient
 const TABLE = 'properties'
 const CREATE_FUNCTION = 'create-property'
 const SEARCH_FUNCTION = 'search-addresses'
+const BASE_MAP_PHOTOS_BUCKET = 'property-base-map-photos'
+
+/** Ticket #6's fallback-base-map fields on `PropertyInput` — the payload `updateBaseMap` writes once aerial imagery turns out unavailable. */
+export type BaseMapUpdate = Pick<
+  PropertyInput,
+  'baseMapSource' | 'baseMapPhotoPath' | 'baseMapDrawing' | 'scaleReference'
+>
+
+async function requireUserId(client: PropertiesDbClient): Promise<string> {
+  const { data, error } = await client.auth.getUser()
+  if (error || !data.user) throw new Error('Not authenticated.')
+  return data.user.id
+}
 
 /** Address the user typed in, plus the specific geocoder candidate they picked for it. */
 export interface PropertyCreateInput {
@@ -109,5 +143,45 @@ export class PropertiesRepository {
   async remove(id: string): Promise<void> {
     const { error } = await this.client.from(TABLE).delete().eq('id', id)
     if (error) throw new Error(error.message)
+  }
+
+  /**
+   * Switches a Property to a photographed-plan or in-app-drawn base map,
+   * with the Scale Reference that calibrates it — the fallback path ticket
+   * #6 adds for when aerial imagery isn't available (see CONTEXT.md's
+   * Property/Scale Reference entries). No Edge Function needed: unlike
+   * `create()`, this touches no external adapter.
+   */
+  async updateBaseMap(id: string, update: BaseMapUpdate): Promise<Property> {
+    const { data, error } = await this.client
+      .from(TABLE)
+      .update({
+        base_map_source: update.baseMapSource,
+        base_map_photo_path: update.baseMapPhotoPath,
+        base_map_drawing: update.baseMapDrawing,
+        scale_reference: update.scaleReference,
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw new Error(error.message)
+    return propertyFromRow(data as PropertyRow)
+  }
+
+  /** Uploads a photographed plot plan/survey and returns its storage path — caller persists the path via `updateBaseMap`. */
+  async uploadBaseMapPhoto(propertyId: string, file: File): Promise<string> {
+    const userId = await requireUserId(this.client)
+    const path = `${userId}/${propertyId}/${crypto.randomUUID()}-${file.name}`
+    const { error } = await this.client.storage.from(BASE_MAP_PHOTOS_BUCKET).upload(path, file)
+    if (error) throw new Error(error.message)
+    return path
+  }
+
+  async getBaseMapPhotoUrl(path: string): Promise<string> {
+    const { data, error } = await this.client.storage
+      .from(BASE_MAP_PHOTOS_BUCKET)
+      .createSignedUrl(path, 3600)
+    if (error || !data) throw new Error(error?.message ?? 'Could not sign photo URL.')
+    return data.signedUrl
   }
 }

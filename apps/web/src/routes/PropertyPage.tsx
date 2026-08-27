@@ -1,9 +1,11 @@
 import type { Bed, Property } from '@plant-app/domain'
+import { pixelsPerFootForProperty } from '@plant-app/domain'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { PlantingMap } from '../plantings/PlantingMap'
 import { AddressAutocomplete } from '../property/AddressAutocomplete'
 import { baseMapTiles, GRID_RADIUS } from '../property/baseMapTiles'
+import { BaseMapSetup } from '../property/BaseMapSetup'
 import { BedEditor } from '../property/BedEditor'
 import { usePropertiesRepository } from '../property/PropertiesRepositoryContext'
 import type { PropertyCreateInput } from '../property/propertiesRepository'
@@ -120,29 +122,35 @@ export function PropertyPage() {
             // a Property quietly pinned to the wrong place.
             <p>Matched to: {property.resolvedAddress}</p>
           )}
-          {property.imageryAvailable ? (
+          {property.imageryAvailable && (
+            <div
+              className="property-base-map"
+              style={{
+                display: 'grid',
+                gridTemplateColumns: `repeat(${GRID_RADIUS * 2 + 1}, 1fr)`,
+                gap: 0,
+                maxWidth: 512,
+              }}
+            >
+              {baseMapTiles(property).map((tile) => (
+                <img key={tile.key} src={tile.url} alt="Aerial base map imagery" />
+              ))}
+            </div>
+          )}
+
+          {pixelsPerFootForProperty(property) !== null ? (
             <>
-              <div
-                className="property-base-map"
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: `repeat(${GRID_RADIUS * 2 + 1}, 1fr)`,
-                  gap: 0,
-                  maxWidth: 512,
-                }}
-              >
-                {baseMapTiles(property).map((tile) => (
-                  <img key={tile.key} src={tile.url} alt="Aerial base map imagery" />
-                ))}
-              </div>
               <BedEditor property={property} onBedsChange={setBeds} />
               <PlantingMap property={property} beds={beds} selectPlantingId={selectPlantingId} />
             </>
           ) : (
-            <p>
-              No aerial imagery is available for this property's location. A photographed plot
-              plan or an in-app drawn base map will cover this case in a later ticket.
-            </p>
+            <>
+              <p>
+                No aerial imagery is available for this property's location. Add a base map
+                another way below.
+              </p>
+              <BaseMapSetup property={property} onUpdated={setProperty} />
+            </>
           )}
           <button type="button" onClick={handleDelete} disabled={deleting}>
             {deleting ? 'Deleting…' : 'Delete Property'}

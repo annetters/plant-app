@@ -2,7 +2,7 @@ import type { Bed, BedPoint, Plant, Planting, PlantingInput, PlantingPhoto, Prop
 import {
   feetToPixels,
   findBedContainingPoint,
-  pixelsPerFoot,
+  pixelsPerFootForProperty,
   pixelsToFeet,
   validatePlantingInput,
   validatePlantingPhotoInput,
@@ -11,12 +11,12 @@ import Konva from 'konva'
 import { useEffect, useRef, useState } from 'react'
 import { plantLabel } from '../plants/plantLabel'
 import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
-import { baseMapTiles, GRID_RADIUS, TILE_SIZE_PX } from '../property/baseMapTiles'
+import { BaseMapBackground } from '../property/BaseMapBackground'
+import { STAGE_SIZE_PX } from '../property/baseMapTiles'
 import { buildOutlineLine, renderedOutlinePoints } from '../property/bedOutline'
 import { useBedsRepository } from '../property/BedsRepositoryContext'
 import { usePlantingsRepository } from './PlantingsRepositoryContext'
 
-const STAGE_SIZE_PX = TILE_SIZE_PX * (GRID_RADIUS * 2 + 1)
 const BED_STROKE = '#52b788'
 const BED_FILL = 'rgba(82,183,136,0.12)'
 const PIN_FILL = '#2d6a4f'
@@ -102,8 +102,7 @@ export function PlantingMap({
   // `selectPlantingId` itself changes to a new value.
   const autoSelectedPlantingIdRef = useRef<string | undefined>(undefined)
 
-  const pixelsPerFootValue =
-    property.imageryZoom !== null ? pixelsPerFoot(property.latitude, property.imageryZoom) : null
+  const pixelsPerFootValue = pixelsPerFootForProperty(property)
 
   useEffect(() => {
     if (bedsProp !== undefined) return
@@ -437,7 +436,7 @@ export function PlantingMap({
     }
   }
 
-  if (!property.imageryAvailable || pixelsPerFootValue === null) {
+  if (pixelsPerFootValue === null) {
     return null
   }
 
@@ -458,23 +457,7 @@ export function PlantingMap({
         // means the container exists on that very first effect run.
       }
       <div style={{ position: 'relative', width: STAGE_SIZE_PX, height: STAGE_SIZE_PX }}>
-        <div
-          style={{
-            position: 'absolute',
-            inset: 0,
-            display: 'grid',
-            gridTemplateColumns: `repeat(${GRID_RADIUS * 2 + 1}, 1fr)`,
-          }}
-        >
-          {baseMapTiles(property).map((tile) => (
-            <img
-              key={tile.key}
-              src={tile.url}
-              alt=""
-              style={{ width: '100%', height: '100%', display: 'block' }}
-            />
-          ))}
-        </div>
+        <BaseMapBackground property={property} />
         <div
           ref={containerRef}
           data-testid="planting-map-surface"
