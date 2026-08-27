@@ -1,6 +1,6 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-25
+**Date:** 2026-08-26
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
@@ -117,10 +117,8 @@ helpers this ticket's new code duplicated from existing files
 memoized the Registry's Plant-to-Planting-locations lookup to avoid an
 O(plants × plantings) rescan on every render/keystroke.
 
-**Not pushed to `origin/main` yet** — `029fc9c` is the only commit ahead of
-`origin/main` (confirmed via `git log origin/main..HEAD`); everything
-before it, including the prior update's #9/#22 work, was already pushed by
-the time this session started.
+**Pushed to `origin/main`** along with #6 and this doc's own update commits
+— see "Current state" below for the full picture.
 
 **Manual QA checklist for whoever resumes** (none of this has been run
 yet — see "Deferred QA (ticket #10)" below for the full list):
@@ -995,10 +993,11 @@ for what's still outstanding. If you're a different session picking this
 up: the working tree being clean now doesn't mean everything's done —
 check "What to do next" before assuming so.
 
-**`main` is 4 commits ahead of `origin/main`** — confirmed directly via
-`git log origin/main..HEAD`. **Not yet pushed.** Don't trust this doc's
-"ahead of origin" claims over `git log origin/main..HEAD` run fresh — it's
-drifted from reality more than once already. Most recent commits first:
+**`main` and `origin/main` are in sync** — `git log origin/main..HEAD`
+returns empty, confirmed directly; everything through `2c77076` has been
+pushed. Don't trust this doc's "ahead of origin" claims over `git log
+origin/main..HEAD` run fresh — it's drifted from reality more than once
+already, twice in this same update alone. Most recent commits first:
 
 ```
 3b38701 Fix Registry test fixture for #6's new PropertyRow fields
