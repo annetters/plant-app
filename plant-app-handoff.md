@@ -8,8 +8,8 @@
 ## What to do next
 
 **⏸ #6 (Property: photographed/in-app-drawn base map + Scale Reference) is
-implemented and code-reviewed, but has zero manual/visual verification yet
-and is entirely uncommitted — resume here first.** A gardener without
+implemented, code-reviewed, and committed (`6f891ff`), but still has zero
+manual/visual verification — resume here first.** A gardener without
 usable aerial imagery can upload a photographed plot plan/survey or draw a
 base plan directly in the app (multi-line, click-to-place points, mirroring
 the existing bezier-pen tool's click-based interaction), then calibrate its
@@ -49,13 +49,14 @@ aerial imagery is unavailable, not offered as a free choice on every
 Property — correct per #6's own "What to build" text ("a gardener *without
 usable aerial imagery* can instead..."), not a gap.
 
-Full monorepo typecheck and test suite are green (173 domain + 64 mobile +
-147 web tests) — but **all of this is Konva-canvas UI that the test suite
-stubs out entirely** (same standing limitation `BedEditor`/`PlantingMap`
-have had since #7/#8), so none of it has actually been looked at in a real
-browser. **Not committed** — 22 files sitting in the working tree
-(`git status -sb` for the exact list); the user chose to review by hand
-before committing rather than have the agent session commit it blind.
+Full monorepo typecheck and test suite are green — but **all of this is
+Konva-canvas UI that the test suite stubs out entirely** (same standing
+limitation `BedEditor`/`PlantingMap` have had since #7/#8), so none of it
+has actually been looked at in a real browser. **Committed** (`6f891ff`,
+22 files) — the user had originally planned to review by hand before
+committing, but authorized committing it later in the same working-tree
+lineage, on the condition that this checklist stays intact so the deferred
+manual verification isn't lost track of. It has not been run yet.
 
 **Manual QA checklist for whoever resumes** (none of this has been run
 yet):
@@ -85,8 +86,7 @@ yet):
 yet), then `npm run dev --workspace apps/web`, then work the checklist
 above against the real linked Supabase project — same fresh-throwaway-
 account pattern every prior ticket's QA has used. If it all looks right,
-commit (files listed via `git status -sb`), close #6, and re-run the
-frontier query.
+close #6 and re-run the frontier query.
 
 ---
 
@@ -976,34 +976,34 @@ Domain glossary: `CONTEXT.md`
 
 ## Current state
 
-**Working tree is not clean** — ticket #6 (Property: photographed/in-app-
-drawn base map + Scale Reference) sits fully implemented and code-reviewed
-but entirely uncommitted (22 files — `git status -sb` for the exact list).
-See the ⏸ #6 entry at the very top of "What to do next" for full detail,
-the real bug its code review caught and fixed (a Scale Reference
-coordinate-space mismatch), and the manual-QA checklist still to run before
-it can be committed and closed. If you're a different session: leave it
-alone; `git status -sb` before any broad `git add` remains essential, same
-standing warning this doc keeps repeating. **A later session implemented
-and committed #10 (Registry view, `029fc9c`) on top of this same working
-tree without disturbing #6** — since #6 had already touched some of the
-same files (`PlantingMap.tsx`, `PropertyPage.tsx`, `domain/index.ts`),
-that session staged only #10's changes on top of true `HEAD` (verified in
-an isolated disposable worktree) before committing, so #6's 22 files are
-still exactly as uncommitted as before. #10 itself now needs its own
-manual QA — see its "What to do next" entry and "Deferred QA (ticket
-#10)" above.
+**Working tree is clean** as of this update. Ticket #6 (Property:
+photographed/in-app-drawn base map + Scale Reference) sat fully
+implemented and code-reviewed but entirely uncommitted for several
+updates; a later session first implemented and committed #10 (Registry
+view, `029fc9c`) on top of that same dirty working tree without disturbing
+#6 — since #6 had already touched some of the same files
+(`PlantingMap.tsx`, `PropertyPage.tsx`, `domain/index.ts`), that session
+staged only #10's changes on top of true `HEAD` (verified in an isolated
+disposable worktree) before committing. The user then explicitly
+authorized committing #6 too, on the condition that this doc's manual-QA
+checklist for it stays intact — done (`6f891ff`), plus one small follow-up
+fix (`3b38701`) to a #10 test fixture that only became a real typecheck
+failure once #6's `PropertyRow` extension was actually committed
+alongside it. **Neither #6 nor #10 has been manually verified yet** — see
+each ticket's own "What to do next" entry and "Deferred QA" section above
+for what's still outstanding. If you're a different session picking this
+up: the working tree being clean now doesn't mean everything's done —
+check "What to do next" before assuming so.
 
-**`main` is 1 commit ahead of `origin/main`** — confirmed directly via
-`git log origin/main..HEAD`. The prior update's text here claimed several
-more commits were still local-only (pending the #22-closure decision), but
-that's stale: a concurrent session evidently pushed since, since only
-`029fc9c` (#10's implementation commit, this update) shows as unpushed
-now. Don't trust this doc's "ahead of origin" claims over `git log
-origin/main..HEAD` run fresh — this is at least the second time it's
-drifted. Most recent commits first:
+**`main` is 4 commits ahead of `origin/main`** — confirmed directly via
+`git log origin/main..HEAD`. **Not yet pushed.** Don't trust this doc's
+"ahead of origin" claims over `git log origin/main..HEAD` run fresh — it's
+drifted from reality more than once already. Most recent commits first:
 
 ```
+3b38701 Fix Registry test fixture for #6's new PropertyRow fields
+6f891ff Add Property: photographed/in-app-drawn base map + Scale Reference (#6)
+af9f274 Update handoff doc: record #10's implementation and deferred manual QA
 029fc9c Add Registry view: filter/search and Planting-location links (#10)
 83565dc Document the Xcode/Metro dev-client workflow and a real signing dead-end (#22)
 675ea1f Show the signed-in account's email on both Dashboards
@@ -1274,7 +1274,7 @@ Ticket map (dependency order; title abbreviated):
 | 3 | Plant record CRUD (manual entry) — built, `9018f33`, closed | 2 |
 | 4 | Care task templates on Plant — built, `4eea9e7`–`8ce7a48`, closed | 3 |
 | 5 | Property + aerial base map — built, `1380351`–`3b7fa07`, closed | 2 |
-| 6 | Property: photographed/in-app-drawn base map + Scale Reference — implemented + code-reviewed, **uncommitted, pending manual QA** (see "What to do next") | 5 |
+| 6 | Property: photographed/in-app-drawn base map + Scale Reference — implemented, code-reviewed, committed `6f891ff`, **not yet closed, pending manual QA** (see "What to do next") | 5 |
 | 7 | Bed drawing (desktop) — built, `6173a57`, closed | 5 |
 | 8 | Planting: create + place Pin, view on tap — built, `3041ca3`, closed | 3, 7 |
 | 9 | Bloom Timeline — built and verified, `08d3851`–`24cf78e`, closed | 3, 8 |
@@ -1299,9 +1299,9 @@ the frontier, same posture as #6/#20 below — it's implemented, code-
 reviewed, tested, and committed (`029fc9c`), awaiting manual QA before it
 can close (see "What to do next" and "Deferred QA (ticket #10)" above),
 not unstarted work. **#6** also has `blocked_by == 0` but is likewise
-excluded from the frontier — it's implemented and code-reviewed, awaiting
-manual QA and a commit (see "What to do next"
-above), not unstarted work. **#9 has closed** (user-confirmed manual QA, `gh issue
+excluded from the frontier — it's implemented, code-reviewed, and
+committed (`6f891ff`), awaiting manual QA before it can close (see "What
+to do next" above), not unstarted work. **#9 has closed** (user-confirmed manual QA, `gh issue
 close`, and pushed — see "What to do next"), which newly unblocks **#17**
 (Native: Bloom Timeline, which needed #9 and #13, #13 already closed) —
 confirmed `blocked_by: 0` directly against the API. **#14** (Native: Map
