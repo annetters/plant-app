@@ -1,6 +1,6 @@
 import type { Bed, Property } from '@plant-app/domain'
 import { useEffect, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { PlantingMap } from '../plantings/PlantingMap'
 import { AddressAutocomplete } from '../property/AddressAutocomplete'
 import { baseMapTiles, GRID_RADIUS } from '../property/baseMapTiles'
@@ -10,6 +10,11 @@ import type { PropertyCreateInput } from '../property/propertiesRepository'
 
 export function PropertyPage() {
   const repository = usePropertiesRepository()
+  // Set by the Registry's "View on the map" link (#10) so a Planting's
+  // details open automatically once the map loads, instead of the gardener
+  // hunting for its Pin.
+  const [searchParams] = useSearchParams()
+  const selectPlantingId = searchParams.get('plantingId') ?? undefined
   const [property, setProperty] = useState<Property | null | undefined>(undefined)
   const [pick, setPick] = useState<PropertyCreateInput | null>(null)
   const [addressError, setAddressError] = useState<string | null>(null)
@@ -131,7 +136,7 @@ export function PropertyPage() {
                 ))}
               </div>
               <BedEditor property={property} onBedsChange={setBeds} />
-              <PlantingMap property={property} beds={beds} />
+              <PlantingMap property={property} beds={beds} selectPlantingId={selectPlantingId} />
             </>
           ) : (
             <p>

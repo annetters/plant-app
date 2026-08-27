@@ -15,6 +15,7 @@ import {
 } from '@plant-app/domain'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { formatOption } from '../plants/formatOption'
 import {
   EMPTY_PLANT_FORM_FIELDS,
   plantFormFieldsFromPlant,
@@ -22,10 +23,6 @@ import {
   type PlantFormFields,
 } from '../plants/plantFormFields'
 import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
-
-function formatOption(value: string): string {
-  return value.replace(/-/g, ' ')
-}
 
 function formatTrigger(trigger: TaskTrigger): string {
   if (trigger.type === 'seasonal-marker') return trigger.text

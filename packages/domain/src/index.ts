@@ -134,3 +134,6 @@ export {
   filterBloomTimelineBarsByMonth,
 } from "./bloomTimeline.js";
 export type { BloomTimelineBar } from "./bloomTimeline.js";
+
+export { filterRegistryEntries } from "./registry.js";
+export type { RegistryFilters } from "./registry.js";

@@ -9,6 +9,7 @@ import {
 } from '@plant-app/domain'
 import Konva from 'konva'
 import { useEffect, useRef, useState } from 'react'
+import { plantLabel } from '../plants/plantLabel'
 import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
 import { baseMapTiles, GRID_RADIUS, TILE_SIZE_PX } from '../property/baseMapTiles'
 import { buildOutlineLine, renderedOutlinePoints } from '../property/bedOutline'
@@ -28,11 +29,6 @@ const EMPTY_FORM = {
   quantity: '1',
   yearAcquired: '',
   sourceNursery: '',
-}
-
-function plantLabel(plant: Plant | undefined): string {
-  if (!plant) return 'Unknown plant'
-  return plant.cultivar ? `${plant.commonName} (${plant.cultivar})` : plant.commonName
 }
 
 function todayIsoDate(): string {
@@ -59,10 +55,13 @@ function bedOutlinesInFeet(beds: readonly Bed[]): { id: string; points: BedPoint
 export function PlantingMap({
   property,
   beds: bedsProp,
+  selectPlantingId,
 }: {
   property: Property
   /** When provided (e.g. by `PropertyPage`, which also renders `BedEditor` against the same Property), this list is used as-is instead of self-fetching — so a Bed drawn and saved in the sibling editor shows up here immediately, not just after a reload. Omit to self-fetch (used by this component's own tests in isolation). */
   beds?: Bed[]
+  /** A Planting to jump straight to once loaded — the Registry's "View on the map" link (#10) lands here via `?plantingId=`, so a gardener reaches that Planting's details without hunting for its Pin. */
+  selectPlantingId?: string
 }) {
   const bedsRepository = useBedsRepository()
   const plantsRepository = usePlantsRepository()
@@ -97,6 +96,11 @@ export function PlantingMap({
   const pinsLayerRef = useRef<Konva.Layer | null>(null)
   const newPinLayerRef = useRef<Konva.Layer | null>(null)
   const newPinPxRef = useRef({ x: STAGE_SIZE_PX / 2, y: STAGE_SIZE_PX / 2 })
+  // Which `selectPlantingId` we've already auto-opened — so a `plantings`
+  // reference change from an unrelated create/remove elsewhere doesn't
+  // reopen a panel the gardener has since closed. Resets only when
+  // `selectPlantingId` itself changes to a new value.
+  const autoSelectedPlantingIdRef = useRef<string | undefined>(undefined)
 
   const pixelsPerFootValue =
     property.imageryZoom !== null ? pixelsPerFoot(property.latitude, property.imageryZoom) : null
@@ -276,6 +280,23 @@ export function PlantingMap({
     setPhotoError(null)
     setNewPhotoDate(todayIsoDate())
   }
+
+  // Jumps straight to the requested Planting once it's loaded — e.g. from
+  // the Registry's "View on the map" link (#10). Keeps re-checking as
+  // `plantings` loads in, but only ever auto-opens once per
+  // `selectPlantingId` (tracked via the ref above) — otherwise a `plantings`
+  // reference change from an unrelated create/remove elsewhere (e.g.
+  // dropping a new Pin) would reopen a panel the gardener already closed.
+  useEffect(() => {
+    if (!selectPlantingId) return
+    if (autoSelectedPlantingIdRef.current === selectPlantingId) return
+    const planting = plantings.find((p) => p.id === selectPlantingId)
+    if (planting) {
+      handleSelectPlanting(planting)
+      autoSelectedPlantingIdRef.current = selectPlantingId
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectPlantingId, plantings])
 
   useEffect(() => {
     if (!selectedPlanting) {

@@ -2,25 +2,11 @@ import type { Bed, BloomTimelineBar, Plant, Planting } from '@plant-app/domain'
 import { buildBloomTimelineBars, dayOfYear, filterBloomTimelineBarsByMonth } from '@plant-app/domain'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { MONTH_NAMES } from '../monthNames'
 import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
 import { usePlantingsRepository } from '../plantings/PlantingsRepositoryContext'
 import { useBedsRepository } from '../property/BedsRepositoryContext'
 import { usePropertiesRepository } from '../property/PropertiesRepositoryContext'
-
-const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
-]
 
 // Matches dayOfYear's own leap-safe cumulative table (Dec 31 -> 366) — the
 // denominator a bar's day-of-year position is a fraction of.

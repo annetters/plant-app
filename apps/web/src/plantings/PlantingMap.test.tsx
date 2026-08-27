@@ -135,6 +135,13 @@ function renderMap({
   plantRows = [PLANT_ROW],
   plantingRows = [] as PlantingRow[],
   photoRows = [] as PlantingPhotoRow[],
+  selectPlantingId,
+}: {
+  bedRows?: BedRow[]
+  plantRows?: PlantRow[]
+  plantingRows?: PlantingRow[]
+  photoRows?: PlantingPhotoRow[]
+  selectPlantingId?: string
 } = {}) {
   const property = propertyFromRow(AVAILABLE_ROW)
   const beds = createFakeBedsDbClient(bedRows)
@@ -144,7 +151,7 @@ function renderMap({
     <BedsRepositoryProvider client={beds.client}>
       <PlantsRepositoryProvider client={plants.client}>
         <PlantingsRepositoryProvider client={plantings.client}>
-          <PlantingMap property={property} />
+          <PlantingMap property={property} selectPlantingId={selectPlantingId} />
         </PlantingsRepositoryProvider>
       </PlantsRepositoryProvider>
     </BedsRepositoryProvider>,
@@ -298,5 +305,45 @@ describe('PlantingMap', () => {
     await screen.findByText(/Coneflower ×3/)
     await userEvent.click(screen.getByRole('button', { name: 'Remove Coneflower Planting' }))
     expect(screen.queryByText(/Coneflower ×3/)).not.toBeInTheDocument()
+  })
+})
+
+describe('PlantingMap — jumping to a Planting (#10 Registry link)', () => {
+  it('opens the requested Planting’s details automatically once loaded', async () => {
+    renderMap({ plantingRows: [PLANTING_ROW], selectPlantingId: 'planting-1' })
+
+    const details = await screen.findByRole('region', { name: 'Planting details' })
+    expect(within(details).getByText('Quantity: 3')).toBeInTheDocument()
+  })
+
+  it('does not reopen the details panel after the gardener closes it', async () => {
+    renderMap({ plantingRows: [PLANTING_ROW], selectPlantingId: 'planting-1' })
+    await screen.findByRole('region', { name: 'Planting details' })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('region', { name: 'Planting details' })).not.toBeInTheDocument()
+  })
+
+  it('does not reopen the details panel after Close just because an unrelated Planting was added elsewhere', async () => {
+    renderMap({ plantingRows: [PLANTING_ROW], selectPlantingId: 'planting-1' })
+    await screen.findByRole('region', { name: 'Planting details' })
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('region', { name: 'Planting details' })).not.toBeInTheDocument()
+
+    // Creating a second, unrelated Planting gives `plantings` a new array
+    // reference — this used to re-trigger the auto-select effect and
+    // reopen the panel the gardener had just closed.
+    await userEvent.click(await screen.findByRole('button', { name: 'Add Planting' }))
+    await userEvent.selectOptions(screen.getByLabelText('Plant *'), 'plant-1')
+    await userEvent.click(screen.getByRole('button', { name: 'Save Planting' }))
+    await screen.findByText(/Coneflower ×1/)
+
+    expect(screen.queryByRole('region', { name: 'Planting details' })).not.toBeInTheDocument()
+  })
+
+  it('does nothing when the requested Planting id matches nothing loaded', async () => {
+    renderMap({ plantingRows: [PLANTING_ROW], selectPlantingId: 'no-such-planting' })
+    await screen.findByText(/Coneflower ×3/)
+    expect(screen.queryByRole('region', { name: 'Planting details' })).not.toBeInTheDocument()
   })
 })

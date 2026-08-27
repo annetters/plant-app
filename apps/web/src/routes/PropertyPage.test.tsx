@@ -1,5 +1,5 @@
-import type { PropertyRow } from '@plant-app/domain'
-import { render, screen } from '@testing-library/react'
+import type { BedRow, PlantingRow, PlantRow, PropertyRow } from '@plant-app/domain'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
@@ -214,5 +214,75 @@ describe('PropertyPage — existing Property', () => {
 
     expect(screen.getByText('10 Main St, Cambridge, MA')).toBeInTheDocument()
     expect(screen.queryByLabelText('Address')).not.toBeInTheDocument()
+  })
+
+  it('opens the Planting named by a ?plantingId= query param (the Registry\'s "View on the map" link, #10)', async () => {
+    const bedRow: BedRow = {
+      id: 'bed-1',
+      property_id: 'property-1',
+      name: 'Front border',
+      tool: 'rectangle',
+      points: [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 10, y: 10 },
+        { x: 0, y: 10 },
+      ],
+      smoothing_enabled: false,
+      created_at: '2026-01-01T00:00:00.000Z',
+    }
+    const plantRow: PlantRow = {
+      id: 'plant-1',
+      common_name: 'Coneflower',
+      scientific_name: 'Echinacea purpurea',
+      cultivar: null,
+      flower_color: null,
+      bloom_start_month: null,
+      bloom_start_day: null,
+      bloom_end_month: null,
+      bloom_end_day: null,
+      sun_requirement: null,
+      mature_height_inches: null,
+      mature_spread_inches: null,
+      hardiness_zone_min: null,
+      hardiness_zone_max: null,
+      foliage_type: null,
+      native_status: null,
+      reference_photo_paths: [],
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    }
+    const plantingRow: PlantingRow = {
+      id: 'planting-1',
+      plant_id: 'plant-1',
+      bed_id: 'bed-1',
+      quantity: 3,
+      year_acquired: null,
+      source_nursery: null,
+      pin_x: 5,
+      pin_y: 5,
+      created_at: '2026-01-01T00:00:00.000Z',
+    }
+
+    const fake = createFakePropertiesDbClient(availableRow)
+    const beds = createFakeBedsDbClient([bedRow])
+    const plants = createFakePlantsDbClient([plantRow])
+    const plantings = createFakePlantingsDbClient([plantingRow])
+    render(
+      <MemoryRouter initialEntries={['/map?plantingId=planting-1']}>
+        <PropertiesRepositoryProvider client={fake.client}>
+          <BedsRepositoryProvider client={beds.client}>
+            <PlantsRepositoryProvider client={plants.client}>
+              <PlantingsRepositoryProvider client={plantings.client}>
+                <PropertyPage />
+              </PlantingsRepositoryProvider>
+            </PlantsRepositoryProvider>
+          </BedsRepositoryProvider>
+        </PropertiesRepositoryProvider>
+      </MemoryRouter>,
+    )
+
+    const details = await screen.findByRole('region', { name: 'Planting details' })
+    expect(within(details).getByText('Quantity: 3')).toBeInTheDocument()
   })
 })
