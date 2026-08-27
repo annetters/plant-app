@@ -7,6 +7,136 @@
 
 ## What to do next
 
+**⏸ #6 (Property: photographed/in-app-drawn base map + Scale Reference) is
+implemented and code-reviewed, but has zero manual/visual verification yet
+and is entirely uncommitted — resume here first.** A gardener without
+usable aerial imagery can upload a photographed plot plan/survey or draw a
+base plan directly in the app (multi-line, click-to-place points, mirroring
+the existing bezier-pen tool's click-based interaction), then calibrate its
+scale via Scale Reference — two clicked points plus a real-world distance,
+in either "known measurement" or "measured object" mode (CONTEXT.md: both
+modes reduce to the same underlying math). `derivePixelsPerFootFromScaleReference`
++ `validateScaleReferenceInput` in `packages/domain/src/scaleReference.ts`
+(the ticket's own required domain-logic test); `Property` gained
+`baseMapSource`/`baseMapPhotoPath`/`baseMapDrawing`/`scaleReference` fields
+plus a `pixelsPerFootForProperty()` helper that unifies scale lookup across
+all three base-map sources (aerial/photo/drawn) — `BedEditor`/`PlantingMap`
+now key off that helper instead of aerial-only math, via a new shared
+`BaseMapBackground` component. New `BaseMapSetup.tsx` drives the fallback
+flow, wired into `PropertyPage` in place of the old "will cover this case
+in a later ticket" placeholder. New migration `0017_property_base_map.sql`
+(columns + a `property-base-map-photos` storage bucket + a
+`properties_base_map_source_consistent` CHECK constraint) — **not yet
+pushed** (`npm run db:push` needed before any of this is reachable against
+the real linked Supabase project).
+
+`/code-review`'s two-axis pass (Standards + Spec, run as separate
+sub-agents) caught and fixed one real bug before anything was committed:
+**`BaseMapSetup` was calibrating Scale Reference against a 512px canvas
+while `BedEditor`/`PlantingMap`/`BaseMapBackground` all render/place Beds
+and Pins against a 768px stage** — every Bed/Pin on a photo or drawn base
+map would have landed roughly 1.5x off from what the user actually
+measured, and a drawn plan's own strokes would have rendered squeezed into
+the stage's top-left corner. Fixed by exporting one shared `STAGE_SIZE_PX`
+constant from `baseMapTiles.ts` that all four files now import instead of
+each computing their own. Also fixed from that same review: a duplicated
+polyline-rendering shape across three sites (extracted to
+`baseMapDrawing.ts`'s `strokePoints`), a test that hand-built a `Property`
+instead of calling `propertyFromRow`, and a hand-duplicated `BaseMapUpdate`
+type narrowed to `Pick<PropertyInput, ...>`. One Spec finding was reviewed
+and deliberately not actioned: photo/drawn sources are only reachable when
+aerial imagery is unavailable, not offered as a free choice on every
+Property — correct per #6's own "What to build" text ("a gardener *without
+usable aerial imagery* can instead..."), not a gap.
+
+Full monorepo typecheck and test suite are green (173 domain + 64 mobile +
+147 web tests) — but **all of this is Konva-canvas UI that the test suite
+stubs out entirely** (same standing limitation `BedEditor`/`PlantingMap`
+have had since #7/#8), so none of it has actually been looked at in a real
+browser. **Not committed** — 22 files sitting in the working tree
+(`git status -sb` for the exact list); the user chose to review by hand
+before committing rather than have the agent session commit it blind.
+
+**Manual QA checklist for whoever resumes** (none of this has been run
+yet):
+1. **Highest priority — the coordinate-space fix, watched live, not just
+   reasoned through.** On a Property with no aerial imagery: upload a plot
+   plan photo, click two points, enter a real distance, save. Confirm the
+   photo renders behind the Bed-drawing canvas undistorted, then draw a Bed
+   and check its size is plausible against a distance you actually know
+   (e.g. a Bed that should read ~5ft against a 25ft-calibrated wall should
+   look like ~5ft, not ~3ft or ~8ft — that exact ratio is what the
+   512-vs-768 bug got wrong). Repeat for "Draw a base plan" (click-to-place
+   multi-line) instead of a photo. Then place a Planting Pin against that
+   same calibrated base map and confirm it resolves into the right Bed.
+2. **Regression check on existing aerial Properties** — the refactor moved
+   aerial-tile rendering and scale computation through new shared code
+   (`BaseMapBackground`, `pixelsPerFootForProperty`). Open an existing
+   aerial Property's Bed editor and confirm tiles still render correctly
+   behind the Konva canvas and a newly-drawn Bed is sized/positioned
+   exactly as before; confirm `PlantingMap` still places/drags Pins and
+   resolves them into Beds; confirm the always-visible 512px aerial
+   thumbnail on the main Property page is unchanged.
+3. **Cosmetic** — the degraded-mode message now reads "Add a base map
+   another way below" with two new buttons, replacing the old "will cover
+   this case in a later ticket" placeholder.
+
+**When resuming**: `npm run db:push` first (migration `0017` isn't live
+yet), then `npm run dev --workspace apps/web`, then work the checklist
+above against the real linked Supabase project — same fresh-throwaway-
+account pattern every prior ticket's QA has used. If it all looks right,
+commit (files listed via `git status -sb`), close #6, and re-run the
+frontier query.
+
+---
+
+**#10 (Registry view) is implemented, code-reviewed, fully tested, and
+committed (`029fc9c`), but has zero manual/visual verification yet — the
+user can't QA right now, so this is queued as their next-time to-do.** A
+gardener can filter/search the full Plant list by name, flower color,
+bloom month, sun/shade, foliage type, and native status — all combinable
+— via `filterRegistryEntries` in `packages/domain/src/registry.ts`, and
+jump from any Registry entry with a Planting straight to that Planting's
+details on the map via a new `?plantingId=` query param `PropertyPage`/
+`PlantingMap` read on load. Domain-logic test matches the ticket's own
+acceptance criterion (combined-axis filtering). Full monorepo typecheck
+and test suite green (182 domain + 64 mobile + 157 web) — verified both
+normally and in an isolated disposable worktree, since this session's
+working tree already had ticket #6 sitting uncommitted in some of the
+same files (`PlantingMap.tsx`, `PropertyPage.tsx`, `domain/index.ts`);
+`029fc9c` contains only #10's changes, layered cleanly on top of true
+`HEAD`, not on top of #6's pending work. A parallel `/code-review` pass
+(5 finder angles) caught and fixed one real bug before this landed: the
+map's auto-select-from-Registry effect re-fired whenever the Plantings
+list changed reference for *any* reason (e.g. an unrelated Planting
+created elsewhere), silently reopening a details panel the gardener had
+just closed — fixed with a ref tracking which Planting id has already
+been auto-opened, plus a regression test. Also extracted three small
+helpers this ticket's new code duplicated from existing files
+(`MONTH_NAMES`, `formatOption`, `plantLabel`) into shared modules, and
+memoized the Registry's Plant-to-Planting-locations lookup to avoid an
+O(plants × plantings) rescan on every render/keystroke.
+
+**Not pushed to `origin/main` yet** — `029fc9c` is the only commit ahead of
+`origin/main` (confirmed via `git log origin/main..HEAD`); everything
+before it, including the prior update's #9/#22 work, was already pushed by
+the time this session started.
+
+**Manual QA checklist for whoever resumes** (none of this has been run
+yet — see "Deferred QA (ticket #10)" below for the full list):
+1. Filter/search, alone and combined, against real Plant data.
+2. The Planting-location map link — opens the right Planting
+   automatically, including a Plant with multiple Plantings and a Plant
+   with none.
+3. Degraded states — no Property/Beds yet, a `?plantingId=` for a since-
+   deleted Planting.
+4. Phone-width layout and cross-browser (Safari/WebKit) — this repo's
+   history has real instances of both classes of bug slipping past desktop-
+   Chromium-only checks (#9's phone-width chart, #5's WebKit-only dropdown
+   bug).
+
+---
+
 **#9 (Bloom Timeline) is implemented, fully manually verified by the user,
 closed on GitHub, and pushed to the remote.** A gardener can view a
 year-view horizontal bar chart
@@ -639,6 +769,42 @@ risk this doc keeps flagging while it was in progress: this repo's working
 tree is shared by more than one session, so `git status` before any broad
 `git add`.
 
+### Deferred QA (ticket #10)
+
+Not run yet — the user couldn't QA this session, so this is queued as
+their own to-do for next time, against the real linked Supabase project
+in a real browser:
+
+1. **Filter/search — the core acceptance criterion.** With several real
+   Plants covering a mix of sun requirements, flower colors, bloom
+   windows, foliage types, and native status: try each filter axis alone
+   (partial common name, scientific name, and cultivar for search; a
+   flower-color substring; bloom month; sun/shade; foliage; native
+   status), then combine 2-3 at once and confirm the result is the
+   intersection, not the union. Clear back to no filters and confirm the
+   full list returns. Search for something matching nothing and confirm
+   "No Plants match these filters." appears rather than a blank list that
+   looks broken.
+2. **Planting-location links — the map jump.** Pick a Plant with a real
+   Planting and confirm a "View in \<Bed name> on the map" link appears
+   under it; click it and confirm `/map` loads with that Planting's
+   details panel (quantity, year, source, photo log) open automatically,
+   with no need to hunt for its Pin. Close the panel, navigate back to the
+   Registry, and click the same link again — confirm it reopens (exercises
+   the ref-guard `/code-review` added, which should reset because
+   `PropertyPage` remounts on navigation). A Plant planted in **more than
+   one** Bed should show multiple links, each opening the correct
+   Planting. A Plant with **no** Planting yet should show no map link.
+3. **Degraded/edge states.** Before any Property/Beds exist: confirm the
+   Registry still loads and filters normally, just with no map links
+   anywhere. A `?plantingId=` naming a since-deleted Planting: confirm the
+   map just loads normally with no panel and no crash.
+4. **Cosmetic.** Phone-width viewport with all six filter fields plus the
+   existing list — check nothing looks cramped or broken (Bloom Timeline's
+   #9 QA found a real phone-width bug here). Cross-browser (Safari/
+   WebKit) — this repo's history (#5's dropdown bug) has found real
+   WebKit-only rendering gaps Chromium alone misses.
+
 ### Deferred QA (ticket #5) — all done, #5 closed
 
 Ticket #5's Edge Function and migrations were verified via `npx supabase
@@ -810,24 +976,35 @@ Domain glossary: `CONTEXT.md`
 
 ## Current state
 
-**Working tree is not clean** — a concurrent session has in-progress,
-uncommitted work sitting in it (`apps/web/src/property/BaseMapBackground.tsx`,
-`BaseMapSetup.tsx`/`.test.tsx`, `packages/domain/src/scaleReference.ts`/
-`.test.ts`, `supabase/migrations/0017_property_base_map.sql`, plus
-modifications to `BedEditor`/`PlantingMap`/`PropertiesRepositoryContext`/
-`propertiesRepository`/`property.ts` and a few route files) — almost
-certainly ticket #6 (Property: photographed/in-app-drawn base map + Scale
-Reference), **not touched, reviewed, or committed by this session**. Leave
-it alone; `git status -sb` before any broad `git add` remains essential,
-same standing warning this doc keeps repeating.
+**Working tree is not clean** — ticket #6 (Property: photographed/in-app-
+drawn base map + Scale Reference) sits fully implemented and code-reviewed
+but entirely uncommitted (22 files — `git status -sb` for the exact list).
+See the ⏸ #6 entry at the very top of "What to do next" for full detail,
+the real bug its code review caught and fixed (a Scale Reference
+coordinate-space mismatch), and the manual-QA checklist still to run before
+it can be committed and closed. If you're a different session: leave it
+alone; `git status -sb` before any broad `git add` remains essential, same
+standing warning this doc keeps repeating. **A later session implemented
+and committed #10 (Registry view, `029fc9c`) on top of this same working
+tree without disturbing #6** — since #6 had already touched some of the
+same files (`PlantingMap.tsx`, `PropertyPage.tsx`, `domain/index.ts`),
+that session staged only #10's changes on top of true `HEAD` (verified in
+an isolated disposable worktree) before committing, so #6's 22 files are
+still exactly as uncommitted as before. #10 itself now needs its own
+manual QA — see its "What to do next" entry and "Deferred QA (ticket
+#10)" above.
 
-`main` is 5 commits ahead of `origin/main`, all local-only as of this
-update (the 12 from the last update, spanning #9 and #22's native module
-commit `dc33e47`, were already pushed; this update adds 4 new #22 fix
-commits plus this doc's own #9-closure commit — **not yet pushed**, pending
-what's decided about closing #22, see above). Most recent commits first:
+**`main` is 1 commit ahead of `origin/main`** — confirmed directly via
+`git log origin/main..HEAD`. The prior update's text here claimed several
+more commits were still local-only (pending the #22-closure decision), but
+that's stale: a concurrent session evidently pushed since, since only
+`029fc9c` (#10's implementation commit, this update) shows as unpushed
+now. Don't trust this doc's "ahead of origin" claims over `git log
+origin/main..HEAD` run fresh — this is at least the second time it's
+drifted. Most recent commits first:
 
 ```
+029fc9c Add Registry view: filter/search and Planting-location links (#10)
 83565dc Document the Xcode/Metro dev-client workflow and a real signing dead-end (#22)
 675ea1f Show the signed-in account's email on both Dashboards
 b75dafd Tag Scan: add Cancel navigation and style the "Look up species" button (#22)
@@ -937,8 +1114,9 @@ via `npx supabase migration list`); #8 needed no Edge Function (Planting
 touches no external adapter). **All of this session's commits, including
 #9's, have now been pushed to the GitHub remote** — confirmed via `git log
 origin/main..HEAD` returning empty. The remaining tickets (#6, #10, #11,
-#12, #14–#18) are still unbuilt or unverified — #6, #10, #14, and #17 are
-genuine frontier work (see "Issue tracker" below for the full dependency
+#12, #14–#18) are still unbuilt or unverified — #14 and #17 are genuine
+frontier work; #6 and #10 are each implemented and committed but pending
+manual QA, not frontier (see "Issue tracker" below for the full dependency
 detail); #11, #12, #15, #16, and #18 each still need at least one other
 still-open ticket; #21 (filed during #4's QA) is `needs-triage`; #22's
 status needs a direct GitHub check per the note above.
@@ -1096,11 +1274,11 @@ Ticket map (dependency order; title abbreviated):
 | 3 | Plant record CRUD (manual entry) — built, `9018f33`, closed | 2 |
 | 4 | Care task templates on Plant — built, `4eea9e7`–`8ce7a48`, closed | 3 |
 | 5 | Property + aerial base map — built, `1380351`–`3b7fa07`, closed | 2 |
-| 6 | Property: photographed/in-app-drawn base map + Scale Reference — **frontier, unblocked** | 5 |
+| 6 | Property: photographed/in-app-drawn base map + Scale Reference — implemented + code-reviewed, **uncommitted, pending manual QA** (see "What to do next") | 5 |
 | 7 | Bed drawing (desktop) — built, `6173a57`, closed | 5 |
 | 8 | Planting: create + place Pin, view on tap — built, `3041ca3`, closed | 3, 7 |
 | 9 | Bloom Timeline — built and verified, `08d3851`–`24cf78e`, closed | 3, 8 |
-| 10 | Registry view — **frontier, unblocked** | 3, 8 |
+| 10 | Registry view — implemented, code-reviewed, committed `029fc9c`, **not yet closed** (pending manual QA — see "What to do next") | 3, 8 |
 | 11 | Dashboard (real content) | 7, 8, 9, 10 |
 | 12 | Task completion logging, history, one-off todos | 4, 8, 11 |
 | 13 | React Native app scaffold + auth — built and verified, `7ff1943`–`7d28ab0`, closed | 2 |
@@ -1116,9 +1294,14 @@ Ticket map (dependency order; title abbreviated):
 
 **Frontier query**: open issues with `issue_dependencies_summary.blocked_by
 == 0` and no assignee. #2, #3, #4, #5, #7, #8, #9, #13, and #19 are closed.
-**#6** and **#10** still have `blocked_by == 0` and are genuine frontier
-work — `ready-for-agent`, unassigned, not previously built (unchanged by
-#9's closure). **#9 has closed** (user-confirmed manual QA, `gh issue
+**#10** still has `blocked_by == 0` but is now deliberately excluded from
+the frontier, same posture as #6/#20 below — it's implemented, code-
+reviewed, tested, and committed (`029fc9c`), awaiting manual QA before it
+can close (see "What to do next" and "Deferred QA (ticket #10)" above),
+not unstarted work. **#6** also has `blocked_by == 0` but is likewise
+excluded from the frontier — it's implemented and code-reviewed, awaiting
+manual QA and a commit (see "What to do next"
+above), not unstarted work. **#9 has closed** (user-confirmed manual QA, `gh issue
 close`, and pushed — see "What to do next"), which newly unblocks **#17**
 (Native: Bloom Timeline, which needed #9 and #13, #13 already closed) —
 confirmed `blocked_by: 0` directly against the API. **#14** (Native: Map
@@ -1136,11 +1319,16 @@ work. **#22** also has `blocked_by == 0` but is `ready-for-human`, not
 check it directly before assuming it's done, since a concurrent session may
 have touched it since this doc was last updated. **#15**/**#16** (each
 blocked by #13 plus one other still-open ticket) remain non-frontier — #15
-needs #6 (still open), #16 needs #10 (frontier, but not yet built).
+needs #6 (still open), #16 needs #10 (implemented but not yet closed —
+same reasoning as #6/#20/#22 elsewhere in this doc: `blocked_by` looks at
+GitHub issue state, not code-review/commit state, so a downstream ticket
+naming a not-yet-closed blocker still isn't frontier even once that
+blocker's code exists).
 
-So the frontier as of this update is: **#6**, **#10**, **#14**, and
-**#17** — all `blocked_by: 0`, unassigned, confirmed directly against the
-API.
+So the frontier as of this update is: **#14** and **#17** — both
+`blocked_by: 0`, unassigned, confirmed directly against the API. **#6**
+and **#10** are both excluded (each implemented, pending QA — see "What to
+do next" above), same posture **#20**/**#22** had before they closed.
 
 ---
 
@@ -1149,12 +1337,12 @@ API.
 - **`/implement`** — the pattern used for every ticket so far. Run once per
   ticket, fresh session each time, pointed at a ticket number. Drives `/tdd`
   internally, closes with `/code-review`. Don't run `/to-tickets` again —
-  tickets #2–#20 are already published. **#6, #10, #14, and #17 are
-  frontier now** (see "Issue tracker" above) — any is a natural next
-  `/implement` target. #20 still needs a deferred-QA/deploy pass to
-  actually close, and #22 needs the Mac/Apple Developer account/iPhone it
-  requires (though check its actual state first — see the frontier-query
-  note above).
+  tickets #2–#20 are already published. **#14 and #17 are frontier now**
+  (see "Issue tracker" above) — either is a natural next `/implement`
+  target. **#6 and #10 are each implemented but not frontier** — resume
+  their manual QA checklists (see "What to do next" and "Deferred QA"
+  above) rather than re-implementing either. #20 still needs a
+  deferred-QA/deploy pass to actually close.
 - ~~`/prototype` — what #19 actually is~~ — done; see the #19 entry in "What
   to do next" above and `docs/adr/0004-tag-scan-ocr-placement-and-usda-adapter.md`.
 - **`/codebase-design`** — for module structure once ticket-writing starts,
