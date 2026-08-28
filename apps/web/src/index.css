@@ -172,7 +172,7 @@ form fieldset .date-pair + .date-pair {
   border-top: 1px solid var(--border);
 }
 
-form [role='alert'] {
+[role='alert'] {
   margin-top: 4px;
   color: var(--danger);
   font-size: 15px;
