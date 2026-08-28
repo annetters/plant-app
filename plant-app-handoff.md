@@ -1,11 +1,51 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-27
+**Date:** 2026-08-27 (updated: #10 closed)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
+
+**#10 (Registry view) has now been manually QA'd by the user directly (not
+Playwright) against the real linked Supabase project, all four deferred QA
+items pass, and it's closed on GitHub** — see the closing comment on the
+issue for the full detail. Real QA surfaced three genuine UX/layout gaps,
+all fixed and committed (`37438dc`, on top of the original `029fc9c`):
+a filter match was invisible in the results (only common/scientific name
+shown, no way to see *why* something matched without trusting the filter
+logic blind) — fixed by showing each Plant's matching attributes (flower
+color, bloom window, sun/shade, foliage, native status) inline, extracting
+a shared `formatMonthDay` out of `BloomTimelinePage.tsx` into
+`apps/web/src/monthDay.ts` along the way; the "View in \<Bed> on the map"
+link read as a disconnected, unrelated list floating below its Plant
+(inherited `main ul`'s generic top-level list spacing with nothing
+grouping it under its Plant) — fixed with a scoped, indented style; and the
+filter fieldset's six fields stacked jaggedly at phone width, root-caused
+to the fieldset layout CSS being scoped to `form fieldset` while the
+Registry's filter fieldset has no `<form>` (nothing to submit) — broadened
+the fieldset/label/input CSS to apply regardless of a `<form>` wrapper, and
+grouped each field into its own `<div>` (the same technique the Plant
+form's date-range pairs already use) so flex-wrap can't split a label from
+its control. Full monorepo typecheck and test suite green throughout (186
+domain + 64 mobile + 165 web).
+
+Also recorded in `CLAUDE.md` this session (`a58e6b7`): before starting a
+QA pass, check with the user whether *they* want to run it or want it
+Playwright-automated — don't assume automation. (A previous instruction in
+this same doc already covers the adjacent "check with me first before
+starting work" case; this is the QA-specific corollary.)
+
+**#10's closure newly unblocks #11 (Dashboard, real content) and #16
+(Native: Registry view)** — confirmed directly against the API
+(`blocked_by: 0`, unassigned, on both). #11 needed #7/#8/#9/#10, all now
+closed. #16 needed #10 and #13, both now closed. **#14** and **#17** were
+already frontier (see below) and remain unaffected by #10's closure.
+
+**Pushed to `origin/main`** — `git log origin/main..HEAD` is empty as of
+this update, confirmed directly.
+
+---
 
 **#6 (Property: photographed/in-app-drawn base map + Scale Reference) is
 implemented, manually verified end-to-end against the real linked Supabase
@@ -947,33 +987,25 @@ Domain glossary: `CONTEXT.md`
 
 ## Current state
 
-**Working tree is clean** as of this update. Ticket #6 (Property:
-photographed/in-app-drawn base map + Scale Reference) sat fully
-implemented and code-reviewed but entirely uncommitted for several
-updates; a later session first implemented and committed #10 (Registry
-view, `029fc9c`) on top of that same dirty working tree without disturbing
-#6 — since #6 had already touched some of the same files
-(`PlantingMap.tsx`, `PropertyPage.tsx`, `domain/index.ts`), that session
-staged only #10's changes on top of true `HEAD` (verified in an isolated
-disposable worktree) before committing. The user then explicitly
-authorized committing #6 too, on the condition that this doc's manual-QA
-checklist for it stays intact — done (`6f891ff`), plus one small follow-up
-fix (`3b38701`) to a #10 test fixture that only became a real typecheck
-failure once #6's `PropertyRow` extension was actually committed
-alongside it. **Neither #6 nor #10 has been manually verified yet** — see
-each ticket's own "What to do next" entry and "Deferred QA" section above
-for what's still outstanding. If you're a different session picking this
-up: the working tree being clean now doesn't mean everything's done —
-check "What to do next" before assuming so.
+**Working tree is clean** as of this update. **Both #6 and #10 have now
+been manually verified** (#6 in an earlier update this same day; #10 this
+update, by the user directly against the real dev server — not
+Playwright) and are closed on GitHub. #10's QA surfaced three real UX/
+layout gaps (invisible filter matches, a disconnected Planting-location
+link, jagged phone-width filter layout), all fixed and committed
+(`37438dc`). If you're a different session picking this up: the working
+tree being clean now doesn't mean everything's done — check "What to do
+next" before assuming so.
 
-**`main` is 3 commits ahead of `origin/main`** as of this update (`git log
-origin/main..HEAD`, confirmed directly) — `ffbc807`/`d6baeb3`/`70c8a9e`
-(this update's #6 QA-driven rework and fixes) are not yet pushed. Don't
-trust this doc's "ahead of origin" claims over `git log origin/main..HEAD`
-run fresh — it's drifted from reality more than once already. Most recent
-commits first:
+**Pushed to `origin/main`** — `git log origin/main..HEAD` is empty as of
+this update, confirmed directly. Don't trust this doc's "ahead of origin"
+claims over `git log origin/main..HEAD` run fresh — it's drifted from
+reality more than once already. Most recent commits first:
 
 ```
+37438dc Fix Registry (#10) QA findings: attribute visibility, link spacing, filter layout
+a58e6b7 Document QA-ownership check-in in CLAUDE.md
+293bfb9 Record #6's closure and #15's new frontier status in the handoff doc
 ffbc807 Fix two more UX issues found by live QA on #6: width cap, duplicate map
 d6baeb3 Fix two real bugs found by live QA on #6's up-front base-map choice
 70c8a9e Make #6's base-map source a free up-front choice, not just an aerial fallback
@@ -1074,13 +1106,12 @@ GitHub. #20 is implemented but **not yet closed on GitHub** — see "What to
 do next" above and its "Deferred QA"/deploy notes. **#22 is still open on
 GitHub, still labeled `ready-for-human`, still unassigned** (confirmed
 directly against the API right after #7 closed) — so despite `dc33e47`
-landing code, #22 evidently still needs the Mac/Apple Developer
-account/physical iPhone device-testing step this environment doesn't have;
-whoever picks this up next should read `dc33e47`'s diff before assuming
-it's a finished, tested module. **Update from a later session the same
-day**: that device-testing step is now genuinely underway — see the
-paused-session entry at the very top of "What to do next" for exactly
-where it stands and how to resume.
+landing code, #22 evidently still needed the Mac/Apple Developer
+account/physical iPhone device-testing step this environment doesn't have.
+**#22 has since been verified end-to-end on a real device and closed** —
+see its own "What to do next" entry above for the full detail (two real
+bugs found and fixed: the native module never actually linked into the
+compiled app, and no way to leave the Capture/Review screens once entered).
 #5's migrations (through `0008`) are pushed to the linked Supabase project
 and both its Edge Functions (`create-property`, `search-addresses`) are
 deployed; #7's migrations (`0011`/`0012`) are pushed; #20's migrations
@@ -1095,17 +1126,15 @@ to the remote before this update's rework of #6 started (a concurrent
 session had pushed it), so the rework's schema changes had to go in a
 fresh `0018` rather than amending `0017` in place, which Supabase's
 filename-based migration tracking would have silently ignored (see "What
-to do next" for the full story). **This update's own commits
-(`70c8a9e`/`d6baeb3`/`ffbc807`) are not yet pushed to the GitHub remote**
-— `git log origin/main..HEAD` shows 3 commits ahead, confirmed directly;
-everything before that is pushed. **#6 is now closed on GitHub.** The
-remaining tickets (#10, #11, #12, #14–#18) are still unbuilt or unverified
-— #10, #14, #15, #17, and #20 are genuine frontier work (#15 newly
-unblocked by #6's closure); #10 is implemented and committed but pending
-its own manual QA, not truly "unbuilt" (see "Issue tracker" below for the
-full dependency detail); #11, #12, #16, and #18 each still need at least
-one other still-open ticket; #21/#24/#25 are `needs-triage`; #22's status
-needs a direct GitHub check per the note above.
+to do next" for the full story). **Everything through this update's own
+commits is pushed to the GitHub remote** — `git log origin/main..HEAD` is
+empty, confirmed directly. **#6, #10, and #22 are all now closed on
+GitHub.** The remaining tickets (#11, #12, #14, #16–#18) are still
+unbuilt or unverified — #11, #14, #16, and #17 are genuine frontier work
+(#11 and #16 newly unblocked by #10's closure this update); #12 and #18
+each still need at least one other still-open ticket; #20 is built but
+deliberately excluded from the frontier pending its own deploy/QA pass;
+#21/#23/#24/#25 are `needs-triage`.
 
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
 > No GPS is read and no user photo is taken — that is exactly why the work was
@@ -1264,13 +1293,13 @@ Ticket map (dependency order; title abbreviated):
 | 7 | Bed drawing (desktop) — built, `6173a57`, closed | 5 |
 | 8 | Planting: create + place Pin, view on tap — built, `3041ca3`, closed | 3, 7 |
 | 9 | Bloom Timeline — built and verified, `08d3851`–`24cf78e`, closed | 3, 8 |
-| 10 | Registry view — implemented, code-reviewed, committed `029fc9c`, **not yet closed** (pending manual QA — see "What to do next") | 3, 8 |
-| 11 | Dashboard (real content) | 7, 8, 9, 10 |
+| 10 | Registry view — built and verified, `029fc9c`/`37438dc`, closed | 3, 8 |
+| 11 | Dashboard (real content) — **frontier, unblocked** | 7, 8, 9, 10 |
 | 12 | Task completion logging, history, one-off todos | 4, 8, 11 |
 | 13 | React Native app scaffold + auth — built and verified, `7ff1943`–`7d28ab0`, closed | 2 |
 | 14 | Native: Map view — **frontier, unblocked** | 8, 13 |
 | 15 | Native: Scale Reference calibration | 6, 13 |
-| 16 | Native: Registry view | 10, 13 |
+| 16 | Native: Registry view — **frontier, unblocked** | 10, 13 |
 | 17 | Native: Bloom Timeline | 9, 13 |
 | 18 | Native: Plant/Planting detail, tasks & todos | 3, 8, 12, 13 |
 | 19 | Tag Scan prototype: OCR placement + USDA data pull — done, `36da29d`/`9718f91`, closed | — |
@@ -1282,41 +1311,28 @@ Ticket map (dependency order; title abbreviated):
 | 25 | PlantingMap: hide the map canvas until a Bed exists (filed during #6 QA, `needs-triage`) | 8 |
 
 **Frontier query**: open issues with `issue_dependencies_summary.blocked_by
-== 0` and no assignee. #2, #3, #4, #5, #6, #7, #8, #9, #13, and #19 are
-closed. **#10** still has `blocked_by == 0` but is deliberately excluded
-from the frontier, same posture as #20 below — it's implemented, code-
-reviewed, tested, and committed (`029fc9c`), awaiting manual QA before it
-can close (see "What to do next" and "Deferred QA (ticket #10)" above),
-not unstarted work. **#6 has closed** (real manual QA against the real
-Supabase project, `gh issue close`, this update — see "What to do next"),
-which newly unblocks **#15** (Native: Scale Reference calibration, which
-needed #6 and #13, #13 already closed) — confirmed `blocked_by: 0`
-directly against the API. **#9's earlier closure** unblocked **#17**
-(Native: Bloom Timeline, needed #9 and #13) — confirmed `blocked_by: 0`.
-**#14** (Native: Map view) remains frontier from #8's earlier closure
-(needed #8 and #13, both closed). **#11** (Dashboard) still needs #10 in
-addition to #7/#8/#9 (now all closed) — confirmed `blocked_by: 1` directly
-against the API, so it's not frontier yet. **#12** (Task completion
-logging) still needs #11 in addition to #4/#8, so it's not frontier
-either. **#18** (Native: Plant/Planting detail) still needs #12, so it's
-not frontier. **#20** has `blocked_by == 0` but is deliberately excluded
-from the frontier — it's built and awaiting closure (specifically,
-deploying `usda-plant-traits` and a real-device manual QA pass — see "What
-to do next" above), not unstarted work. **#22** also has `blocked_by ==
-0` but is `ready-for-human`, not `ready-for-agent`, so it's excluded the
-same way #21/#23/#24/#25 are (`needs-triage`) — check it directly before
-assuming it's done, since a concurrent session may have touched it since
-this doc was last updated. **#16** (blocked by #13 plus #10) remains
-non-frontier — #10 is implemented but not yet closed (same reasoning as
-#10/#20/#22 elsewhere in this doc: `blocked_by` looks at GitHub issue
-state, not code-review/commit state, so a downstream ticket naming a
-not-yet-closed blocker still isn't frontier even once that blocker's code
-exists).
+== 0` and no assignee. #2, #3, #4, #5, #6, #7, #8, #9, #10, #13, #19, and
+#22 are closed (**#10 closed this update** — real manual QA, run by the
+user directly, not Playwright — see "What to do next" above). **#10's
+closure newly unblocks #11** (Dashboard, needed #7/#8/#9/#10, all now
+closed) **and #16** (Native: Registry view, needed #10 and #13, both now
+closed) — both confirmed `blocked_by: 0` directly against the API. **#14**
+(Native: Map view) and **#17** (Native: Bloom Timeline) remain frontier
+from earlier closures (#8+#13 and #9+#13 respectively, all closed). **#12**
+(Task completion logging) still needs #11 (now frontier but not yet
+closed) in addition to #4/#8 — confirmed `blocked_by: 1` directly against
+the API, so it's not frontier yet. **#18** (Native: Plant/Planting detail)
+still needs #12, so it's not frontier either — confirmed `blocked_by: 1`.
+**#20** has `blocked_by == 0` but is deliberately excluded from the
+frontier — it's built and awaiting closure (specifically, deploying
+`usda-plant-traits` and a real-device manual QA pass — see "What to do
+next" above), not unstarted work. **#21**/**#23**/**#24**/**#25** are
+`needs-triage`, excluded the same way.
 
-So the frontier as of this update is: **#14** and **#17** — both
-`blocked_by: 0`, unassigned, confirmed directly against the API. **#6**
-and **#10** are both excluded (each implemented, pending QA — see "What to
-do next" above), same posture **#20**/**#22** had before they closed.
+So the frontier as of this update is: **#11**, **#14**, **#16**, and
+**#17** — all `blocked_by: 0`, unassigned, confirmed directly against the
+API. **#20** remains excluded (implemented, awaiting its own deploy/QA
+pass — see "What to do next" above).
 
 ---
 
@@ -1325,12 +1341,12 @@ do next" above), same posture **#20**/**#22** had before they closed.
 - **`/implement`** — the pattern used for every ticket so far. Run once per
   ticket, fresh session each time, pointed at a ticket number. Drives `/tdd`
   internally, closes with `/code-review`. Don't run `/to-tickets` again —
-  tickets #2–#20 are already published. **#14 and #17 are frontier now**
-  (see "Issue tracker" above) — either is a natural next `/implement`
-  target. **#6 and #10 are each implemented but not frontier** — resume
-  their manual QA checklists (see "What to do next" and "Deferred QA"
-  above) rather than re-implementing either. #20 still needs a
-  deferred-QA/deploy pass to actually close.
+  tickets #2–#20 are already published. **#11, #14, #16, and #17 are
+  frontier now** (see "Issue tracker" above) — any is a natural next
+  `/implement` target. #20 still needs a deferred-QA/deploy pass to
+  actually close. **Before starting a QA pass on any ticket, check with the
+  user whether they want to run it themselves or want it Playwright-
+  automated** — don't assume (see `CLAUDE.md`).
 - ~~`/prototype` — what #19 actually is~~ — done; see the #19 entry in "What
   to do next" above and `docs/adr/0004-tag-scan-ocr-placement-and-usda-adapter.md`.
 - **`/codebase-design`** — for module structure once ticket-writing starts,
