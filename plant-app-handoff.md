@@ -1,11 +1,46 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-27 (updated: #10 closed)
+**Date:** 2026-08-27 (updated: #11 closed)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
+
+**#11 (Dashboard, real content) is implemented, manually QA'd by the user
+directly against the dev server (not Playwright), and closed on GitHub** —
+see commit `8bd93e5` and the closing comment on the issue for full detail.
+Both acceptance criteria turned out to already be structurally met by
+#7/#8/#9/#10: each of those tickets landed its own real page and updated
+the Dashboard's routing as it went, so by the time #10 closed, Map,
+Registry, and Bloom Timeline were already routing to real content rather
+than a placeholder — and the task/todo-list criterion is vacuously true
+since #12 (which would add them) isn't built yet. The actual work this
+ticket did was finishing that migration for real: removed the now-dead
+`ComingSoonPage`/`ROUTED_TILE_IDS` fallback-route mechanism (T1's original
+placeholder scaffolding), since every Dashboard tile now has a real route
+and the fallback generator produced zero routes — pure dead code by the
+time this ticket picked it up. A `/code-review` pass caught a real
+regression risk in that removal: deleting the fallback generator also
+silently removed the app's only safety net for any future unrouted path
+(would have rendered blank instead of a message) — fixed by adding a
+small, tested catch-all `NotFoundPage` + `path="*"` route to cover that
+case going forward. QA'd manually by the user: all three Dashboard links
+work, and the new 404 page shows correctly for a bad URL both logged-in
+and logged-out (including "Back to Dashboard" correctly bouncing a
+logged-out visitor to the login page). Full monorepo typecheck and test
+suite green throughout (186 domain + 64 mobile + 166 web).
+
+**#11's closure newly unblocks #12 (Task completion logging)** — confirmed
+directly against the API (`blocked_by: 0`, unassigned). **#18** (Native:
+Plant/Planting detail) still needs #12 in addition to #3/#8/#13, so it's
+not frontier yet — confirmed `blocked_by: 1`. **#14, #16, #17** remain
+frontier, unaffected by #11's closure.
+
+**Pushed to `origin/main`** — `git log origin/main..HEAD` is empty as of
+this update, confirmed directly.
+
+---
 
 **#10 (Registry view) has now been manually QA'd by the user directly (not
 Playwright) against the real linked Supabase project, all four deferred QA
@@ -987,15 +1022,17 @@ Domain glossary: `CONTEXT.md`
 
 ## Current state
 
-**Working tree is clean** as of this update. **Both #6 and #10 have now
-been manually verified** (#6 in an earlier update this same day; #10 this
-update, by the user directly against the real dev server — not
-Playwright) and are closed on GitHub. #10's QA surfaced three real UX/
-layout gaps (invisible filter matches, a disconnected Planting-location
-link, jagged phone-width filter layout), all fixed and committed
-(`37438dc`). If you're a different session picking this up: the working
-tree being clean now doesn't mean everything's done — check "What to do
-next" before assuming so.
+**Working tree is clean** as of this update. **#6, #10, and #11 have now
+all been manually verified** (#6 and #10 in earlier updates this same
+day; #11 this update, by the user directly against the dev server — not
+Playwright) and are closed on GitHub. #11 turned out to need no new
+user-facing behavior (Map/Registry/Bloom Timeline were already routed to
+real pages by #7/#8/#9/#10) — its real work was removing the now-dead
+`ComingSoonPage` placeholder-routing mechanism and adding a tested
+catch-all `NotFoundPage` in its place, commit `8bd93e5`. If you're a
+different session picking this up: the working tree being clean now
+doesn't mean everything's done — check "What to do next" before assuming
+so.
 
 **Pushed to `origin/main`** — `git log origin/main..HEAD` is empty as of
 this update, confirmed directly. Don't trust this doc's "ahead of origin"
@@ -1003,6 +1040,7 @@ claims over `git log origin/main..HEAD` run fresh — it's drifted from
 reality more than once already. Most recent commits first:
 
 ```
+8bd93e5 Finish wiring Dashboard to real views, replace dead placeholder route (#11)
 37438dc Fix Registry (#10) QA findings: attribute visibility, link spacing, filter layout
 a58e6b7 Document QA-ownership check-in in CLAUDE.md
 293bfb9 Record #6's closure and #15's new frontier status in the handoff doc
@@ -1128,12 +1166,13 @@ fresh `0018` rather than amending `0017` in place, which Supabase's
 filename-based migration tracking would have silently ignored (see "What
 to do next" for the full story). **Everything through this update's own
 commits is pushed to the GitHub remote** — `git log origin/main..HEAD` is
-empty, confirmed directly. **#6, #10, and #22 are all now closed on
-GitHub.** The remaining tickets (#11, #12, #14, #16–#18) are still
-unbuilt or unverified — #11, #14, #16, and #17 are genuine frontier work
-(#11 and #16 newly unblocked by #10's closure this update); #12 and #18
-each still need at least one other still-open ticket; #20 is built but
-deliberately excluded from the frontier pending its own deploy/QA pass;
+empty, confirmed directly. **#6, #10, #11, and #22 are all now closed on
+GitHub.** The remaining tickets (#12, #14, #16–#18) are still unbuilt or
+unverified — #12, #14, #16, and #17 are genuine frontier work (#12 newly
+unblocked by #11's closure this update, #16 by #10's closure earlier
+today); #18 still needs at least one other still-open ticket (#12); #20
+is built but deliberately excluded from the frontier pending its own
+deploy/QA pass;
 #21/#23/#24/#25 are `needs-triage`.
 
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
@@ -1294,8 +1333,8 @@ Ticket map (dependency order; title abbreviated):
 | 8 | Planting: create + place Pin, view on tap — built, `3041ca3`, closed | 3, 7 |
 | 9 | Bloom Timeline — built and verified, `08d3851`–`24cf78e`, closed | 3, 8 |
 | 10 | Registry view — built and verified, `029fc9c`/`37438dc`, closed | 3, 8 |
-| 11 | Dashboard (real content) — **frontier, unblocked** | 7, 8, 9, 10 |
-| 12 | Task completion logging, history, one-off todos | 4, 8, 11 |
+| 11 | Dashboard (real content) — built and verified, `8bd93e5`, closed | 7, 8, 9, 10 |
+| 12 | Task completion logging, history, one-off todos — **frontier, unblocked** | 4, 8, 11 |
 | 13 | React Native app scaffold + auth — built and verified, `7ff1943`–`7d28ab0`, closed | 2 |
 | 14 | Native: Map view — **frontier, unblocked** | 8, 13 |
 | 15 | Native: Scale Reference calibration | 6, 13 |
@@ -1311,25 +1350,23 @@ Ticket map (dependency order; title abbreviated):
 | 25 | PlantingMap: hide the map canvas until a Bed exists (filed during #6 QA, `needs-triage`) | 8 |
 
 **Frontier query**: open issues with `issue_dependencies_summary.blocked_by
-== 0` and no assignee. #2, #3, #4, #5, #6, #7, #8, #9, #10, #13, #19, and
-#22 are closed (**#10 closed this update** — real manual QA, run by the
-user directly, not Playwright — see "What to do next" above). **#10's
-closure newly unblocks #11** (Dashboard, needed #7/#8/#9/#10, all now
-closed) **and #16** (Native: Registry view, needed #10 and #13, both now
-closed) — both confirmed `blocked_by: 0` directly against the API. **#14**
-(Native: Map view) and **#17** (Native: Bloom Timeline) remain frontier
-from earlier closures (#8+#13 and #9+#13 respectively, all closed). **#12**
-(Task completion logging) still needs #11 (now frontier but not yet
-closed) in addition to #4/#8 — confirmed `blocked_by: 1` directly against
-the API, so it's not frontier yet. **#18** (Native: Plant/Planting detail)
-still needs #12, so it's not frontier either — confirmed `blocked_by: 1`.
+== 0` and no assignee. #2, #3, #4, #5, #6, #7, #8, #9, #10, #11, #13, #19,
+and #22 are closed (**#11 closed this update** — real manual QA, run by
+the user directly against the dev server, not Playwright — see "What to
+do next" above). **#11's closure newly unblocks #12** (Task completion
+logging, needed #4/#8/#11, all now closed) — confirmed `blocked_by: 0`
+directly against the API. **#14** (Native: Map view), **#16** (Native:
+Registry view), and **#17** (Native: Bloom Timeline) remain frontier from
+earlier closures. **#18** (Native: Plant/Planting detail) still needs #12
+(now frontier but not yet closed) in addition to #3/#8/#13 — confirmed
+`blocked_by: 1` directly against the API, so it's not frontier yet.
 **#20** has `blocked_by == 0` but is deliberately excluded from the
 frontier — it's built and awaiting closure (specifically, deploying
 `usda-plant-traits` and a real-device manual QA pass — see "What to do
 next" above), not unstarted work. **#21**/**#23**/**#24**/**#25** are
 `needs-triage`, excluded the same way.
 
-So the frontier as of this update is: **#11**, **#14**, **#16**, and
+So the frontier as of this update is: **#12**, **#14**, **#16**, and
 **#17** — all `blocked_by: 0`, unassigned, confirmed directly against the
 API. **#20** remains excluded (implemented, awaiting its own deploy/QA
 pass — see "What to do next" above).
@@ -1341,7 +1378,7 @@ pass — see "What to do next" above).
 - **`/implement`** — the pattern used for every ticket so far. Run once per
   ticket, fresh session each time, pointed at a ticket number. Drives `/tdd`
   internally, closes with `/code-review`. Don't run `/to-tickets` again —
-  tickets #2–#20 are already published. **#11, #14, #16, and #17 are
+  tickets #2–#20 are already published. **#12, #14, #16, and #17 are
   frontier now** (see "Issue tracker" above) — any is a natural next
   `/implement` target. #20 still needs a deferred-QA/deploy pass to
   actually close. **Before starting a QA pass on any ticket, check with the
