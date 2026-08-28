@@ -267,33 +267,31 @@ main:has(form) a {
  * reading as "not clickable" even though the click handler itself worked.
  */
 /*
- * Property's form container specifically gets more room than the generic
- * 420px caps (both `main:has(form)`'s and the plain `form` rule's — two
- * independent 420px ceilings, not one) — full geocoder results routinely
- * run street + city + county + state + postal code + country, cramped and
- * hard to read at the width every other form page uses. `.property-page`
- * (a class, not just `:has(form)`/`form` alone) wins on specificity over
- * both generic rules regardless of source order, so this doesn't need
- * `!important`. The form's own max-width is set to 100% rather than a
- * second hardcoded number, so the two stay in sync automatically.
+ * Property's page overrides `main:has(form)`'s 420px cap entirely — unlike
+ * every other form page, this one also holds the Bed/Planting drawing
+ * canvas (`STAGE_SIZE_PX`, 768px), a fixed-size visual widget that a text-
+ * readability cap only clips, not helps. `#root` (width: 1126px) is the
+ * only width bound left for this page; nothing here re-imposes a narrower
+ * one.
  */
 main.property-page {
   /*
    * `#root` is a flex column container, and `main:has(form)`'s own
    * `margin: 0 auto` (a plain block-centering idiom) suppresses flexbox's
-   * cross-axis stretch on auto-margined items — so bumping max-width
+   * cross-axis stretch on auto-margined items — so removing the max-width
    * alone doesn't widen anything; `main` still shrinks to its content's
    * size. `width: 100%` sidesteps that: the item is no longer auto-sized,
-   * so it fills available cross-axis space up to max-width, and the
-   * inherited `margin: 0 auto` still centers the leftover space evenly.
+   * so it fills all the way out to `#root`'s own bound.
    */
   width: 100%;
-  max-width: 640px;
+  max-width: none;
 }
 
-main.property-page form {
-  max-width: 100%;
-}
+/*
+ * The address form itself stays at the generic `form` rule's 420px —
+ * readability still applies to it even though the page around it doesn't
+ * cap width anymore (see the comment above `main.property-page`).
+ */
 
 main:has(form) .address-autocomplete {
   position: relative;

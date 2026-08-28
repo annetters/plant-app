@@ -4,7 +4,6 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { PlantingMap } from '../plantings/PlantingMap'
 import { AddressAutocomplete } from '../property/AddressAutocomplete'
-import { baseMapTiles, GRID_RADIUS } from '../property/baseMapTiles'
 import { BaseMapSetup } from '../property/BaseMapSetup'
 import { BedEditor } from '../property/BedEditor'
 import { usePropertiesRepository } from '../property/PropertiesRepositoryContext'
@@ -163,22 +162,6 @@ export function PropertyPage() {
             // a Property quietly pinned to the wrong place.
             <p>Matched to: {property.resolvedAddress}</p>
           )}
-          {property.imageryAvailable && (
-            <div
-              className="property-base-map"
-              style={{
-                display: 'grid',
-                gridTemplateColumns: `repeat(${GRID_RADIUS * 2 + 1}, 1fr)`,
-                gap: 0,
-                maxWidth: 512,
-              }}
-            >
-              {baseMapTiles(property).map((tile) => (
-                <img key={tile.key} src={tile.url} alt="Aerial base map imagery" />
-              ))}
-            </div>
-          )}
-
           {pixelsPerFootForProperty(property) !== null ? (
             <>
               <BedEditor property={property} onBedsChange={setBeds} />

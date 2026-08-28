@@ -237,10 +237,12 @@ describe('PropertyPage — existing Property', () => {
     expect(screen.queryByText(/Matched to/)).not.toBeInTheDocument()
   })
 
-  it('renders the base map imagery for an available property', async () => {
+  it('renders the base map imagery behind the Bed editor for an available property (no separate thumbnail)', async () => {
     renderPage(availableRow)
     expect(await screen.findByText('10 Main St, Cambridge, MA')).toBeInTheDocument()
-    const tiles = screen.getAllByRole('img')
+    // BaseMapBackground's tiles are decorative (alt=""), so they're excluded
+    // from the accessible "img" role — query the DOM directly instead.
+    const tiles = document.querySelectorAll('img')
     expect(tiles.length).toBeGreaterThan(0)
     expect(tiles[0]).toHaveAttribute(
       'src',
