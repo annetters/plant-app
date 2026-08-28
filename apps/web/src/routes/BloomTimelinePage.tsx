@@ -2,6 +2,7 @@ import type { Bed, BloomTimelineBar, Plant, Planting } from '@plant-app/domain'
 import { buildBloomTimelineBars, dayOfYear, filterBloomTimelineBarsByMonth } from '@plant-app/domain'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { formatMonthDay } from '../monthDay'
 import { MONTH_NAMES } from '../monthNames'
 import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
 import { usePlantingsRepository } from '../plantings/PlantingsRepositoryContext'
@@ -22,10 +23,6 @@ const MONTH_START_PERCENTAGES = MONTH_NAMES.map(
 )
 
 type BloomTimelineView = 'chart' | 'list'
-
-function formatMonthDay(value: { month: number; day: number }): string {
-  return `${MONTH_NAMES[value.month - 1]} ${value.day}`
-}
 
 /**
  * The year-view chart's horizontal track for one bar. A wrapping bloom

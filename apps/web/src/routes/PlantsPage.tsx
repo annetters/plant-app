@@ -10,6 +10,7 @@ import type {
 import { FOLIAGE_TYPES, NATIVE_STATUSES, SUN_REQUIREMENTS, filterRegistryEntries } from '@plant-app/domain'
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { formatMonthDay } from '../monthDay'
 import { MONTH_NAMES } from '../monthNames'
 import { formatOption } from '../plants/formatOption'
 import { plantLabel } from '../plants/plantLabel'
@@ -26,6 +27,24 @@ import { usePropertiesRepository } from '../property/PropertiesRepositoryContext
  * location(s) on the map — a secondary feature, so a failure loading them
  * doesn't block the primary Plant list or its search/filter.
  */
+/**
+ * The Plant fields the Registry's own filters match against, labeled so a
+ * filtered result visibly shows *why* it matched — without this, verifying
+ * a filter/search result against the underlying data means trusting the
+ * filter logic rather than seeing it.
+ */
+function plantAttributeLines(plant: Plant): string[] {
+  const lines: string[] = []
+  if (plant.flowerColor) lines.push(`Flower color: ${plant.flowerColor}`)
+  if (plant.bloomWindow) {
+    lines.push(`Blooms: ${formatMonthDay(plant.bloomWindow.start)} – ${formatMonthDay(plant.bloomWindow.end)}`)
+  }
+  if (plant.sunRequirement) lines.push(`Sun: ${formatOption(plant.sunRequirement)}`)
+  if (plant.foliageType) lines.push(`Foliage: ${formatOption(plant.foliageType)}`)
+  if (plant.nativeStatus) lines.push(`Native status: ${formatOption(plant.nativeStatus)}`)
+  return lines
+}
+
 export function PlantsPage() {
   const repository = usePlantsRepository()
   const propertiesRepository = usePropertiesRepository()
@@ -146,77 +165,89 @@ export function PlantsPage() {
           <fieldset>
             <legend>Filter</legend>
 
-            <label htmlFor="registry-search">Search</label>
-            <input
-              id="registry-search"
-              type="search"
-              placeholder="Name or cultivar"
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-            />
+            <div>
+              <label htmlFor="registry-search">Search</label>
+              <input
+                id="registry-search"
+                type="search"
+                placeholder="Name or cultivar"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+              />
+            </div>
 
-            <label htmlFor="registry-flower-color">Flower color</label>
-            <input
-              id="registry-flower-color"
-              value={flowerColor}
-              onChange={(event) => setFlowerColor(event.target.value)}
-            />
+            <div>
+              <label htmlFor="registry-flower-color">Flower color</label>
+              <input
+                id="registry-flower-color"
+                value={flowerColor}
+                onChange={(event) => setFlowerColor(event.target.value)}
+              />
+            </div>
 
-            <label htmlFor="registry-bloom-month">Bloom month</label>
-            <select
-              id="registry-bloom-month"
-              value={bloomMonth}
-              onChange={(event) => setBloomMonth(event.target.value)}
-            >
-              <option value="">Any month</option>
-              {MONTH_NAMES.map((name, index) => (
-                <option key={name} value={index + 1}>
-                  {name}
-                </option>
-              ))}
-            </select>
+            <div>
+              <label htmlFor="registry-bloom-month">Bloom month</label>
+              <select
+                id="registry-bloom-month"
+                value={bloomMonth}
+                onChange={(event) => setBloomMonth(event.target.value)}
+              >
+                <option value="">Any month</option>
+                {MONTH_NAMES.map((name, index) => (
+                  <option key={name} value={index + 1}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-            <label htmlFor="registry-sun-requirement">Sun/shade</label>
-            <select
-              id="registry-sun-requirement"
-              value={sunRequirement}
-              onChange={(event) => setSunRequirement(event.target.value as SunRequirement | '')}
-            >
-              <option value="">Any</option>
-              {SUN_REQUIREMENTS.map((value) => (
-                <option key={value} value={value}>
-                  {formatOption(value)}
-                </option>
-              ))}
-            </select>
+            <div>
+              <label htmlFor="registry-sun-requirement">Sun/shade</label>
+              <select
+                id="registry-sun-requirement"
+                value={sunRequirement}
+                onChange={(event) => setSunRequirement(event.target.value as SunRequirement | '')}
+              >
+                <option value="">Any</option>
+                {SUN_REQUIREMENTS.map((value) => (
+                  <option key={value} value={value}>
+                    {formatOption(value)}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-            <label htmlFor="registry-foliage-type">Foliage</label>
-            <select
-              id="registry-foliage-type"
-              value={foliageType}
-              onChange={(event) => setFoliageType(event.target.value as FoliageType | '')}
-            >
-              <option value="">Any</option>
-              {FOLIAGE_TYPES.map((value) => (
-                <option key={value} value={value}>
-                  {formatOption(value)}
-                </option>
-              ))}
-            </select>
+            <div>
+              <label htmlFor="registry-foliage-type">Foliage</label>
+              <select
+                id="registry-foliage-type"
+                value={foliageType}
+                onChange={(event) => setFoliageType(event.target.value as FoliageType | '')}
+              >
+                <option value="">Any</option>
+                {FOLIAGE_TYPES.map((value) => (
+                  <option key={value} value={value}>
+                    {formatOption(value)}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-            <label htmlFor="registry-native-status">Native status</label>
-            <select
-              id="registry-native-status"
-              value={nativeStatus}
-              onChange={(event) => setNativeStatus(event.target.value as NativeStatus | '')}
-            >
-              <option value="">Any</option>
-              {NATIVE_STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {formatOption(value)}
-                </option>
-              ))}
-            </select>
+            <div>
+              <label htmlFor="registry-native-status">Native status</label>
+              <select
+                id="registry-native-status"
+                value={nativeStatus}
+                onChange={(event) => setNativeStatus(event.target.value as NativeStatus | '')}
+              >
+                <option value="">Any</option>
+                {NATIVE_STATUSES.map((value) => (
+                  <option key={value} value={value}>
+                    {formatOption(value)}
+                  </option>
+                ))}
+              </select>
+            </div>
           </fieldset>
 
           {filteredPlants.length === 0 && <p>No Plants match these filters.</p>}
@@ -225,13 +256,17 @@ export function PlantsPage() {
             <ul className="plant-list">
               {filteredPlants.map((plant) => {
                 const locations = plantingsByPlantId.get(plant.id) ?? []
+                const attributeLines = plantAttributeLines(plant)
                 return (
                   <li key={plant.id}>
                     <Link to={`/registry/${plant.id}`}>
                       {plant.commonName} — <em>{plant.scientificName}</em>
                     </Link>
+                    {attributeLines.length > 0 && (
+                      <p className="plant-list-attributes">{attributeLines.join(' · ')}</p>
+                    )}
                     {locations.length > 0 && (
-                      <ul aria-label={`${plantLabel(plant)} Planting locations`}>
+                      <ul className="plant-list-locations" aria-label={`${plantLabel(plant)} Planting locations`}>
                         {locations.map((planting) => {
                           const bed = bedsById.get(planting.bedId)
                           return (

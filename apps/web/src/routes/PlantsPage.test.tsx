@@ -151,6 +151,16 @@ describe('PlantsPage — filters', () => {
     await userEvent.type(screen.getByLabelText('Flower color'), 'never-matches')
     expect(await screen.findByText('No Plants match these filters.')).toBeInTheDocument()
   })
+
+  it("shows each Plant's matching attributes, so a filter result is visibly verifiable rather than trusted blind", async () => {
+    renderPage({ plants: [CONEFLOWER, FERN] })
+    await screen.findByText(/Coneflower/)
+
+    expect(
+      screen.getByText('Flower color: purple-pink · Blooms: June 1 – August 15 · Sun: full sun'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Sun: full shade')).toBeInTheDocument()
+  })
 })
 
 describe('PlantsPage — Planting locations', () => {

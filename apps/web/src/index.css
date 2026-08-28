@@ -134,6 +134,23 @@ main ul.plant-list {
   padding-left: 24px;
 }
 
+.plant-list-attributes {
+  margin: 2px 0 0;
+  font-size: 15px;
+}
+
+/*
+ * Without this, a Plant's Planting-location links inherit `main ul`'s
+ * generic block-list spacing (8px margin, no indent) — the same as any
+ * unrelated top-level list — and read as a separate floating list rather
+ * than something nested under the Plant above it.
+ */
+.plant-list-locations {
+  margin: 2px 0 0;
+  padding-left: 16px;
+  font-size: 15px;
+}
+
 form {
   display: flex;
   flex-direction: column;
@@ -143,7 +160,15 @@ form {
   text-align: left;
 }
 
-form fieldset {
+/*
+ * Not scoped to `form fieldset` — the Registry's filter fieldset
+ * (PlantsPage) isn't inside a <form> (there's nothing to submit), so a
+ * form-scoped rule left it with no layout at all: labels and inputs wrapped
+ * raggedly with no consistent spacing, especially at phone width. Every
+ * fieldset in the app wants this same grouped-field styling regardless of
+ * whether it happens to sit inside a <form>.
+ */
+fieldset {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 16px;
@@ -159,17 +184,47 @@ form fieldset {
  * label from its input, with a divider between the start and end pairs so
  * the two halves of the range read as distinct groups.
  */
-form fieldset .date-pair {
+fieldset .date-pair {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 16px;
   width: 100%;
 }
 
-form fieldset .date-pair + .date-pair {
+fieldset .date-pair + .date-pair {
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
+}
+
+/*
+ * Mirrors `main:has(form) label`/`input,select` below, but scoped to
+ * `fieldset` instead of "a page that happens to contain a <form>" — the
+ * Registry's filter fieldset has no <form> anywhere on the page, so it was
+ * getting none of that styling: unblocked labels and unstyled native
+ * inputs/selects, free to sit side by side and wrap raggedly. No top
+ * margin on the label itself (unlike the form version) — the fieldset's
+ * own `gap` already spaces one field group from the next. Each field's
+ * label+control pair is also wrapped in its own <div> in the markup (see
+ * PlantsPage) so a flex-wrap break can't land between a label and its own
+ * control, the same technique `.date-pair` above uses.
+ */
+fieldset label {
+  display: block;
+  font-weight: 500;
+  color: var(--text-h);
+}
+
+fieldset input,
+fieldset select {
+  display: block;
+  margin-top: 4px;
+  padding: 8px 10px;
+  font: inherit;
+  color: inherit;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
 }
 
 [role='alert'] {
