@@ -1,92 +1,65 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-26
+**Date:** 2026-08-27
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
 
-**⏸ #6 (Property: photographed/in-app-drawn base map + Scale Reference) is
-implemented, code-reviewed, and committed (`6f891ff`), but still has zero
-manual/visual verification — resume here first.** A gardener without
-usable aerial imagery can upload a photographed plot plan/survey or draw a
-base plan directly in the app (multi-line, click-to-place points, mirroring
-the existing bezier-pen tool's click-based interaction), then calibrate its
-scale via Scale Reference — two clicked points plus a real-world distance,
-in either "known measurement" or "measured object" mode (CONTEXT.md: both
-modes reduce to the same underlying math). `derivePixelsPerFootFromScaleReference`
-+ `validateScaleReferenceInput` in `packages/domain/src/scaleReference.ts`
-(the ticket's own required domain-logic test); `Property` gained
-`baseMapSource`/`baseMapPhotoPath`/`baseMapDrawing`/`scaleReference` fields
-plus a `pixelsPerFootForProperty()` helper that unifies scale lookup across
-all three base-map sources (aerial/photo/drawn) — `BedEditor`/`PlantingMap`
-now key off that helper instead of aerial-only math, via a new shared
-`BaseMapBackground` component. New `BaseMapSetup.tsx` drives the fallback
-flow, wired into `PropertyPage` in place of the old "will cover this case
-in a later ticket" placeholder. New migration `0017_property_base_map.sql`
-(columns + a `property-base-map-photos` storage bucket + a
-`properties_base_map_source_consistent` CHECK constraint) — **not yet
-pushed** (`npm run db:push` needed before any of this is reachable against
-the real linked Supabase project).
+**#6 (Property: photographed/in-app-drawn base map + Scale Reference) is
+implemented, manually verified end-to-end against the real linked Supabase
+project, and closed on GitHub** — see the closing comment on the issue for
+the full acceptance-criteria checklist. Initial implementation committed
+`6f891ff` (22 files); `/code-review`'s two-axis pass caught and fixed one
+real bug pre-commit (`BaseMapSetup` calibrating Scale Reference against a
+512px canvas while the rest of the stack rendered at 768px — every Bed/Pin
+on a photo or drawn base map would have landed ~1.5x off; fixed via one
+shared `STAGE_SIZE_PX` constant).
 
-`/code-review`'s two-axis pass (Standards + Spec, run as separate
-sub-agents) caught and fixed one real bug before anything was committed:
-**`BaseMapSetup` was calibrating Scale Reference against a 512px canvas
-while `BedEditor`/`PlantingMap`/`BaseMapBackground` all render/place Beds
-and Pins against a 768px stage** — every Bed/Pin on a photo or drawn base
-map would have landed roughly 1.5x off from what the user actually
-measured, and a drawn plan's own strokes would have rendered squeezed into
-the stage's top-left corner. Fixed by exporting one shared `STAGE_SIZE_PX`
-constant from `baseMapTiles.ts` that all four files now import instead of
-each computing their own. Also fixed from that same review: a duplicated
-polyline-rendering shape across three sites (extracted to
-`baseMapDrawing.ts`'s `strokePoints`), a test that hand-built a `Property`
-instead of calling `propertyFromRow`, and a hand-duplicated `BaseMapUpdate`
-type narrowed to `Pick<PropertyInput, ...>`. One Spec finding was reviewed
-and deliberately not actioned: photo/drawn sources are only reachable when
-aerial imagery is unavailable, not offered as a free choice on every
-Property — correct per #6's own "What to build" text ("a gardener *without
-usable aerial imagery* can instead..."), not a gap.
+**Scope grew substantially during live QA, driven by real user feedback**
+(commits `70c8a9e`, `d6baeb3`, `ffbc807`): the original design only offered
+photo/drawn base maps as a fallback once an address's aerial imagery came
+back unavailable. QA surfaced that "usable" imagery is subjective (outdated,
+tree-obscured, too low-res — not just present/absent), and some gardeners
+want to skip geocoding their address entirely for privacy. Reworked so
+base-map source is a free, one-time choice offered up front at Property
+creation (aerial / upload / draw), identified by a new `name` field when
+there's no address. The original aerial-unavailable fallback still works
+unchanged. Along the way, live QA (not the unit suite, which stubs Konva
+and the DB client) caught and fixed several more real bugs: migration
+`0017` had already been pushed to the real project by a concurrent session
+before this rework started, so amending it in place silently never reached
+the database (Supabase tracks migrations by filename, not content) — the
+new flow 400'd on save with **no visible error**, because a CSS rule only
+styled alerts nested inside a `<form>` element and this new flow didn't use
+one. Fixed by reverting `0017` to its originally-applied content, moving
+the schema changes to a new `0018` (now pushed and confirmed live), and
+broadening the alert-styling CSS rule to cover every error in the app, not
+just form-nested ones. Also fixed: `.property-page`'s own 640px width cap
+(tuned for #5's address form, before this ticket's 768px drawing canvas
+existed) was clipping the canvas; removed in favor of `#root`'s existing
+page-wide bound. And a redundant standalone 512px aerial thumbnail on the
+Property page — which #7 had since made obsolete by rendering the same
+imagery natively behind the Bed editor's own canvas — was removed entirely.
 
-Full monorepo typecheck and test suite are green — but **all of this is
-Konva-canvas UI that the test suite stubs out entirely** (same standing
-limitation `BedEditor`/`PlantingMap` have had since #7/#8), so none of it
-has actually been looked at in a real browser. **Committed** (`6f891ff`,
-22 files) — the user had originally planned to review by hand before
-committing, but authorized committing it later in the same working-tree
-lineage, on the condition that this checklist stays intact so the deferred
-manual verification isn't lost track of. It has not been run yet.
+Full monorepo typecheck and test suite green throughout (186 domain + 64
+mobile + 164 web at close).
 
-**Manual QA checklist for whoever resumes** (none of this has been run
-yet):
-1. **Highest priority — the coordinate-space fix, watched live, not just
-   reasoned through.** On a Property with no aerial imagery: upload a plot
-   plan photo, click two points, enter a real distance, save. Confirm the
-   photo renders behind the Bed-drawing canvas undistorted, then draw a Bed
-   and check its size is plausible against a distance you actually know
-   (e.g. a Bed that should read ~5ft against a 25ft-calibrated wall should
-   look like ~5ft, not ~3ft or ~8ft — that exact ratio is what the
-   512-vs-768 bug got wrong). Repeat for "Draw a base plan" (click-to-place
-   multi-line) instead of a photo. Then place a Planting Pin against that
-   same calibrated base map and confirm it resolves into the right Bed.
-2. **Regression check on existing aerial Properties** — the refactor moved
-   aerial-tile rendering and scale computation through new shared code
-   (`BaseMapBackground`, `pixelsPerFootForProperty`). Open an existing
-   aerial Property's Bed editor and confirm tiles still render correctly
-   behind the Konva canvas and a newly-drawn Bed is sized/positioned
-   exactly as before; confirm `PlantingMap` still places/drags Pins and
-   resolves them into Beds; confirm the always-visible 512px aerial
-   thumbnail on the main Property page is unchanged.
-3. **Cosmetic** — the degraded-mode message now reads "Add a base map
-   another way below" with two new buttons, replacing the old "will cover
-   this case in a later ticket" placeholder.
+**Filed during QA, not part of #6, not blocking anything**: **#24**
+(`needs-triage`) — Bed drawing's rectangle/oval tools can't be rotated,
+relevant when a base map isn't axis-aligned to the canvas. **#25**
+(`needs-triage`) — `PlantingMap`'s full map canvas renders even before any
+Bed exists, when it's entirely non-functional; a fix is scoped in the issue
+but deliberately not applied.
 
-**When resuming**: `npm run db:push` first (migration `0017` isn't live
-yet), then `npm run dev --workspace apps/web`, then work the checklist
-above against the real linked Supabase project — same fresh-throwaway-
-account pattern every prior ticket's QA has used. If it all looks right,
-close #6 and re-run the frontier query.
+**#6's closure newly unblocks #15** (Native: Scale Reference calibration —
+confirmed directly against the API, `blocked_by: 0`; it needed #6 and the
+already-closed #13). **#10** (Registry view) remains implemented and
+committed but still has its own deferred manual QA queued as the user's
+next-time to-do — see "Deferred QA (ticket #10)" below. **#20** remains
+implemented but intentionally held open pending its own deploy/QA pass (see
+its entry further down). **#21** is still `needs-triage`.
 
 ---
 
@@ -993,13 +966,19 @@ for what's still outstanding. If you're a different session picking this
 up: the working tree being clean now doesn't mean everything's done —
 check "What to do next" before assuming so.
 
-**`main` and `origin/main` are in sync** — `git log origin/main..HEAD`
-returns empty, confirmed directly; everything through `2c77076` has been
-pushed. Don't trust this doc's "ahead of origin" claims over `git log
-origin/main..HEAD` run fresh — it's drifted from reality more than once
-already, twice in this same update alone. Most recent commits first:
+**`main` is 3 commits ahead of `origin/main`** as of this update (`git log
+origin/main..HEAD`, confirmed directly) — `ffbc807`/`d6baeb3`/`70c8a9e`
+(this update's #6 QA-driven rework and fixes) are not yet pushed. Don't
+trust this doc's "ahead of origin" claims over `git log origin/main..HEAD`
+run fresh — it's drifted from reality more than once already. Most recent
+commits first:
 
 ```
+ffbc807 Fix two more UX issues found by live QA on #6: width cap, duplicate map
+d6baeb3 Fix two real bugs found by live QA on #6's up-front base-map choice
+70c8a9e Make #6's base-map source a free up-front choice, not just an aerial fallback
+b17d6e1 Fix handoff doc's stale push-status claims after pushing
+2c77076 Update handoff doc: record #6's commit, keep its QA checklist intact
 3b38701 Fix Registry test fixture for #6's new PropertyRow fields
 6f891ff Add Property: photographed/in-app-drawn base map + Scale Reference (#6)
 af9f274 Update handoff doc: record #10's implementation and deferred manual QA
@@ -1110,15 +1089,23 @@ deployed; #7's migrations (`0011`/`0012`) are pushed; #20's migrations
 deployed**, so #20 still can't fully close on that front — see "What to do
 next" above. #8's migrations (`0013`–`0016`) are pushed and live (confirmed
 via `npx supabase migration list`); #8 needed no Edge Function (Planting
-touches no external adapter). **All of this session's commits, including
-#9's, have now been pushed to the GitHub remote** — confirmed via `git log
-origin/main..HEAD` returning empty. The remaining tickets (#6, #10, #11,
-#12, #14–#18) are still unbuilt or unverified — #14 and #17 are genuine
-frontier work; #6 and #10 are each implemented and committed but pending
-manual QA, not frontier (see "Issue tracker" below for the full dependency
-detail); #11, #12, #15, #16, and #18 each still need at least one other
-still-open ticket; #21 (filed during #4's QA) is `needs-triage`; #22's
-status needs a direct GitHub check per the note above.
+touches no external adapter). #6's migrations (`0017`/`0018`) are pushed
+and live — `0017` note for posterity: it turned out to already be applied
+to the remote before this update's rework of #6 started (a concurrent
+session had pushed it), so the rework's schema changes had to go in a
+fresh `0018` rather than amending `0017` in place, which Supabase's
+filename-based migration tracking would have silently ignored (see "What
+to do next" for the full story). **This update's own commits
+(`70c8a9e`/`d6baeb3`/`ffbc807`) are not yet pushed to the GitHub remote**
+— `git log origin/main..HEAD` shows 3 commits ahead, confirmed directly;
+everything before that is pushed. **#6 is now closed on GitHub.** The
+remaining tickets (#10, #11, #12, #14–#18) are still unbuilt or unverified
+— #10, #14, #15, #17, and #20 are genuine frontier work (#15 newly
+unblocked by #6's closure); #10 is implemented and committed but pending
+its own manual QA, not truly "unbuilt" (see "Issue tracker" below for the
+full dependency detail); #11, #12, #16, and #18 each still need at least
+one other still-open ticket; #21/#24/#25 are `needs-triage`; #22's status
+needs a direct GitHub check per the note above.
 
 > On `14957a9`'s message: the satellite prototype is **not** GPS exploration.
 > No GPS is read and no user photo is taken — that is exactly why the work was
@@ -1273,7 +1260,7 @@ Ticket map (dependency order; title abbreviated):
 | 3 | Plant record CRUD (manual entry) — built, `9018f33`, closed | 2 |
 | 4 | Care task templates on Plant — built, `4eea9e7`–`8ce7a48`, closed | 3 |
 | 5 | Property + aerial base map — built, `1380351`–`3b7fa07`, closed | 2 |
-| 6 | Property: photographed/in-app-drawn base map + Scale Reference — implemented, code-reviewed, committed `6f891ff`, **not yet closed, pending manual QA** (see "What to do next") | 5 |
+| 6 | Property: photographed/in-app-drawn base map + Scale Reference — built and verified, `6f891ff`/`70c8a9e`/`d6baeb3`/`ffbc807`, closed | 5 |
 | 7 | Bed drawing (desktop) — built, `6173a57`, closed | 5 |
 | 8 | Planting: create + place Pin, view on tap — built, `3041ca3`, closed | 3, 7 |
 | 9 | Bloom Timeline — built and verified, `08d3851`–`24cf78e`, closed | 3, 8 |
@@ -1290,39 +1277,41 @@ Ticket map (dependency order; title abbreviated):
 | 20 | Tag Scan build — built, `96e46c6`, **open** (deferred deploy/QA; OCR module split to #22) | 3, 13, 19 |
 | 21 | Care task template: single-day trigger UX (filed during #4 QA, `needs-triage`) | 4 |
 | 22 | Tag Scan: on-device Vision OCR + EAS dev client migration — verified end-to-end and closed, `9fd6d6f`–`83565dc` | — |
+| 23 | Tag Scan OCR: scientific-name-only heuristic misses common real tag layouts (filed during #22, `needs-triage`) | 22 |
+| 24 | Bed drawing: rotate rectangle/oval shapes (filed during #6 QA, `needs-triage`) | 7 |
+| 25 | PlantingMap: hide the map canvas until a Bed exists (filed during #6 QA, `needs-triage`) | 8 |
 
 **Frontier query**: open issues with `issue_dependencies_summary.blocked_by
-== 0` and no assignee. #2, #3, #4, #5, #7, #8, #9, #13, and #19 are closed.
-**#10** still has `blocked_by == 0` but is now deliberately excluded from
-the frontier, same posture as #6/#20 below — it's implemented, code-
+== 0` and no assignee. #2, #3, #4, #5, #6, #7, #8, #9, #13, and #19 are
+closed. **#10** still has `blocked_by == 0` but is deliberately excluded
+from the frontier, same posture as #20 below — it's implemented, code-
 reviewed, tested, and committed (`029fc9c`), awaiting manual QA before it
 can close (see "What to do next" and "Deferred QA (ticket #10)" above),
-not unstarted work. **#6** also has `blocked_by == 0` but is likewise
-excluded from the frontier — it's implemented, code-reviewed, and
-committed (`6f891ff`), awaiting manual QA before it can close (see "What
-to do next" above), not unstarted work. **#9 has closed** (user-confirmed manual QA, `gh issue
-close`, and pushed — see "What to do next"), which newly unblocks **#17**
-(Native: Bloom Timeline, which needed #9 and #13, #13 already closed) —
-confirmed `blocked_by: 0` directly against the API. **#14** (Native: Map
-view) remains frontier from #8's earlier closure (needed #8 and #13, both
-closed). **#11** (Dashboard) still needs #10 in addition to #7/#8/#9 (now
-all closed) — confirmed `blocked_by: 1` directly against the API, so it's
-not frontier yet. **#12** (Task completion logging) still needs #11 in
-addition to #4/#8, so it's not frontier either. **#18** (Native:
-Plant/Planting detail) still needs #12, so it's not frontier. **#20** has
-`blocked_by == 0` but is deliberately excluded from the frontier — it's
-built and awaiting closure (specifically, deploying `usda-plant-traits` and
-a real-device manual QA pass — see "What to do next" above), not unstarted
-work. **#22** also has `blocked_by == 0` but is `ready-for-human`, not
-`ready-for-agent`, so it's excluded the same way #21 is (`needs-triage`) —
-check it directly before assuming it's done, since a concurrent session may
-have touched it since this doc was last updated. **#15**/**#16** (each
-blocked by #13 plus one other still-open ticket) remain non-frontier — #15
-needs #6 (still open), #16 needs #10 (implemented but not yet closed —
-same reasoning as #6/#20/#22 elsewhere in this doc: `blocked_by` looks at
-GitHub issue state, not code-review/commit state, so a downstream ticket
-naming a not-yet-closed blocker still isn't frontier even once that
-blocker's code exists).
+not unstarted work. **#6 has closed** (real manual QA against the real
+Supabase project, `gh issue close`, this update — see "What to do next"),
+which newly unblocks **#15** (Native: Scale Reference calibration, which
+needed #6 and #13, #13 already closed) — confirmed `blocked_by: 0`
+directly against the API. **#9's earlier closure** unblocked **#17**
+(Native: Bloom Timeline, needed #9 and #13) — confirmed `blocked_by: 0`.
+**#14** (Native: Map view) remains frontier from #8's earlier closure
+(needed #8 and #13, both closed). **#11** (Dashboard) still needs #10 in
+addition to #7/#8/#9 (now all closed) — confirmed `blocked_by: 1` directly
+against the API, so it's not frontier yet. **#12** (Task completion
+logging) still needs #11 in addition to #4/#8, so it's not frontier
+either. **#18** (Native: Plant/Planting detail) still needs #12, so it's
+not frontier. **#20** has `blocked_by == 0` but is deliberately excluded
+from the frontier — it's built and awaiting closure (specifically,
+deploying `usda-plant-traits` and a real-device manual QA pass — see "What
+to do next" above), not unstarted work. **#22** also has `blocked_by ==
+0` but is `ready-for-human`, not `ready-for-agent`, so it's excluded the
+same way #21/#23/#24/#25 are (`needs-triage`) — check it directly before
+assuming it's done, since a concurrent session may have touched it since
+this doc was last updated. **#16** (blocked by #13 plus #10) remains
+non-frontier — #10 is implemented but not yet closed (same reasoning as
+#10/#20/#22 elsewhere in this doc: `blocked_by` looks at GitHub issue
+state, not code-review/commit state, so a downstream ticket naming a
+not-yet-closed blocker still isn't frontier even once that blocker's code
+exists).
 
 So the frontier as of this update is: **#14** and **#17** — both
 `blocked_by: 0`, unassigned, confirmed directly against the API. **#6**
