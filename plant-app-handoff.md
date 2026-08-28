@@ -1,11 +1,44 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-27 (updated: #11 closed)
+**Date:** 2026-08-27 (updated: #20's Edge Function deployed + smoke-tested)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
+
+**#20 (Tag Scan build) — its `usda-plant-traits` Edge Function is now
+deployed and smoke-tested; #20 is still open, one item left.** Checked
+live rather than trusting this doc's own prior "still needed" claim (which
+turned out to be stale): migrations `0009`/`0010` were already live
+(`npx supabase migration list` shows local=remote through `0018`), so the
+only real gap was the Edge Function itself — confirmed via
+`npx supabase functions list`, which showed only `create-property`/
+`search-addresses` before this update. Deployed with `npm run
+functions:deploy` (blocked by the auto-mode permission classifier as a
+live-deploy action; user approved explicitly before it ran). Smoke-tested
+the same way `create-property`/`search-addresses` were, against a fresh
+throwaway test account (signup returns a session immediately — email
+confirmation is off, no Property/DB rows touched, account itself remains,
+same no-service-role-access limitation noted on prior sessions' QA):
+CORS preflight (204, correct `Access-Control-Allow-*` headers), missing
+auth (`{"error":"Not authenticated."}`), malformed JSON body (400), both
+`scientificName`/`commonName` provided at once (400, exactly-one-of
+guard), a real authenticated lookup against *Digitalis purpurea* (a known
+exact USDA match per ADR-0004's own prototype validation — returned real
+characteristics data, e.g. `Temperature, Minimum (°F): -13`), and a real
+lookup with no match (clean `{"species":[]}`, not an error — matches the
+"no match is a routine outcome" design). All passed.
+
+**Still needed before #20 can close**: a real-device manual walkthrough of
+the mobile Tag Scan flow via Expo Go — front/back capture, manual entry,
+species lookup + ambiguous-species picker, duplicate-Plant offer
+(including the "create anyway" override), and the USDA-suggested-traits
+screen (now backed by a live, verified function rather than an undeployed
+one). None of this has been exercised outside Jest's fake DB client as of
+this update.
+
+---
 
 **#11 (Dashboard, real content) is implemented, manually QA'd by the user
 directly against the dev server (not Playwright), and closed on GitHub** —
@@ -564,13 +597,15 @@ decided" acceptance criterion is therefore only structurally satisfied
 whether #20 should stay open until #22 lands, is a call for whoever's
 driving next, not decided here.
 
-**Before closing #20**, still needed (none of it done this session, same
-as #5's deferred posture below):
-- Push migrations `0009`/`0010` (`npm run db:push`), confirm live via
-  `npx supabase migration list`.
-- Deploy `usda-plant-traits` (`npm run functions:deploy`), smoke-test its
-  guard paths the way `search-addresses`/`create-property` were (CORS
-  preflight, missing auth, malformed body) plus one real USDA lookup.
+**Before closing #20**, still needed as of this update (see the "What to
+do next" entry at the top of this doc for the latest — migrations and the
+Edge Function are now both done, only the device QA remains):
+- ~~Push migrations `0009`/`0010`~~ — **done**, confirmed already live via
+  `npx supabase migration list` (turned out to have been pushed alongside
+  #7's in an earlier `db push`, this doc just hadn't caught up).
+- ~~Deploy `usda-plant-traits`~~ — **done**, deployed and smoke-tested
+  (CORS preflight, missing auth, malformed body, both-fields-provided, a
+  real matched lookup, a real no-match lookup — see "What to do next").
 - Manually verify the mobile flow on a real device via Expo Go: front/back
   capture, manual entry, species lookup + ambiguous-species picker,
   duplicate-Plant offer (including the "create anyway" override), and the
