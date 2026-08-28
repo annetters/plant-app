@@ -2,7 +2,7 @@ import type { PropertyRow } from '@plant-app/domain'
 import { vi } from 'vitest'
 import type { PropertiesDbClient } from '../property/propertiesRepository'
 
-type DbResult = { data: unknown; error: { message: string } | null }
+type DbResult = { data: unknown; error: { message: string; code?: string } | null }
 type CreatePropertyBody = {
   address: string
   resolvedAddress: string
@@ -58,13 +58,14 @@ export function createFakePropertiesDbClient(initialRow: PropertyRow | null = nu
       base_map_photo_path: null,
       base_map_drawing: null,
       scale_reference: null,
+      name: null,
       created_at: '2026-01-01T00:00:00.000Z',
     }
     row = created
     return { data: created, error: null }
   })
 
-  function builder(op: 'select' | 'update' | 'delete', payload?: Record<string, unknown>) {
+  function builder(op: 'select' | 'insert' | 'update' | 'delete', payload?: Record<string, unknown>) {
     const filters: Record<string, string> = {}
 
     const chain = {
@@ -100,6 +101,16 @@ export function createFakePropertiesDbClient(initialRow: PropertyRow | null = nu
       if (op === 'select') {
         return { data: row, error: null }
       }
+      if (op === 'insert') {
+        if (row) {
+          return {
+            data: null,
+            error: { message: 'duplicate key value violates unique constraint', code: '23505' },
+          }
+        }
+        row = { created_at: '2026-01-01T00:00:00.000Z', ...payload } as PropertyRow
+        return { data: row, error: null }
+      }
       if (op === 'update') {
         if (!row || !matches()) return { data: null, error: { message: 'Property not found.' } }
         row = { ...row, ...payload } as PropertyRow
@@ -125,6 +136,7 @@ export function createFakePropertiesDbClient(initialRow: PropertyRow | null = nu
     from(_table: 'properties') {
       return {
         select: () => builder('select'),
+        insert: (values: Record<string, unknown>) => builder('insert', values),
         update: (values: Record<string, unknown>) => builder('update', values),
         delete: () => builder('delete'),
       }

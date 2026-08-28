@@ -15,6 +15,7 @@ const EXISTING_ROW: PropertyRow = {
   base_map_photo_path: null,
   base_map_drawing: null,
   scale_reference: null,
+  name: null,
   created_at: '2026-01-01T00:00:00.000Z',
 }
 
@@ -48,6 +49,7 @@ describe('PropertiesRepository.get', () => {
       baseMapPhotoPath: null,
       baseMapDrawing: null,
       scaleReference: null,
+      name: null,
     })
   })
 })
@@ -172,6 +174,57 @@ describe('PropertiesRepository.updateBaseMap', () => {
 
     expect(property.baseMapSource).toBe('drawn')
     expect(property.baseMapDrawing).toEqual([[{ x: 0, y: 0 }, { x: 100, y: 0 }, { x: 100, y: 100 }]])
+  })
+})
+
+describe('PropertiesRepository.createWithBaseMap', () => {
+  it('creates a Property directly from a photo base map, with no address or geocoding', async () => {
+    const { client, invoke } = createFakePropertiesDbClient(null)
+    const repository = new PropertiesRepository(client)
+
+    const property = await repository.createWithBaseMap({
+      id: 'property-1',
+      name: 'Backyard plot',
+      baseMapSource: 'photo',
+      baseMapPhotoPath: 'user-1/property-1/plan.jpg',
+      baseMapDrawing: null,
+      scaleReference: {
+        pointA: { x: 0, y: 0 },
+        pointB: { x: 300, y: 0 },
+        realDistanceFeet: 25,
+        mode: 'known-measurement',
+      },
+    })
+
+    expect(property.name).toBe('Backyard plot')
+    expect(property.address).toBeNull()
+    expect(property.latitude).toBeNull()
+    expect(property.imageryAvailable).toBe(false)
+    expect(property.baseMapSource).toBe('photo')
+    // No external adapter involved — unlike create(), this never calls out
+    // to an Edge Function (search-addresses/create-property).
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('surfaces a one-Property-per-account conflict', async () => {
+    const { client } = createFakePropertiesDbClient(EXISTING_ROW)
+    const repository = new PropertiesRepository(client)
+
+    await expect(
+      repository.createWithBaseMap({
+        id: 'property-2',
+        name: 'Front yard',
+        baseMapSource: 'drawn',
+        baseMapPhotoPath: null,
+        baseMapDrawing: [[{ x: 0, y: 0 }, { x: 100, y: 0 }]],
+        scaleReference: {
+          pointA: { x: 0, y: 0 },
+          pointB: { x: 100, y: 0 },
+          realDistanceFeet: 10,
+          mode: 'measured-object',
+        },
+      }),
+    ).rejects.toThrow('You already have a Property.')
   })
 })
 

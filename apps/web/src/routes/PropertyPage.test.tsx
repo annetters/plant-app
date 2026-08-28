@@ -1,5 +1,5 @@
 import type { BedRow, PlantingRow, PlantRow, PropertyRow } from '@plant-app/domain'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
@@ -147,6 +147,65 @@ describe('PropertyPage — no Property yet', () => {
   })
 })
 
+/** See BaseMapSetup.test.tsx's identical helper — jsdom's zeroed getBoundingClientRect means clientX/Y map directly to the surface's own coordinate space. */
+function clickAt(testId: string, x: number, y: number) {
+  fireEvent.click(screen.getByTestId(testId), { clientX: x, clientY: y })
+}
+
+describe('PropertyPage — own base map, no address (privacy/up-front choice)', () => {
+  it('offers a way to skip aerial imagery up front, before any address is typed', async () => {
+    renderPage(null)
+    await screen.findByLabelText('Address')
+
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: "Don't want to use aerial imagery? Upload or draw your own base map instead.",
+      }),
+    )
+
+    expect(screen.queryByLabelText('Address')).not.toBeInTheDocument()
+    expect(await screen.findByLabelText('Name your map')).toBeInTheDocument()
+  })
+
+  it('can switch back to the address form from the name step', async () => {
+    renderPage(null)
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: "Don't want to use aerial imagery? Upload or draw your own base map instead.",
+      }),
+    )
+    await userEvent.click(screen.getByRole('button', { name: 'Use aerial imagery instead' }))
+
+    expect(await screen.findByLabelText('Address')).toBeInTheDocument()
+  })
+
+  it('creates the Property from a name and an uploaded photo, with no address or geocode call at all', async () => {
+    const fake = renderPage(null)
+    await userEvent.click(
+      await screen.findByRole('button', {
+        name: "Don't want to use aerial imagery? Upload or draw your own base map instead.",
+      }),
+    )
+    await userEvent.type(await screen.findByLabelText('Name your map'), 'Backyard plot')
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Upload a plot plan photo' }))
+    const file = new File(['fake'], 'plan.jpg', { type: 'image/jpeg' })
+    await userEvent.upload(screen.getByLabelText('Plot plan or survey photo'), file)
+    await screen.findByAltText('Uploaded plot plan or survey')
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to Scale Reference' }))
+
+    clickAt('scale-reference-surface', 100, 50)
+    clickAt('scale-reference-surface', 400, 50)
+    await userEvent.type(screen.getByLabelText('Real-world distance (feet)'), '25')
+    await userEvent.click(screen.getByRole('button', { name: 'Save Scale Reference' }))
+
+    expect(await screen.findByText('Backyard plot')).toBeInTheDocument()
+    expect(screen.queryByText(/No aerial imagery is available/)).not.toBeInTheDocument()
+    expect(fake.invoke).not.toHaveBeenCalled()
+  })
+})
+
 describe('PropertyPage — existing Property', () => {
   const availableRow: PropertyRow = {
     id: 'property-1',
@@ -160,6 +219,7 @@ describe('PropertyPage — existing Property', () => {
     base_map_photo_path: null,
     base_map_drawing: null,
     scale_reference: null,
+    name: null,
     created_at: '2026-01-01T00:00:00.000Z',
   }
 

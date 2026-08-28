@@ -89,20 +89,31 @@ export interface AddressCandidate {
 /**
  * Which of the three sources (CONTEXT.md's Property entry) a Property's base
  * map comes from — one per Property, never mixed (ticket #6's own
- * acceptance criterion). Every Property starts `'aerial'` (set by
- * `create-property`, per ticket #5); `'photo'`/`'drawn'` are chosen
- * afterward, only when aerial imagery isn't available there.
+ * acceptance criterion), chosen once up front when the Property is created
+ * and not changed afterward (a Property is recreated, not re-sourced, if the
+ * gardener wants a different kind of base map). The one exception: an
+ * `'aerial'` Property whose address turns out to have no imagery coverage
+ * can still fall back to `'photo'`/`'drawn'` afterward — that's completing
+ * the original setup, not switching a settled choice.
  */
 export type BaseMapSource = "aerial" | "photo" | "drawn";
 
 export interface PropertyInput {
-  /** What the user typed in. Never re-derived — always shown alongside `resolvedAddress` so a bad geocoder match is visible, not silent. */
-  address: string;
-  /** What the geocoder actually matched `address` to (Nominatim's `display_name`), or `null` for a Property created before this field existed. */
+  /**
+   * What the user typed in. Required (and geocoded) only for
+   * `baseMapSource === 'aerial'` — `'photo'`/`'drawn'` Properties skip
+   * geocoding entirely (no address is ever sent to Nominatim/Esri for them,
+   * by design: some gardeners choose those sources specifically to avoid
+   * that) and are identified by `name` instead. Always shown alongside
+   * `resolvedAddress` when present, so a bad geocoder match is visible, not
+   * silent.
+   */
+  address: string | null;
+  /** What the geocoder actually matched `address` to (Nominatim's `display_name`), or `null` for a Property created before this field existed, or one with no address at all. */
   resolvedAddress: string | null;
-  latitude: number;
-  longitude: number;
-  /** Highest zoom with confirmed imagery, or `null` if none was available anywhere probed. */
+  latitude: number | null;
+  longitude: number | null;
+  /** Highest zoom with confirmed imagery, or `null` if none was available anywhere probed, or never probed at all (`baseMapSource !== 'aerial'`). */
   imageryZoom: number | null;
   imageryAvailable: boolean;
   baseMapSource: BaseMapSource;
@@ -112,6 +123,8 @@ export interface PropertyInput {
   baseMapDrawing: BedPoint[][] | null;
   /** Calibrates `baseMapPhotoPath`/`baseMapDrawing` to real-world feet (see `scaleReference.ts`) — always `null` for `baseMapSource === 'aerial'`, which derives its scale from latitude/zoom instead (see `pixelsPerFoot` below). */
   scaleReference: ScaleReferenceInput | null;
+  /** User-chosen label for a `'photo'`/`'drawn'` Property, which has no address to identify it by. Always `null` for `'aerial'`, which is identified by `address` instead. */
+  name: string | null;
 }
 
 export interface Property extends PropertyInput {
@@ -128,13 +141,24 @@ export type PropertyValidationResult =
 export function validatePropertyInput(input: PropertyInput): PropertyValidationResult {
   const errors: PropertyValidationErrors = {};
 
-  if (!input.address.trim()) {
-    errors.address = "Address is required.";
+  if (input.baseMapSource === "aerial") {
+    if (!input.address?.trim()) {
+      errors.address = "Address is required.";
+    }
+    if (input.latitude === null) {
+      errors.latitude = "Latitude is required.";
+    }
+    if (input.longitude === null) {
+      errors.longitude = "Longitude is required.";
+    }
+  } else if (!input.name?.trim()) {
+    errors.name = "Name is required.";
   }
-  if (!(input.latitude >= -90 && input.latitude <= 90)) {
+
+  if (input.latitude !== null && !(input.latitude >= -90 && input.latitude <= 90)) {
     errors.latitude = "Latitude must be between -90 and 90.";
   }
-  if (!(input.longitude >= -180 && input.longitude <= 180)) {
+  if (input.longitude !== null && !(input.longitude >= -180 && input.longitude <= 180)) {
     errors.longitude = "Longitude must be between -180 and 180.";
   }
 
@@ -144,16 +168,17 @@ export function validatePropertyInput(input: PropertyInput): PropertyValidationR
 /** The `properties` table's row shape — the seam between domain types and Postgres. */
 export interface PropertyRow {
   id: string;
-  address: string;
+  address: string | null;
   resolved_address: string | null;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   imagery_zoom: number | null;
   imagery_available: boolean;
   base_map_source: BaseMapSource;
   base_map_photo_path: string | null;
   base_map_drawing: BedPoint[][] | null;
   scale_reference: ScaleReferenceInput | null;
+  name: string | null;
   created_at: string;
 }
 
@@ -171,6 +196,7 @@ export function propertyInputToRow(
     base_map_photo_path: input.baseMapPhotoPath,
     base_map_drawing: input.baseMapDrawing,
     scale_reference: input.scaleReference,
+    name: input.name,
   };
 }
 
@@ -188,6 +214,7 @@ export function propertyFromRow(row: PropertyRow): Property {
     baseMapPhotoPath: row.base_map_photo_path,
     baseMapDrawing: row.base_map_drawing,
     scaleReference: row.scale_reference,
+    name: row.name,
   };
 }
 
@@ -201,7 +228,7 @@ export function propertyFromRow(row: PropertyRow): Property {
  */
 export function pixelsPerFootForProperty(property: Property): number | null {
   if (property.baseMapSource === "aerial") {
-    return property.imageryZoom !== null
+    return property.imageryZoom !== null && property.latitude !== null
       ? pixelsPerFoot(property.latitude, property.imageryZoom)
       : null;
   }

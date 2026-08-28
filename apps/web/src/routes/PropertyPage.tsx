@@ -23,6 +23,13 @@ export function PropertyPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // Up-front alternative to the address form, for a gardener who doesn't
+  // want to use aerial imagery at all (unusable coverage, or privacy — see
+  // CONTEXT.md's Property entry) rather than only reachable after an
+  // address turns out to have no imagery.
+  const [ownMapMode, setOwnMapMode] = useState(false)
+  const [propertyName, setPropertyName] = useState('')
+  const [confirmedName, setConfirmedName] = useState<string | null>(null)
   // Shared with PlantingMap below, via BedEditor's onBedsChange — so a Bed
   // drawn and saved in the editor is immediately visible for Pin placement,
   // not just after a reload.
@@ -78,6 +85,9 @@ export function PropertyPage() {
     try {
       await repository.remove(property.id)
       setProperty(null)
+      setOwnMapMode(false)
+      setPropertyName('')
+      setConfirmedName(null)
     } catch {
       setFormError('Could not delete this Property. Please try again.')
     } finally {
@@ -95,25 +105,56 @@ export function PropertyPage() {
 
       {property === undefined && <p>Loading…</p>}
 
-      {property === null && (
-        <form onSubmit={handleSubmit}>
-          <label htmlFor="property-address">Address</label>
-          <AddressAutocomplete
-            onSelect={(next) => {
-              setPick(next)
-              setAddressError(null)
-            }}
+      {property === null && !ownMapMode && (
+        <>
+          <form onSubmit={handleSubmit}>
+            <label htmlFor="property-address">Address</label>
+            <AddressAutocomplete
+              onSelect={(next) => {
+                setPick(next)
+                setAddressError(null)
+              }}
+            />
+            {addressError && <p role="alert">{addressError}</p>}
+            <button type="submit" disabled={submitting}>
+              {submitting ? 'Creating…' : 'Create Property'}
+            </button>
+          </form>
+          <button type="button" onClick={() => setOwnMapMode(true)}>
+            Don't want to use aerial imagery? Upload or draw your own base map instead.
+          </button>
+        </>
+      )}
+
+      {property === null && ownMapMode && confirmedName === null && (
+        <form
+          onSubmit={(event) => {
+            event.preventDefault()
+            if (propertyName.trim()) setConfirmedName(propertyName.trim())
+          }}
+        >
+          <label htmlFor="property-name">Name your map</label>
+          <input
+            id="property-name"
+            value={propertyName}
+            onChange={(event) => setPropertyName(event.target.value)}
           />
-          {addressError && <p role="alert">{addressError}</p>}
-          <button type="submit" disabled={submitting}>
-            {submitting ? 'Creating…' : 'Create Property'}
+          <button type="submit" disabled={!propertyName.trim()}>
+            Continue
+          </button>
+          <button type="button" onClick={() => setOwnMapMode(false)}>
+            Use aerial imagery instead
           </button>
         </form>
       )}
 
+      {property === null && ownMapMode && confirmedName !== null && (
+        <BaseMapSetup mode="create" name={confirmedName} onCreated={setProperty} />
+      )}
+
       {property && (
         <section>
-          <p>{property.address}</p>
+          <p>{property.address ?? property.name}</p>
           {property.resolvedAddress && (
             // A vague address (e.g. "1 main st", no city/state) still
             // geocodes to *something* — the geocoder's top-ranked guess,
@@ -149,7 +190,7 @@ export function PropertyPage() {
                 No aerial imagery is available for this property's location. Add a base map
                 another way below.
               </p>
-              <BaseMapSetup property={property} onUpdated={setProperty} />
+              <BaseMapSetup mode="update" property={property} onUpdated={setProperty} />
             </>
           )}
           <button type="button" onClick={handleDelete} disabled={deleting}>

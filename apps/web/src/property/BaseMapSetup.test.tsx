@@ -19,6 +19,7 @@ const DEGRADED_ROW: PropertyRow = {
   base_map_photo_path: null,
   base_map_drawing: null,
   scale_reference: null,
+  name: null,
   created_at: '2026-01-01T00:00:00.000Z',
 }
 
@@ -27,10 +28,20 @@ function renderSetup(onUpdated = vi.fn()) {
   const fake = createFakePropertiesDbClient(DEGRADED_ROW)
   render(
     <PropertiesRepositoryProvider client={fake.client}>
-      <BaseMapSetup property={property} onUpdated={onUpdated} />
+      <BaseMapSetup mode="update" property={property} onUpdated={onUpdated} />
     </PropertiesRepositoryProvider>,
   )
   return { fake, onUpdated }
+}
+
+function renderCreateSetup(name = 'Backyard plot', onCreated = vi.fn()) {
+  const fake = createFakePropertiesDbClient(null)
+  render(
+    <PropertiesRepositoryProvider client={fake.client}>
+      <BaseMapSetup mode="create" name={name} onCreated={onCreated} />
+    </PropertiesRepositoryProvider>,
+  )
+  return { fake, onCreated }
 }
 
 /** Clicks a specific pixel position on a fixed-size drawing/calibration surface — jsdom's zeroed getBoundingClientRect means clientX/Y map directly to the surface's own coordinate space. */
@@ -101,6 +112,54 @@ describe('BaseMapSetup — photo source', () => {
     expect(
       await screen.findByText('Enter a real-world distance greater than 0.'),
     ).toBeInTheDocument()
+  })
+})
+
+describe('BaseMapSetup — create mode (no Property yet)', () => {
+  it('creates a Property directly from an uploaded photo, with no address at all', async () => {
+    const { fake, onCreated } = renderCreateSetup('Backyard plot')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Upload a plot plan photo' }))
+    const file = new File(['fake'], 'plan.jpg', { type: 'image/jpeg' })
+    await userEvent.upload(screen.getByLabelText('Plot plan or survey photo'), file)
+    await screen.findByAltText('Uploaded plot plan or survey')
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to Scale Reference' }))
+
+    clickAt('scale-reference-surface', 100, 50)
+    clickAt('scale-reference-surface', 400, 50)
+    await userEvent.type(screen.getByLabelText('Real-world distance (feet)'), '25')
+    await userEvent.click(screen.getByRole('button', { name: 'Save Scale Reference' }))
+
+    expect(await screen.findByRole('button', { name: 'Save Scale Reference' })).toBeInTheDocument()
+    expect(onCreated).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Backyard plot',
+        address: null,
+        latitude: null,
+        longitude: null,
+        baseMapSource: 'photo',
+      }),
+    )
+    expect(fake.storage.upload).toHaveBeenCalled()
+  })
+
+  it('creates a Property directly from a drawn plan', async () => {
+    const { onCreated } = renderCreateSetup('Front yard')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Draw a base plan' }))
+    clickAt('base-map-drawing-surface', 0, 0)
+    clickAt('base-map-drawing-surface', 100, 0)
+    await userEvent.click(screen.getByRole('button', { name: 'Finish this line' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Done drawing' }))
+
+    clickAt('scale-reference-surface', 0, 0)
+    clickAt('scale-reference-surface', 100, 0)
+    await userEvent.type(screen.getByLabelText('Real-world distance (feet)'), '10')
+    await userEvent.click(screen.getByRole('button', { name: 'Save Scale Reference' }))
+
+    expect(onCreated).toHaveBeenCalledWith(
+      expect.objectContaining({ name: 'Front yard', address: null, baseMapSource: 'drawn' }),
+    )
   })
 })
 

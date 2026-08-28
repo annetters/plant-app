@@ -7,30 +7,40 @@ import { usePropertiesRepository } from './PropertiesRepositoryContext'
 
 type Step = 'choose' | 'photo' | 'draw' | 'calibrate'
 
+/**
+ * `'create'`: no Property exists yet — the gardener picked "upload/draw my
+ * own base map" up front, before any address/aerial attempt (see
+ * CONTEXT.md's Property entry). `'update'`: a Property already exists (it
+ * was created as `'aerial'`) but its address turned out to have no imagery
+ * coverage — this is completing that original setup via a fallback, not
+ * changing a settled choice.
+ */
+type BaseMapSetupProps =
+  | { mode: 'create'; name: string; onCreated: (property: Property) => void }
+  | { mode: 'update'; property: Property; onUpdated: (property: Property) => void }
+
 function clickPoint(event: ReactMouseEvent<HTMLDivElement>): ScalePoint {
   const rect = event.currentTarget.getBoundingClientRect()
   return { x: event.clientX - rect.left, y: event.clientY - rect.top }
 }
 
 /**
- * Ticket #6: the fallback flow once aerial imagery turns out unavailable
- * (see CONTEXT.md's Property/Scale Reference entries) — upload a
- * photographed plot plan/survey, or draw a base plan directly in the app,
- * then calibrate whichever one against a real-world distance. Everything
- * here stays local state until "Save Scale Reference" persists it all in
- * one `updateBaseMap` call, so a Property never sits half-configured (e.g. a
- * photo saved with no scale yet) between steps.
+ * Ticket #6: upload a photographed plot plan/survey, or draw a base plan
+ * directly in the app, then calibrate whichever one against a real-world
+ * distance. Everything here stays local state until "Save Scale Reference"
+ * persists it all in one call, so a Property never sits half-configured
+ * (e.g. a photo saved with no scale yet) between steps.
  */
-export function BaseMapSetup({
-  property,
-  onUpdated,
-}: {
-  property: Property
-  onUpdated: (property: Property) => void
-}) {
+export function BaseMapSetup(props: BaseMapSetupProps) {
   const repository = usePropertiesRepository()
   const [step, setStep] = useState<Step>('choose')
   const [source, setSource] = useState<BaseMapSource | null>(null)
+  // Generated up front even in 'update' mode (where it's unused) so the
+  // storage path an uploaded photo lands under is stable for the whole flow
+  // — see `createWithBaseMap`, which inserts the Property row under this
+  // same id afterward.
+  const [pendingId] = useState(() => crypto.randomUUID())
+  const propertyId = props.mode === 'update' ? props.property.id : pendingId
 
   const [uploading, setUploading] = useState(false)
   const [photoPath, setPhotoPath] = useState<string | null>(null)
@@ -52,7 +62,7 @@ export function BaseMapSetup({
     setError(null)
     setUploading(true)
     try {
-      const path = await repository.uploadBaseMapPhoto(property.id, file)
+      const path = await repository.uploadBaseMapPhoto(propertyId, file)
       const url = await repository.getBaseMapPhotoUrl(path)
       setPhotoPath(path)
       setPhotoPreviewUrl(url)
@@ -113,13 +123,25 @@ export function BaseMapSetup({
     setError(null)
     setSaving(true)
     try {
-      const updated = await repository.updateBaseMap(property.id, {
-        baseMapSource: source as BaseMapSource,
-        baseMapPhotoPath: source === 'photo' ? photoPath : null,
-        baseMapDrawing: source === 'drawn' ? strokes : null,
-        scaleReference,
-      })
-      onUpdated(updated)
+      if (props.mode === 'create') {
+        const created = await repository.createWithBaseMap({
+          id: propertyId,
+          name: props.name,
+          baseMapSource: source as 'photo' | 'drawn',
+          baseMapPhotoPath: source === 'photo' ? photoPath : null,
+          baseMapDrawing: source === 'drawn' ? strokes : null,
+          scaleReference,
+        })
+        props.onCreated(created)
+      } else {
+        const updated = await repository.updateBaseMap(props.property.id, {
+          baseMapSource: source as BaseMapSource,
+          baseMapPhotoPath: source === 'photo' ? photoPath : null,
+          baseMapDrawing: source === 'drawn' ? strokes : null,
+          scaleReference,
+        })
+        props.onUpdated(updated)
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save this base map.')
     } finally {
@@ -128,7 +150,10 @@ export function BaseMapSetup({
   }
 
   return (
-    <section aria-label="Set up a base map another way" className="base-map-setup">
+    <section
+      aria-label={props.mode === 'create' ? 'Upload or draw your base map' : 'Set up a base map another way'}
+      className="base-map-setup"
+    >
       {error && <p role="alert">{error}</p>}
 
       {step === 'choose' && (

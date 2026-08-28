@@ -28,6 +28,7 @@ function validInput(overrides: Partial<PropertyInput> = {}): PropertyInput {
     baseMapPhotoPath: null,
     baseMapDrawing: null,
     scaleReference: null,
+    name: null,
     ...overrides,
   };
 }
@@ -72,6 +73,50 @@ describe("validatePropertyInput", () => {
       errors: { longitude: "Longitude must be between -180 and 180." },
     });
   });
+
+  it("rejects an aerial Property with no address/latitude/longitude", () => {
+    const result = validatePropertyInput(
+      validInput({ address: null, latitude: null, longitude: null }),
+    );
+    expect(result).toEqual({
+      ok: false,
+      errors: {
+        address: "Address is required.",
+        latitude: "Latitude is required.",
+        longitude: "Longitude is required.",
+      },
+    });
+  });
+
+  it("accepts a photo/drawn Property with a name and no address/latitude/longitude at all", () => {
+    const result = validatePropertyInput(
+      validInput({
+        baseMapSource: "photo",
+        name: "Backyard plot",
+        address: null,
+        resolvedAddress: null,
+        latitude: null,
+        longitude: null,
+        imageryZoom: null,
+        imageryAvailable: false,
+        baseMapPhotoPath: "user-1/property-1/plan.jpg",
+        scaleReference: {
+          pointA: { x: 0, y: 0 },
+          pointB: { x: 100, y: 0 },
+          realDistanceFeet: 10,
+          mode: "known-measurement",
+        },
+      }),
+    );
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("rejects a photo/drawn Property with a blank name", () => {
+    const result = validatePropertyInput(
+      validInput({ baseMapSource: "drawn", name: "   ", address: null }),
+    );
+    expect(result).toEqual({ ok: false, errors: { name: "Name is required." } });
+  });
 });
 
 describe("propertyInputToRow / propertyFromRow", () => {
@@ -95,7 +140,30 @@ describe("propertyInputToRow / propertyFromRow", () => {
       baseMapPhotoPath: input.baseMapPhotoPath,
       baseMapDrawing: input.baseMapDrawing,
       scaleReference: input.scaleReference,
+      name: input.name,
     });
+  });
+
+  it("preserves a name and a null address (a photo/drawn Property with no geocoding)", () => {
+    const input = validInput({
+      baseMapSource: "photo",
+      name: "Backyard plot",
+      address: null,
+      resolvedAddress: null,
+      latitude: null,
+      longitude: null,
+      imageryZoom: null,
+      imageryAvailable: false,
+      baseMapPhotoPath: "user-1/property-1/plan.jpg",
+    });
+    const row: PropertyRow = {
+      id: "property-1",
+      created_at: "2026-01-01T00:00:00.000Z",
+      ...propertyInputToRow(input),
+    };
+    const property = propertyFromRow(row);
+    expect(property.name).toBe("Backyard plot");
+    expect(property.address).toBeNull();
   });
 
   it("preserves a null imageryZoom (no imagery available anywhere)", () => {
@@ -203,7 +271,7 @@ describe("aerialTileUrl", () => {
 describe("pixelsPerFootForProperty", () => {
   it("derives from latitude/zoom for an aerial Property", () => {
     const property = validProperty({ baseMapSource: "aerial", imageryZoom: 20 });
-    expect(pixelsPerFootForProperty(property)).toBe(pixelsPerFoot(property.latitude, 20));
+    expect(pixelsPerFootForProperty(property)).toBe(pixelsPerFoot(property.latitude!, 20));
   });
 
   it("returns null for an aerial Property with no imagery available", () => {

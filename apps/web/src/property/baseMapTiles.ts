@@ -19,7 +19,9 @@ export interface BaseMapTile {
 }
 
 export function baseMapTiles(property: Property): BaseMapTile[] {
-  if (property.imageryZoom === null) return []
+  if (property.imageryZoom === null || property.latitude === null || property.longitude === null) {
+    return []
+  }
   const center = lonLatToTile(property.latitude, property.longitude, property.imageryZoom)
   const tiles: BaseMapTile[] = []
   for (let dy = -GRID_RADIUS; dy <= GRID_RADIUS; dy++) {

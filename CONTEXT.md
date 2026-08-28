@@ -78,6 +78,20 @@ of it, positioned by eye against the real features it shows. The latter two
 base-map sources carry no inherent scale and require a Scale Reference to
 establish one.
 
+Which source to use is a **free choice offered up front** when the Property
+is first created, not a fallback only reachable once an address turns out to
+have no aerial coverage — a gardener may prefer their own photographed/drawn
+plan simply because the imagery available isn't usable (outdated, obscured
+by tree cover, too low-res), or for privacy: choosing photo/drawn skips
+geocoding entirely, so no address is ever sent to Nominatim or Esri for that
+Property. A photo/drawn Property therefore has no address at all — it's
+identified by a user-chosen name instead. The choice is made once, at
+creation; it isn't revisited afterward (a Property is recreated, not
+re-sourced, to change it) — with one exception: an aerial Property whose
+address turns out to have no imagery coverage can still fall back to
+photo/drawn afterward, since that's completing the original setup, not
+switching a settled choice.
+
 ### Scale Reference
 Establishes a Property's scale when it has none of its own (i.e. no aerial
 image — see Property). Two entry modes, producing the same underlying data —
