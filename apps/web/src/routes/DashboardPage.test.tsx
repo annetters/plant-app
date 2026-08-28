@@ -6,7 +6,7 @@ import { createMockAuthClient } from '../test/mockAuthClient'
 import { DashboardPage } from './DashboardPage'
 
 describe('DashboardPage', () => {
-  it('shows a placeholder tile linking to each of Map, Registry, and Bloom Timeline', () => {
+  it('shows a link to each of Map, Registry, and Bloom Timeline', () => {
     const { client } = createMockAuthClient(null)
     render(
       <MemoryRouter>
