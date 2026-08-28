@@ -31,12 +31,41 @@ lookup with no match (clean `{"species":[]}`, not an error — matches the
 "no match is a routine outcome" design). All passed.
 
 **Still needed before #20 can close**: a real-device manual walkthrough of
-the mobile Tag Scan flow via Expo Go — front/back capture, manual entry,
-species lookup + ambiguous-species picker, duplicate-Plant offer
-(including the "create anyway" override), and the USDA-suggested-traits
-screen (now backed by a live, verified function rather than an undeployed
-one). None of this has been exercised outside Jest's fake DB client as of
-this update.
+the mobile Tag Scan flow, via the custom EAS dev client built in #22 (not
+Expo Go — Expo Go can't run the native Vision OCR module) — front/back
+capture, manual entry, species lookup + ambiguous-species picker,
+duplicate-Plant offer (including the "create anyway" override), and the
+USDA-suggested-traits screen (now backed by a live, verified function
+rather than an undeployed one). None of this has been exercised outside
+Jest's fake DB client as of this update.
+
+**PAUSED HERE mid-QA, resume by asking the user for their results** — the
+user has the dev-client app open on their phone (`npx expo start
+--dev-client` running, same Wi-Fi as the Mac, per
+`apps/mobile/README.md`'s "Day-to-day workflow") and was handed this
+six-item checklist to work through at their own pace, with no results
+reported back yet:
+1. Capture a real tag (front required; try both "photograph the back" and
+   "Skip — no back photo" across different tags).
+2. Manual entry — type common/scientific name by hand, confirming the
+   fallback still works even when OCR fills something in.
+3. Species lookup button — hits the now-deployed `usda-plant-traits`
+   function; either suggested traits or a clean "not found" are both valid
+   outcomes, just shouldn't error/hang.
+4. Ambiguous-common-name picker (try a common name spanning multiple
+   species, e.g. "sage").
+5. Duplicate-Plant detection against a Plant already in the Registry,
+   including the "create anyway" override.
+6. Accept vs. skip the suggested-traits screen, confirming the right thing
+   lands on the saved Plant either way.
+
+When the user reports back: if all six pass cleanly, that's the last item
+needed to close #20 — see the closing pattern used for #6/#8/#9/#10/#22
+(GitHub closing comment summarizing the full QA, commit reference if any
+code changes were needed, then updating this doc's "Issue tracker"
+frontier query — #20's closure doesn't unblock anything new, since nothing
+lists it as a blocker). If something fails, fix it, re-verify, and only
+close once it's genuinely clean, same as every prior ticket in this repo.
 
 ---
 
