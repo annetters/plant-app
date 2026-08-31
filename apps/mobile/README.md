@@ -154,6 +154,61 @@ So every normal session working on this app:
 You do **not** need to open Xcode or press ▶ Run again for routine work —
 screens, styling, business logic — only when native code changes.
 
+## Troubleshooting: dev client won't connect (blank screen / crash / stuck attach)
+
+Found while debugging a genuinely broken dev client build (2026-08-29/30) —
+several distinct problems stacked on top of each other, worth reading in the
+order below since each one masked the next:
+
+1. **Blank white screen, then a native crash**: `RCTFatal`, `No script URL
+   provided`, `UnsanitizedURLString = (null)`. Root cause: `scripts/setup-
+   tag-ocr-dev-client.sh` never actually runs `npx expo install expo-dev-
+   client` — none of its 7 stages install the package, so `expo prebuild`
+   (which only bakes in plugins/modules already installed) never wires the
+   real dev-launcher into the native project. A dev client built by that
+   script today is missing the one thing that makes it a dev client. **A
+   reliable tell**: Metro itself prints this when you start it against such
+   a build — "Unable to determine the default URI scheme for deep linking
+   into the app. Ensure that the expo-dev-client package is installed." —
+   recognize that line immediately if it comes up again.
+   This can look like it works anyway if you're driving the app live from
+   Xcode's ▶ Run each time, since Xcode injects the Metro server location
+   directly at build/launch time regardless of the dev-launcher. It only
+   breaks once you rely on the day-to-day workflow above (open the app
+   cold, no Xcode attached) — there's no dev-launcher to rediscover Metro.
+   **Fix**, from `apps/mobile`: `npx expo install expo-dev-client`, then
+   `npx expo prebuild --clean` (regenerates `ios/`/`android/` with the
+   dev-launcher wired in, reruns `pod install`), then rebuild via Xcode
+   (stage 6 of the setup script). Confirms fixed when a cold launch shows a
+   real "Development servers" screen instead of crashing.
+2. **Metro started from the repo root instead of `apps/mobile`** doesn't
+   fail loudly — it silently scaffolds a stray `.expo/` folder and
+   `tsconfig.json` at the repo root and prints confusing downstream errors,
+   since Expo CLI treats whatever directory it's run from as "the project."
+   Always check the CLI's own "Starting project at ..." line points at
+   `.../apps/mobile` before troubleshooting anything else; delete any stray
+   `.expo/`/`tsconfig.json` that end up at the repo root by mistake.
+3. **Xcode says "Build Succeeded" but then hangs indefinitely at "Attaching
+   to [device]"** — no error, no trust prompt on the phone. Not a project
+   issue: reproduced with the device fully paired, wired, developer-mode
+   enabled, and tunnel-connected (confirmed via `xcrun devicectl device
+   info details`), so this is a known flaky spot in Xcode's own
+   device-attach pipeline (CoreDevice/RemoteXPC). Fix, in the order that
+   tends to resolve it: restart the iPhone (a full restart, not just
+   force-quitting the app) and retry; if still stuck, Xcode's **Window →
+   Devices and Simulators** → right-click the device → **Unpair Device** →
+   reconnect the cable (re-trust if prompted) → retry.
+4. Even with a genuine dev-launcher present, its "Development servers"
+   screen can say "No development servers found" with Metro running and
+   the phone on the same Wi-Fi — Bonjour/QR auto-discovery isn't reliable.
+   Use the launcher's **"Enter URL manually"** option instead:
+   `<mac-ip>:8081`, where `<mac-ip>` is `ipconfig getifaddr en0` on the Mac.
+5. `npx expo start --dev-client --tunnel` failed here with `@expo/ngrok`'s
+   global install returning exit code 243 — plausibly the same non-admin-
+   account/Homebrew-permissions class of issue documented above, not fully
+   diagnosed. Treat tunnel mode as unreliable on this machine for now; the
+   manual-URL entry in point 4 is the practical fallback.
+
 ## Commands
 
 Run from the repo root (workspace-aware) or from this directory:
