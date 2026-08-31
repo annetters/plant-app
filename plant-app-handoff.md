@@ -1,13 +1,77 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-27 (updated: #20's Edge Function deployed + smoke-tested)
+**Date:** 2026-08-31 (updated: #20 closed — real-device QA complete)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
 
-**#20 (Tag Scan build) — its `usda-plant-traits` Edge Function is now
+**#20 (Tag Scan build) is now fully closed on GitHub** — the real-device
+manual QA checklist (the one remaining item from this doc's prior entry)
+was run end-to-end on a physical iPhone via the EAS dev client, and all six
+items passed: front/back capture, manual entry, species lookup, the
+ambiguous-common-name picker, duplicate-Plant detection (including "create
+anyway"), and the suggested-traits accept/skip screen. See the closing
+comment on the issue for full detail.
+
+**Getting a working dev client onto the phone took real, unplanned
+debugging this session**, separate from #20's own QA — worth knowing about
+since it's now written up as a permanent troubleshooting section in
+`apps/mobile/README.md` ("Troubleshooting: dev client won't connect"):
+`scripts/setup-tag-ocr-dev-client.sh` never actually installs
+`expo-dev-client` in any of its 7 stages, so the dev client built during
+#22 was never a real dev client — it only ever appeared to work because it
+was driven live from Xcode's ▶ Run each time. Diagnosed via the exact `RCTFatal`/"No
+script URL provided" crash plus Expo CLI's own "Ensure expo-dev-client
+package is installed" warning. Fixed this session (`npx expo install
+expo-dev-client` + `npx expo prebuild --clean` + reinstall via Xcode) —
+**but that fix (`apps/mobile/package.json`/`package-lock.json`) is still
+sitting uncommitted, along with the README troubleshooting section,
+pending the user's go-ahead to commit.** The setup script itself still has
+the underlying gap (never runs `npx expo install expo-dev-client`) and
+hasn't been patched — worth doing before anyone else runs through that
+wizard fresh.
+
+Two real bugs surfaced during the device QA itself, both fixed, tested, and
+already committed/pushed/deployed:
+- **`usda-plant-traits`'s common-name search required an exact match**
+  against USDA's `commonName` field, but USDA's values are always
+  adjective-qualified compound names ("common sunflower", "garden tomato")
+  — a bare word a user naturally types (sunflower, tomato, daisy, phlox,
+  false indigo) could never match, silently returning a clean but wrong "no
+  match" every time. The exact same mistake was independently duplicated
+  client-side in `resolveCommonName`, re-filtering the server's (once
+  fixed) results against the same bare-word needle and discarding them
+  again. Both fixed to substring matching. Commit `f057872`, redeployed.
+- **The ambiguous-species picker ("Which one is this?") had no way to
+  leave the screen** if none of the listed options matched the physical
+  tag — no Cancel/back button, and the app's `headerShown: false` (global,
+  set in #13 to fix a real notch/safe-area bug) meant no default back
+  button either. Fixed with a "Go back and edit" link back to Review
+  (`navigation.goBack()`, preserves captured photos), matching the existing
+  pattern on `TagScanDuplicateOfferScreen` for the same kind of situation.
+  Commit `724df5f`. Deliberately did **not** touch the global
+  `headerShown: false` setting itself to fix this — filed separately as
+  **#26** (`needs-triage`) since re-enabling native headers risks
+  reintroducing #13's regression across the whole app, not just one
+  screen; the user specifically asked to revisit this later, not now.
+
+Full monorepo typecheck/test suite green throughout (187 domain + 65
+mobile). **Pushed to `origin/main`** — `724df5f` is the tip as of this
+update.
+
+**#20's closure doesn't unblock anything new** — confirmed directly against
+the API: **#12, #14, #15, #16, #17** are all already frontier
+(`blocked_by: 0`, unassigned) independent of #20. **#18** remains blocked
+(`blocked_by: 1`, still needs #12). **#26** is `needs-triage`, not blocking
+anything. Whoever resumes next should pick one of the frontier tickets —
+this doc doesn't prescribe which.
+
+---
+
+**Previous entry, superseded above** — #20 (Tag Scan build)'s
+`usda-plant-traits` Edge Function is now
 deployed and smoke-tested; #20 is still open, one item left.** Checked
 live rather than trusting this doc's own prior "still needed" claim (which
 turned out to be stale): migrations `0009`/`0010` were already live
