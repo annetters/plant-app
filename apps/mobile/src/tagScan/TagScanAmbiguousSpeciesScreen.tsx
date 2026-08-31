@@ -25,10 +25,13 @@ export function TagScanAmbiguousSpeciesScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <Pressable accessibilityRole="button" onPress={() => navigation.goBack()}>
+        <Text style={styles.backText}>Go back and edit</Text>
+      </Pressable>
       <Text style={styles.title}>Which one is this?</Text>
       <Text>
         "{candidate.commonName}" matches more than one species. Check the physical tag, then pick
-        the one it names.
+        the one it names. If none of these are right, go back and adjust what you typed.
       </Text>
       <FlatList
         data={species}
@@ -68,5 +71,8 @@ const styles = StyleSheet.create({
   optionScientificName: {
     fontStyle: 'italic',
     fontWeight: '600',
+  },
+  backText: {
+    color: '#2e7d32',
   },
 })

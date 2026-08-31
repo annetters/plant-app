@@ -1,6 +1,7 @@
-import { NavigationContainer } from '@react-navigation/native'
+import { NavigationContainer, useNavigation } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
+import { useEffect } from 'react'
 import { Text } from 'react-native'
 import { TagScanAmbiguousSpeciesScreen } from './TagScanAmbiguousSpeciesScreen'
 
@@ -55,5 +56,38 @@ describe('TagScanAmbiguousSpeciesScreen', () => {
       scientificName: 'Monarda fistulosa',
     })
     expect(params.photoIds).toEqual(photoIds)
+  })
+
+  it('lets the user leave the screen without picking any option, back to Review, when none of them match', async () => {
+    function ReviewStandIn() {
+      const navigation = useNavigation<any>()
+      useEffect(() => {
+        navigation.navigate('TagScanAmbiguousSpecies', {
+          scanId: 'scan-1',
+          photoIds,
+          candidate: { commonName: 'bee balm' },
+          species: [
+            { scientificName: 'Monarda didyma', commonName: 'bee balm' },
+            { scientificName: 'Monarda fistulosa', commonName: 'bee balm' },
+          ],
+        })
+      }, [navigation])
+      return <Text>back on review</Text>
+    }
+
+    await render(
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="TagScanReview" component={ReviewStandIn} />
+          <Stack.Screen name="TagScanAmbiguousSpecies" component={TagScanAmbiguousSpeciesScreen} />
+        </Stack.Navigator>
+      </NavigationContainer>,
+    )
+
+    await waitFor(() => expect(screen.getByText('Monarda fistulosa')).toBeTruthy())
+
+    await fireEvent.press(screen.getByText('Go back and edit'))
+
+    expect(await screen.findByText('back on review')).toBeTruthy()
   })
 })
