@@ -82,4 +82,20 @@ describe("resolveCommonName", () => {
     const result = resolveCommonName("bee balm", [monardaDidyma, { ...monardaDidyma }]);
     expect(result).toEqual({ status: "resolved", species: monardaDidyma });
   });
+
+  it("matches a bare word against USDA's adjective-qualified compound common names", () => {
+    const commonSunflower: SpeciesNameSummary = {
+      scientificName: "Helianthus annuus",
+      commonName: "common sunflower",
+    };
+    const swampSunflower: SpeciesNameSummary = {
+      scientificName: "Helianthus angustifolius",
+      commonName: "swamp sunflower",
+    };
+    const result = resolveCommonName("sunflower", [commonSunflower, swampSunflower]);
+    expect(result).toEqual({
+      status: "ambiguous",
+      candidates: [commonSunflower, swampSunflower],
+    });
+  });
 });

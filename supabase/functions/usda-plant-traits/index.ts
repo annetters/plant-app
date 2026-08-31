@@ -118,8 +118,13 @@ Deno.serve(async (req) => {
 
   if (input.commonName) {
     const needle = input.commonName.toLowerCase();
+    // USDA's own commonName values are always adjective-qualified compound
+    // names ("common sunflower", "garden tomato", "moss phlox") — an exact
+    // match against a bare word a user naturally types (e.g. "sunflower")
+    // can never succeed, so this searches for the typed name as a substring
+    // instead of requiring the whole string to match.
     const matches = species
-      .filter((s) => s.commonName?.toLowerCase() === needle)
+      .filter((s) => s.commonName?.toLowerCase().includes(needle))
       .map(toSpeciesNameSummary)
       .filter((s): s is SpeciesNameSummary => s !== null);
     // No match is a routine, common outcome (ADR-0004: USDA is a

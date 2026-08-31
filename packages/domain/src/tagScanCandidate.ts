@@ -86,7 +86,11 @@ export function resolveCommonName(
   knownSpecies: readonly SpeciesNameSummary[],
 ): CommonNameResolution {
   const needle = commonName.trim().toLowerCase();
-  const matches = knownSpecies.filter((species) => species.commonName.trim().toLowerCase() === needle);
+  // Substring, not exact-equality: USDA's own commonName values are always
+  // adjective-qualified compound names ("common sunflower"), never the bare
+  // word a user naturally types — an equality check would discard every
+  // real match the caller's search already found.
+  const matches = knownSpecies.filter((species) => species.commonName.trim().toLowerCase().includes(needle));
 
   const distinctByScientificName = new Map<string, SpeciesNameSummary>();
   for (const species of matches) {
