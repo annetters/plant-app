@@ -228,6 +228,7 @@ export function RegistryScreen() {
                   placeholder="Name or cultivar"
                   value={search}
                   onChangeText={setSearch}
+                  clearButtonMode="while-editing"
                 />
               </View>
 
@@ -238,6 +239,7 @@ export function RegistryScreen() {
                   style={styles.input}
                   value={flowerColor}
                   onChangeText={setFlowerColor}
+                  clearButtonMode="while-editing"
                 />
               </View>
 
@@ -381,7 +383,7 @@ const styles = StyleSheet.create({
   },
   listItem: {
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: '#ccc',
     borderRadius: 4,
     padding: 12,
     gap: 4,
