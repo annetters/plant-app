@@ -10,6 +10,7 @@ export type TagScanPhotoIds = { frontTagPhotoId: string; backTagPhotoId?: string
 
 export type MainStackParamList = {
   Dashboard: undefined
+  Registry: undefined
   TagScanCapture: undefined
   TagScanMultipleReadings: {
     scanId: string

@@ -1,6 +1,8 @@
 export { DASHBOARD_TILES } from "./dashboard.js";
 export type { DashboardTile } from "./dashboard.js";
 
+export { MONTH_NAMES, formatMonthDay, formatOption, plantLabel } from "./plantDisplay.js";
+
 export {
   FOLIAGE_TYPES,
   HARDINESS_ZONE_NUMBERS,
@@ -151,3 +153,32 @@ export type { BloomTimelineBar } from "./bloomTimeline.js";
 
 export { filterRegistryEntries } from "./registry.js";
 export type { RegistryFilters } from "./registry.js";
+
+export {
+  buildPlantingTaskHistory,
+  taskCompletionFromRow,
+  taskCompletionInputToRow,
+  validateTaskCompletionInput,
+} from "./taskCompletion.js";
+export type {
+  PlantingTaskHistoryEntry,
+  TaskCompletion,
+  TaskCompletionInput,
+  TaskCompletionRow,
+  TaskCompletionStatus,
+  TaskCompletionValidationErrors,
+  TaskCompletionValidationResult,
+} from "./taskCompletion.js";
+
+export {
+  oneOffTodoFromRow,
+  oneOffTodoInputToRow,
+  validateOneOffTodoInput,
+} from "./oneOffTodo.js";
+export type {
+  OneOffTodo,
+  OneOffTodoInput,
+  OneOffTodoRow,
+  OneOffTodoValidationErrors,
+  OneOffTodoValidationResult,
+} from "./oneOffTodo.js";

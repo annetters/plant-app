@@ -30,11 +30,22 @@ export function DashboardScreen() {
         <Text style={styles.scanButtonText}>Scan a tag</Text>
       </Pressable>
       <View style={styles.tiles}>
-        {DASHBOARD_TILES.map((tile) => (
-          <View key={tile.id} style={styles.tile}>
-            <Text>{tile.label}</Text>
-          </View>
-        ))}
+        {DASHBOARD_TILES.map((tile) =>
+          tile.id === 'registry' ? (
+            <Pressable
+              key={tile.id}
+              accessibilityRole="button"
+              style={styles.tile}
+              onPress={() => navigation.navigate('Registry')}
+            >
+              <Text>{tile.label}</Text>
+            </Pressable>
+          ) : (
+            <View key={tile.id} style={styles.tile}>
+              <Text>{tile.label}</Text>
+            </View>
+          ),
+        )}
       </View>
     </SafeAreaView>
   )

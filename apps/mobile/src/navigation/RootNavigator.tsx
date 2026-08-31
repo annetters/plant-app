@@ -1,5 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { useAuth } from '../auth/AuthContext'
+import { RegistryScreen } from '../registry/RegistryScreen'
 import { DashboardScreen } from '../screens/DashboardScreen'
 import { LoadingScreen } from '../screens/LoadingScreen'
 import { LoginScreen } from '../screens/LoginScreen'
@@ -39,6 +40,7 @@ export function RootNavigator() {
   return (
     <MainStack.Navigator screenOptions={{ headerShown: false }}>
       <MainStack.Screen name="Dashboard" component={DashboardScreen} />
+      <MainStack.Screen name="Registry" component={RegistryScreen} />
       <MainStack.Screen name="TagScanCapture" component={TagScanCaptureScreen} />
       <MainStack.Screen name="TagScanMultipleReadings" component={TagScanMultipleReadingsScreen} />
       <MainStack.Screen name="TagScanReview" component={TagScanReviewScreen} />

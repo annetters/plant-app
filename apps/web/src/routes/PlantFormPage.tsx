@@ -4,6 +4,7 @@ import {
   NATIVE_STATUSES,
   SUN_REQUIREMENTS,
   dateRangeWraps,
+  formatOption,
   validateCareTaskTemplateInput,
   validatePlantInput,
   type CareTaskTemplate,
@@ -15,7 +16,6 @@ import {
 } from '@plant-app/domain'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { formatOption } from '../plants/formatOption'
 import {
   EMPTY_PLANT_FORM_FIELDS,
   plantFormFieldsFromPlant,

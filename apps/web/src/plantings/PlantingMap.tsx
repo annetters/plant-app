@@ -4,12 +4,12 @@ import {
   findBedContainingPoint,
   pixelsPerFootForProperty,
   pixelsToFeet,
+  plantLabel,
   validatePlantingInput,
   validatePlantingPhotoInput,
 } from '@plant-app/domain'
 import Konva from 'konva'
 import { useEffect, useRef, useState } from 'react'
-import { plantLabel } from '../plants/plantLabel'
 import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
 import { BaseMapBackground } from '../property/BaseMapBackground'
 import { STAGE_SIZE_PX } from '../property/baseMapTiles'
