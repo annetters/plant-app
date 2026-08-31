@@ -1,13 +1,62 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-31 (updated: #20 closed — real-device QA complete)
+**Date:** 2026-08-30 (updated: #16 closed — native Registry QA complete)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
 
-**#20 (Tag Scan build) is now fully closed on GitHub** — the real-device
+**#16 (Native: Registry view) is now fully closed on GitHub** — phone
+parity for the Registry, manually QA'd by the user directly on a real
+device against real Plant/Bed/Planting data. See the closing comment on
+the issue for full detail.
+
+Built (commit `103091b`): a new mobile `RegistryScreen` matching the web
+Registry's filter/search axes (search, flower color, bloom month, sun
+requirement, foliage type, native status, all combinable — reuses the
+same `filterRegistryEntries` from `@plant-app/domain` web already uses),
+wired from the Dashboard's Registry tile. New read-only mobile
+Plants/Beds/Plantings/Properties repositories, mirroring web's pattern
+but trimmed to list/get only.
+
+**Scoping call, not a gap**: there's no native Map screen yet (#14 is
+still unbuilt), so a Planting's location shows as plain "In [Bed name]"
+text rather than a live link to a map that doesn't exist yet — same
+reasoning as web's `/map?plantingId=` link, just without a target to jump
+to. Once #14 ships, this can become a real navigation target.
+
+A `/code-review` pass caught one real issue before QA: `formatOption`/
+`MONTH_NAMES`/`formatMonthDay`/`plantLabel` had been copy-pasted from web
+rather than shared, and the mobile copy had already silently drifted
+(dropped web's undefined-Plant fallback). Fixed by moving all four into
+`packages/domain` and repointing both apps at the shared source.
+
+**Manual QA** by the user on a real device, against an account with real
+Plant/Bed/Planting data, found and fixed two real bugs (commit
+`e0b5ede`): list-item borders too light to see (`#eee` → `#ccc`), and no
+way to clear the search/flower-color fields except repeated backspace
+(added iOS's native `clearButtonMode`). A third report — Foliage/Native
+status filters returning 0 results for everything — turned out not to be
+a bug: confirmed via the web app's own Plant edit form that those fields
+were genuinely never set on the affected Plants (skipped as optional
+during manual entry). The underlying UX gap this exposed — a zero-match
+filter result can't distinguish "no matches" from "field never set" — is
+filed as **#27** (`needs-triage`), not blocking anything.
+
+Full monorepo typecheck/test suite green throughout (209 domain + 78
+mobile + 166 web).
+
+**#16's closure doesn't unblock anything new** — confirmed directly
+against the API: **#12, #14, #15, #17** were already frontier
+(`blocked_by: 0`, unassigned) independent of #16. **#18** remains blocked
+(`blocked_by: 1`, still needs #12). **A concurrent session is already
+working on #12** — don't pick it up again, whoever resumes next should
+choose a different frontier ticket (#14, #15, or #17).
+
+---
+
+**Previous entry, superseded above** — #20 (Tag Scan build) is now fully closed on GitHub** — the real-device
 manual QA checklist (the one remaining item from this doc's prior entry)
 was run end-to-end on a physical iPhone via the EAS dev client, and all six
 items passed: front/back capture, manual entry, species lookup, the
@@ -26,12 +75,11 @@ was driven live from Xcode's ▶ Run each time. Diagnosed via the exact `RCTFata
 script URL provided" crash plus Expo CLI's own "Ensure expo-dev-client
 package is installed" warning. Fixed this session (`npx expo install
 expo-dev-client` + `npx expo prebuild --clean` + reinstall via Xcode) —
-**but that fix (`apps/mobile/package.json`/`package-lock.json`) is still
-sitting uncommitted, along with the README troubleshooting section,
-pending the user's go-ahead to commit.** The setup script itself still has
-the underlying gap (never runs `npx expo install expo-dev-client`) and
-hasn't been patched — worth doing before anyone else runs through that
-wizard fresh.
+that fix (`apps/mobile/package.json`/`package-lock.json`), along with the
+README troubleshooting section, is committed — `58a23dc`. The setup
+script itself still has the underlying gap (never runs `npx expo install
+expo-dev-client`) and hasn't been patched — worth doing before anyone
+else runs through that wizard fresh.
 
 Two real bugs surfaced during the device QA itself, both fixed, tested, and
 already committed/pushed/deployed:
