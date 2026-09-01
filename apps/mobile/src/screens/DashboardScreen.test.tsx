@@ -15,6 +15,7 @@ function renderDashboard(client: ReturnType<typeof createMockAuthClient>['client
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
           <Stack.Screen name="Registry">{() => <Text>registry screen</Text>}</Stack.Screen>
+          <Stack.Screen name="BloomTimeline">{() => <Text>bloom timeline screen</Text>}</Stack.Screen>
           <Stack.Screen name="TagScanCapture">{() => <Text>tag scan capture screen</Text>}</Stack.Screen>
         </Stack.Navigator>
       </NavigationContainer>
@@ -39,6 +40,15 @@ describe('DashboardScreen', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Registry' }))
 
     expect(await screen.findByText('registry screen')).toBeTruthy()
+  })
+
+  it('navigates to the Bloom Timeline screen when the Bloom Timeline tile is pressed', async () => {
+    const { client } = createMockAuthClient(null)
+    await renderDashboard(client)
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Bloom Timeline' }))
+
+    expect(await screen.findByText('bloom timeline screen')).toBeTruthy()
   })
 
   it('logs out when the Log out button is pressed', async () => {

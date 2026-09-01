@@ -22,6 +22,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { ChipRow } from '../components/ChipRow'
 import type { MainStackParamList } from '../navigation/types'
 import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
 import { usePlantingsRepository } from '../plantings/PlantingsRepositoryContext'
@@ -50,51 +51,6 @@ function plantAttributeLines(plant: Plant): string[] {
   if (plant.foliageType) lines.push(`Foliage: ${formatOption(plant.foliageType)}`)
   if (plant.nativeStatus) lines.push(`Native status: ${formatOption(plant.nativeStatus)}`)
   return lines
-}
-
-function ChipRow({
-  label,
-  options,
-  selected,
-  onSelect,
-  formatChip,
-}: {
-  label: string
-  options: readonly string[]
-  selected: string
-  onSelect: (value: string) => void
-  formatChip: (value: string) => string
-}) {
-  return (
-    <View style={styles.filterRow}>
-      <Text style={styles.filterLabel}>{label}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View style={styles.chipRow}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityState={{ selected: selected === '' }}
-            style={[styles.chip, selected === '' && styles.chipSelected]}
-            onPress={() => onSelect('')}
-          >
-            <Text style={selected === '' ? styles.chipTextSelected : styles.chipText}>Any</Text>
-          </Pressable>
-          {options.map((option) => (
-            <Pressable
-              key={option}
-              accessibilityRole="button"
-              accessibilityState={{ selected: selected === option }}
-              style={[styles.chip, selected === option && styles.chipSelected]}
-              onPress={() => onSelect(selected === option ? '' : option)}
-            >
-              <Text style={selected === option ? styles.chipTextSelected : styles.chipText}>
-                {formatChip(option)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      </ScrollView>
-    </View>
-  )
 }
 
 const MONTH_OPTIONS = MONTH_NAMES.map((_, index) => String(index + 1))
@@ -355,28 +311,6 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     borderRadius: 4,
     padding: 8,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  chip: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 16,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-  },
-  chipSelected: {
-    borderColor: '#2e7d32',
-    backgroundColor: '#e8f5e9',
-  },
-  chipText: {
-    color: '#333',
-  },
-  chipTextSelected: {
-    color: '#2e7d32',
-    fontWeight: '600',
   },
   list: {
     gap: 16,

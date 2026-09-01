@@ -11,6 +11,7 @@ export type TagScanPhotoIds = { frontTagPhotoId: string; backTagPhotoId?: string
 export type MainStackParamList = {
   Dashboard: undefined
   Registry: undefined
+  BloomTimeline: undefined
   TagScanCapture: undefined
   TagScanMultipleReadings: {
     scanId: string
