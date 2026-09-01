@@ -1,13 +1,88 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-31 (updated: #12 closed — Task completion logging, history, and one-off todos)
+**Date:** 2026-08-31 (updated: #17 closed — Native: Bloom Timeline)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
 
-**#12 (Task completion logging, history, and one-off todos) is now fully
+**#17 (Native: Bloom Timeline) is now fully closed on GitHub** — phone
+parity for the Bloom Timeline, implemented and manually QA'd by the user
+directly on a real device via the dev client (not Playwright — this is a
+native RN screen, no browser involved). See the closing comment on the
+issue for full detail.
+
+Built (commits `51c9bf5`, `bd2214b`): a new mobile `BloomTimelineScreen`
+porting web's year-view chart + month-filtered list, both filterable by
+Bed, straight from `packages/domain/src/bloomTimeline.ts` (zero domain
+changes needed — `buildBloomTimelineBars`/`filterBloomTimelineBarsByMonth`
+already handled everything, including wrap-around bloom windows like
+Nov 15 → Feb 15). Reused the four read-only repositories built for #16
+(Registry) unchanged — no new repository/context files. The year-view
+chart's horizontal scroll is a bare `ScrollView horizontal`, no new native
+dependency (`react-native-reanimated`/`gesture-handler` considered and
+deliberately deferred — see the "Future idea" note in
+`BloomTimelineScreen.tsx`, since nothing in the acceptance criteria asked
+for snap/velocity effects beyond default momentum scrolling). Extracted
+Registry's private `ChipRow` into a shared `apps/mobile/src/components/
+ChipRow.tsx` since both screens needed the identical chip-filter UI.
+
+**Confirmed safe to build concurrently with #12** before starting — both
+of #17's blockers (#9 Bloom Timeline web, #13 RN scaffold) were already
+closed, and #12's in-progress changes at the time touched nothing #17
+needed (confirmed via file-level diff review, not assumed).
+
+A `/code-review` pass caught and fixed two real bugs before this landed:
+wrap detection compared pixel offsets (`endPx < startPx`) instead of using
+the domain's own `bloomWindowWraps`, which could misfire when a wrapping
+window's start/end landed on equal pixel offsets (e.g. a bloom window
+running June 1 → May 31); and the "No Beds yet" hint could show during an
+actual Beds-fetch error, not just when there really were no Beds. Both
+fixed with regression tests.
+
+**Manual QA on a real device found one more real bug, missed by both the
+initial port and code review**: a lone chart bar (single Plant, blooming
+in May) was nearly invisible — the native port had dropped web's visible
+track rail (`.bloom-bar-track`'s background + border) and its per-row
+month tick marks entirely, keeping only the bar itself. With nothing else
+drawn on the track, an empty stretch of the horizontal scroll looked
+identical to a broken render — there was nothing to anchor the eye to
+"this is a timeline." Fixed (`bd2214b`) by restoring both, matching web's
+`.bloom-bar-track`/`.bloom-month-tick`. A second report during the same QA
+pass turned out not to be a bug — scrolling itself always worked; the
+"track and label are side by side" description was just pointing out that
+an earlier checklist item's wording ("scrolls underneath") didn't match
+what was actually a correct, non-overlapping two-column layout. A
+speculative `flex: 1` fix made in response to the misread was reverted
+before committing, since it wasn't addressing a real problem.
+
+**Process note for next time**: mid-QA, the user corrected an over-eager
+commit — a QA-found fix had been committed without checking in first,
+while the user was still the one driving the pass. Recorded as a standing
+rule: fix and verify QA findings, but don't commit until the user says the
+pass is done, even when an earlier instruction in the same session said
+"commit your work" for the implementation that preceded QA.
+
+**Deferred, not run**: testing with iOS's Larger Text / Larger
+Accessibility Sizes turned up. `BloomTimelineScreen.tsx` uses fixed pixel
+constants (`ROW_HEIGHT`/`LABEL_WIDTH`/`AXIS_HEIGHT`/`CHART_WIDTH`) rather
+than web's CSS-percentage layout, so this needs a real check for
+truncation/clipping at larger text sizes — not yet done.
+
+Full monorepo typecheck/test suite green throughout (209 domain + 97
+mobile + 188 web at close).
+
+**#17's closure doesn't unblock anything new** — confirmed directly
+against the API: no open issue lists #17 as a blocker. **#14, #15, #18**
+remain frontier (all already unblocked independent of #17). Whoever
+resumes next should pick one of those — this doc doesn't prescribe which.
+
+**Pushed to `origin/main`** — `bd2214b` is the tip as of this update.
+
+---
+
+**Previous entry, superseded above** — **#12 (Task completion logging, history, and one-off todos) is now fully
 closed on GitHub** — implemented and manually QA'd by the user directly
 against the real linked Supabase project (dev server, not Playwright). See
 the closing comment on the issue for full detail.
