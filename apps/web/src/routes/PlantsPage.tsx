@@ -265,7 +265,7 @@ export function PlantsPage() {
                 return (
                   <li key={plant.id}>
                     <Link to={`/registry/${plant.id}`}>
-                      {plant.commonName} — <em>{plant.scientificName}</em>
+                      {plantLabel(plant)} — <em>{plant.scientificName}</em>
                     </Link>
                     {attributeLines.length > 0 && (
                       <p className="plant-list-attributes">{attributeLines.join(' · ')}</p>

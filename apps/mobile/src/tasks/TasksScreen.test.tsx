@@ -97,13 +97,24 @@ describe('TasksScreen', () => {
     expect(oneOffTodosFake.rows()).toHaveLength(1)
   })
 
+  it("renders a completed to-do's checkbox as checked, distinct from an on/off switch", async () => {
+    await renderScreen({
+      todoRows: [{ id: 'todo-1', text: 'Order mulch', done: true, created_at: '2026-01-01T00:00:00.000Z' }],
+    })
+    await screen.findByText('Order mulch')
+
+    const checkbox = screen.getByRole('checkbox', { name: 'Mark done: Order mulch' })
+    expect(checkbox.props.accessibilityState.checked).toBe(true)
+    expect(screen.queryByRole('switch')).toBeNull()
+  })
+
   it('toggles and removes a to-do', async () => {
     const { oneOffTodosFake } = await renderScreen({
       todoRows: [{ id: 'todo-1', text: 'Order mulch', done: false, created_at: '2026-01-01T00:00:00.000Z' }],
     })
     await screen.findByText('Order mulch')
 
-    await fireEvent(screen.getByRole('switch'), 'valueChange', true)
+    await fireEvent.press(screen.getByRole('checkbox', { name: 'Mark done: Order mulch' }))
     await waitFor(() => expect(oneOffTodosFake.rows()[0].done).toBe(true))
 
     await fireEvent.press(screen.getByLabelText('Remove to-do: Order mulch'))

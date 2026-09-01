@@ -82,6 +82,21 @@ describe('PlantingTaskHistoryScreen', () => {
     expect(taskCompletionsFake.rows()[0].status).toBe('done')
   })
 
+  it('gives the button matching the current status a distinct active look, not just the plain status text', async () => {
+    await renderScreen({
+      templateRows: [careTaskTemplateRow({ id: 't1', plant_id: 'plant-1', name: 'Fertilize' })],
+    })
+    await screen.findByText('Fertilize')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Mark done' }))
+    await waitFor(() => expect(screen.getByText('done')).toBeTruthy())
+
+    const doneButton = screen.getByRole('button', { name: 'Mark done' })
+    const missedButton = screen.getByRole('button', { name: 'Mark missed' })
+    expect(doneButton.props.accessibilityState.selected).toBe(true)
+    expect(missedButton.props.accessibilityState.selected).toBe(false)
+  })
+
   it('re-marking a task updates the same row rather than duplicating it', async () => {
     const { taskCompletionsFake } = await renderScreen({
       templateRows: [careTaskTemplateRow({ id: 't1', plant_id: 'plant-1', name: 'Fertilize' })],

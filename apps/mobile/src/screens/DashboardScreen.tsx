@@ -110,6 +110,9 @@ const styles = StyleSheet.create({
   },
   tasksLinkText: {
     color: '#2e7d32',
+    fontSize: 16,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   tiles: {
     gap: 8,

@@ -14,7 +14,7 @@ import {
 } from '@plant-app/domain'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { ChipRow } from '../components/ChipRow'
@@ -45,7 +45,8 @@ export function PlantDetailScreen() {
   const [formError, setFormError] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [photoBusy, setPhotoBusy] = useState(false)
+  const [photoBusy, setPhotoBusy] = useState<'camera' | 'library' | 'remove' | null>(null)
+  const scrollViewRef = useRef<ScrollView>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -109,7 +110,15 @@ export function PlantDetailScreen() {
 
   async function handleSave() {
     const input = validatedInputFor(referencePhotoPaths)
-    if (!input) return
+    if (!input) {
+      // The failing field's own inline error could be scrolled out of view
+      // (e.g. a blank required "Common name" at the top while the user is
+      // down by the Save button) — scroll back up so it's actually visible,
+      // and say so here too in case some of it still isn't.
+      setFormError('Fix the highlighted fields above.')
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true })
+      return
+    }
     setFormError(null)
     setStatusMessage(null)
     setSubmitting(true)
@@ -129,7 +138,7 @@ export function PlantDetailScreen() {
     try {
       const picked = await pickPhoto(source)
       if (!picked) return
-      setPhotoBusy(true)
+      setPhotoBusy(source)
       let uploadedPath: string | null = null
       try {
         uploadedPath = await repository.uploadReferencePhoto(plantId, picked)
@@ -148,7 +157,7 @@ export function PlantDetailScreen() {
         }
         setFormError((current) => current ?? 'Could not upload this photo. Please try again.')
       } finally {
-        setPhotoBusy(false)
+        setPhotoBusy(null)
       }
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'Could not open the photo picker.')
@@ -162,7 +171,7 @@ export function PlantDetailScreen() {
       setFormError('Fix the highlighted fields above, then remove photos again.')
       return
     }
-    setPhotoBusy(true)
+    setPhotoBusy('remove')
     setFormError(null)
     setStatusMessage(null)
     try {
@@ -173,7 +182,7 @@ export function PlantDetailScreen() {
     } catch {
       setFormError('Could not remove this photo. Please try again.')
     } finally {
-      setPhotoBusy(false)
+      setPhotoBusy(null)
     }
   }
 
@@ -207,7 +216,7 @@ export function PlantDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView ref={scrollViewRef} contentContainerStyle={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>{fields.commonName || 'Plant'}</Text>
           <Pressable accessibilityRole="button" onPress={() => navigation.goBack()}>
@@ -265,6 +274,7 @@ export function PlantDetailScreen() {
               placeholder="Start month"
               style={[styles.input, styles.dateInput]}
               keyboardType="number-pad"
+              maxLength={2}
               value={fields.bloomStartMonth}
               onChangeText={(value) => updateField('bloomStartMonth', value)}
             />
@@ -273,6 +283,7 @@ export function PlantDetailScreen() {
               placeholder="Start day"
               style={[styles.input, styles.dateInput]}
               keyboardType="number-pad"
+              maxLength={2}
               value={fields.bloomStartDay}
               onChangeText={(value) => updateField('bloomStartDay', value)}
             />
@@ -283,6 +294,7 @@ export function PlantDetailScreen() {
               placeholder="End month"
               style={[styles.input, styles.dateInput]}
               keyboardType="number-pad"
+              maxLength={2}
               value={fields.bloomEndMonth}
               onChangeText={(value) => updateField('bloomEndMonth', value)}
             />
@@ -291,6 +303,7 @@ export function PlantDetailScreen() {
               placeholder="End day"
               style={[styles.input, styles.dateInput]}
               keyboardType="number-pad"
+              maxLength={2}
               value={fields.bloomEndDay}
               onChangeText={(value) => updateField('bloomEndDay', value)}
             />
@@ -368,18 +381,6 @@ export function PlantDetailScreen() {
           formatChip={formatOption}
         />
 
-        {formError && <Text style={styles.error}>{formError}</Text>}
-        {statusMessage && <Text style={styles.status}>{statusMessage}</Text>}
-
-        <Pressable
-          accessibilityRole="button"
-          style={styles.saveButton}
-          disabled={submitting}
-          onPress={handleSave}
-        >
-          <Text style={styles.saveButtonText}>{submitting ? 'Saving…' : 'Save changes'}</Text>
-        </Pressable>
-
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Reference photos</Text>
           {referencePhotoPaths.length === 0 && <Text>No reference photos yet.</Text>}
@@ -391,10 +392,10 @@ export function PlantDetailScreen() {
                 )}
                 <Pressable
                   accessibilityRole="button"
-                  disabled={photoBusy}
+                  disabled={photoBusy !== null}
                   onPress={() => handleRemovePhoto(path)}
                 >
-                  <Text style={styles.removeLink}>Remove</Text>
+                  <Text style={styles.removeLink}>{photoBusy === 'remove' ? 'Removing…' : 'Remove'}</Text>
                 </Pressable>
               </View>
             ))}
@@ -403,21 +404,33 @@ export function PlantDetailScreen() {
             <Pressable
               accessibilityRole="button"
               style={styles.buttonSecondary}
-              disabled={photoBusy}
+              disabled={photoBusy !== null}
               onPress={() => handleAddPhoto('camera')}
             >
-              <Text>Take photo</Text>
+              <Text>{photoBusy === 'camera' ? 'Uploading…' : 'Take photo'}</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
               style={styles.buttonSecondary}
-              disabled={photoBusy}
+              disabled={photoBusy !== null}
               onPress={() => handleAddPhoto('library')}
             >
-              <Text>Choose from library</Text>
+              <Text>{photoBusy === 'library' ? 'Uploading…' : 'Choose from library'}</Text>
             </Pressable>
           </View>
         </View>
+
+        {formError && <Text style={styles.error}>{formError}</Text>}
+        {statusMessage && <Text style={styles.status}>{statusMessage}</Text>}
+
+        <Pressable
+          accessibilityRole="button"
+          style={styles.saveButton}
+          disabled={submitting}
+          onPress={handleSave}
+        >
+          <Text style={styles.saveButtonText}>{submitting ? 'Saving…' : 'Save changes'}</Text>
+        </Pressable>
 
         <Pressable
           accessibilityRole="button"

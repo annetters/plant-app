@@ -2,7 +2,7 @@ import { plantLabel, validateOneOffTodoInput, type Bed, type OneOffTodo, type Pl
 import { useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useEffect, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import type { MainStackParamList } from '../navigation/types'
 import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
@@ -175,7 +175,21 @@ export function TasksScreen() {
           <View style={styles.todoList}>
             {todos.map((todo) => (
               <View key={todo.id} style={styles.todoItem}>
-                <Switch value={todo.done} onValueChange={() => handleToggleTodo(todo)} />
+                {/* A checkbox, not a Switch — "on/off" reads as a setting,
+                    while a to-do is something you check off a list, never
+                    toggled back "on" in the same sense. Matches web's own
+                    <input type="checkbox">. RN has no built-in checkbox, so
+                    this is a small Pressable standing in for one rather than
+                    pulling in a dependency for it. */}
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: todo.done }}
+                  accessibilityLabel={`Mark done: ${todo.text}`}
+                  style={styles.checkbox}
+                  onPress={() => handleToggleTodo(todo)}
+                >
+                  {todo.done && <Text style={styles.checkboxMark}>✓</Text>}
+                </Pressable>
                 <Text style={[styles.todoText, todo.done && styles.todoTextDone]}>{todo.text}</Text>
                 <Pressable
                   accessibilityRole="button"
@@ -270,6 +284,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 1,
+    borderColor: '#2e7d32',
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxMark: {
+    color: '#2e7d32',
+    fontWeight: '700',
   },
   todoText: {
     flex: 1,

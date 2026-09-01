@@ -85,6 +85,50 @@ describe('PlantDetailScreen', () => {
     expect(fake.rows()[0].common_name).toBe('Purple Coneflower')
   })
 
+  it('caps the bloom window fields at 2 digits — a month or day never needs a 3rd', async () => {
+    await renderScreen()
+    await screen.findByDisplayValue('Coneflower')
+
+    for (const label of ['Bloom start month', 'Bloom start day', 'Bloom end month', 'Bloom end day']) {
+      expect(screen.getByLabelText(label).props.maxLength).toBe(2)
+    }
+  })
+
+  it('shows a summary error and scrolls back up when Save fails validation on a field scrolled out of view', async () => {
+    const fake = await renderScreen()
+    await screen.findByDisplayValue('Coneflower')
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), '')
+    await fireEvent.press(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText('Fix the highlighted fields above.')).toBeTruthy()
+    expect(fake.rows()[0].common_name).toBe('Coneflower')
+  })
+
+  it('shows an uploading label on the pressed button while a photo upload is in flight', async () => {
+    jest.mocked(ImagePicker.requestCameraPermissionsAsync).mockResolvedValue({ granted: true } as never)
+    jest.mocked(ImagePicker.launchCameraAsync).mockResolvedValue({
+      canceled: false,
+      assets: [{ uri: 'file:///leaf.jpg', fileName: 'leaf.jpg', mimeType: 'image/jpeg' }],
+    } as never)
+    const fake = await renderScreen()
+    await screen.findByDisplayValue('Coneflower')
+    let resolveUpload: () => void = () => {}
+    fake.storage.upload.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveUpload = () => resolve({ data: { path: 'fake/path.jpg' }, error: null })
+        }),
+    )
+
+    fireEvent.press(screen.getByRole('button', { name: 'Take photo' }))
+
+    expect(await screen.findByText('Uploading…')).toBeTruthy()
+    expect(screen.getByText('Choose from library')).toBeTruthy()
+    resolveUpload()
+    await waitFor(() => expect(screen.getByText('Photo added.')).toBeTruthy())
+  })
+
   it('uploads a reference photo taken with the camera', async () => {
     jest.mocked(ImagePicker.requestCameraPermissionsAsync).mockResolvedValue({ granted: true } as never)
     jest.mocked(ImagePicker.launchCameraAsync).mockResolvedValue({

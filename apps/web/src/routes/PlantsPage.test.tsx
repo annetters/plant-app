@@ -93,6 +93,21 @@ describe('PlantsPage', () => {
     expect(await screen.findByText('No plants yet — add your first one.')).toBeInTheDocument()
   })
 
+  it('shows the same commonName+cultivar label other pages use (plantLabel), not a separate commonName-only heading', async () => {
+    renderPage({
+      plants: [
+        row({
+          id: 'p1',
+          common_name: 'Agastache',
+          scientific_name: 'Agastache',
+          cultivar: 'Blue Fortune',
+        }),
+      ],
+    })
+
+    expect(await screen.findByText(/Agastache \(Blue Fortune\)/)).toBeInTheDocument()
+  })
+
   it('links to the Add Plant page', async () => {
     renderPage()
     expect(screen.getByRole('link', { name: 'Add Plant' })).toHaveAttribute('href', '/registry/new')

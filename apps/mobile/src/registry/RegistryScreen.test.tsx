@@ -1,7 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
-import { Text } from 'react-native'
+import { Pressable, Text } from 'react-native'
 import { PlantsRepositoryProvider } from '../plants/PlantsRepositoryContext'
 import { PlantingsRepositoryProvider } from '../plantings/PlantingsRepositoryContext'
 import { BedsRepositoryProvider } from '../property/BedsRepositoryContext'
@@ -18,7 +18,7 @@ import { RegistryScreen } from './RegistryScreen'
 
 const Stack = createNativeStackNavigator()
 
-function renderRegistry({
+async function renderRegistry({
   plantRows = [],
   bedRows = [],
   plantingRows = [],
@@ -29,21 +29,40 @@ function renderRegistry({
   plantingRows?: Parameters<typeof createFakePlantingsDbClient>[0]
   property?: Parameters<typeof createFakePropertiesDbClient>[0]
 } = {}) {
-  const { client: plantsClient } = createFakePlantsDbClient(plantRows)
-  const { client: bedsClient } = createFakeBedsDbClient(bedRows)
-  const { client: plantingsClient } = createFakePlantingsDbClient(plantingRows)
-  const { client: propertiesClient } = createFakePropertiesDbClient(property)
+  const plantsFake = createFakePlantsDbClient(plantRows)
+  const bedsFake = createFakeBedsDbClient(bedRows)
+  const plantingsFake = createFakePlantingsDbClient(plantingRows)
+  const propertiesFake = createFakePropertiesDbClient(property)
 
-  return render(
-    <PropertiesRepositoryProvider client={propertiesClient}>
-      <BedsRepositoryProvider client={bedsClient}>
-        <PlantingsRepositoryProvider client={plantingsClient}>
-          <PlantsRepositoryProvider client={plantsClient}>
+  await render(
+    <PropertiesRepositoryProvider client={propertiesFake.client}>
+      <BedsRepositoryProvider client={bedsFake.client}>
+        <PlantingsRepositoryProvider client={plantingsFake.client}>
+          <PlantsRepositoryProvider client={plantsFake.client}>
             <NavigationContainer>
               <Stack.Navigator screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="Registry" component={RegistryScreen} />
                 <Stack.Screen name="PlantDetail">
-                  {({ route }: any) => <Text>plant detail: {route.params.plantId}</Text>}
+                  {({ navigation, route }: any) => (
+                    <>
+                      <Text>plant detail: {route.params.plantId}</Text>
+                      {/* Simulates PlantDetailScreen's real save-then-goBack flow,
+                          mutating the underlying row directly rather than going
+                          through the repository, so the test can assert Registry
+                          picks the change up on refocus rather than needing its
+                          own PlantDetailScreen import. */}
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => {
+                          const row = plantsFake.rows().find((r) => r.id === route.params.plantId)
+                          if (row) row.common_name = 'Purple Coneflower'
+                          navigation.goBack()
+                        }}
+                      >
+                        <Text>simulate edit and go back</Text>
+                      </Pressable>
+                    </>
+                  )}
                 </Stack.Screen>
                 <Stack.Screen name="PlantingDetail">
                   {({ route }: any) => <Text>planting detail: {route.params.plantingId}</Text>}
@@ -55,6 +74,7 @@ function renderRegistry({
       </BedsRepositoryProvider>
     </PropertiesRepositoryProvider>,
   )
+  return { plantsFake, bedsFake, plantingsFake, propertiesFake }
 }
 
 describe('RegistryScreen', () => {
@@ -81,6 +101,21 @@ describe('RegistryScreen', () => {
     expect(screen.getByText(/Echinacea purpurea/)).toBeTruthy()
     expect(screen.getByText(/Flower color: Purple/)).toBeTruthy()
     expect(screen.getByText(/Sun: full sun/)).toBeTruthy()
+  })
+
+  it('shows the same commonName+cultivar label the Tasks screen uses, not a separate commonName-only heading', async () => {
+    await renderRegistry({
+      plantRows: [
+        plantRow({
+          id: 'p1',
+          common_name: 'Agastache',
+          scientific_name: 'Agastache',
+          cultivar: 'Blue Fortune',
+        }),
+      ],
+    })
+
+    expect(await screen.findByText(/Agastache \(Blue Fortune\)/)).toBeTruthy()
   })
 
   it('narrows the list by search, combined with an enum filter axis', async () => {
@@ -142,6 +177,18 @@ describe('RegistryScreen', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'View in Front border' }))
 
     expect(await screen.findByText('planting detail: planting-1')).toBeTruthy()
+  })
+
+  it('refreshes the Plant list when returning from PlantDetail, since the native stack keeps Registry mounted in the background', async () => {
+    await renderRegistry({ plantRows: [plantRow({ id: 'p1', common_name: 'Coneflower' })] })
+    await screen.findByText(/Coneflower/)
+
+    await fireEvent.press(screen.getByRole('button', { name: /Coneflower/ }))
+    await screen.findByText('plant detail: p1')
+    await fireEvent.press(screen.getByText('simulate edit and go back'))
+
+    expect(await screen.findByText(/Purple Coneflower/)).toBeTruthy()
+    expect(screen.queryByText('Coneflower — Echinacea purpurea')).toBeNull()
   })
 
   it('shows an error if the Plant list fails to load', async () => {

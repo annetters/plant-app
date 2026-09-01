@@ -17,9 +17,9 @@ import {
   formatOption,
   plantLabel,
 } from '@plant-app/domain'
-import { useNavigation } from '@react-navigation/native'
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { ChipRow } from '../components/ChipRow'
@@ -74,40 +74,51 @@ export function RegistryScreen() {
   const [foliageType, setFoliageType] = useState('')
   const [nativeStatus, setNativeStatus] = useState('')
 
-  useEffect(() => {
-    let cancelled = false
-    plantsRepository
-      .list()
-      .then((result) => {
-        if (!cancelled) setPlants(result)
-      })
-      .catch(() => {
-        if (!cancelled) setError('Could not load your plants. Please try again.')
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [plantsRepository])
-
-  useEffect(() => {
-    let cancelled = false
-    propertiesRepository
-      .get()
-      .then((property) => {
-        if (cancelled || !property) return undefined
-        return bedsRepository.list(property.id).then((result) => {
-          if (!cancelled) setBeds(result)
+  // useFocusEffect, not a plain effect: the native stack keeps this screen
+  // mounted in the background while PlantDetail/PlantingDetail are pushed on
+  // top of it, so a plain mount-only effect would never see an edit made
+  // there (a renamed Plant, a removed Planting) until the whole app
+  // remounted this screen from scratch. Re-fetching on every focus —
+  // including the initial mount, which also counts as gaining focus —
+  // keeps this list current the moment you navigate back.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false
+      plantsRepository
+        .list()
+        .then((result) => {
+          if (!cancelled) setPlants(result)
         })
-      })
-      .catch(() => {
-        // Planting-location info is a nice-to-have on top of the primary
-        // Plant list — a failure loading the Property/Beds shouldn't block
-        // search/filtering, which works from `plants` alone.
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [propertiesRepository, bedsRepository])
+        .catch(() => {
+          if (!cancelled) setError('Could not load your plants. Please try again.')
+        })
+      return () => {
+        cancelled = true
+      }
+    }, [plantsRepository]),
+  )
+
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false
+      propertiesRepository
+        .get()
+        .then((property) => {
+          if (cancelled || !property) return undefined
+          return bedsRepository.list(property.id).then((result) => {
+            if (!cancelled) setBeds(result)
+          })
+        })
+        .catch(() => {
+          // Planting-location info is a nice-to-have on top of the primary
+          // Plant list — a failure loading the Property/Beds shouldn't block
+          // search/filtering, which works from `plants` alone.
+        })
+      return () => {
+        cancelled = true
+      }
+    }, [propertiesRepository, bedsRepository]),
+  )
 
   useEffect(() => {
     if (beds.length === 0) {
@@ -247,7 +258,7 @@ export function RegistryScreen() {
                       onPress={() => navigation.navigate('PlantDetail', { plantId: plant.id })}
                     >
                       <Text style={styles.plantName}>
-                        {plant.commonName} — <Text style={styles.scientificName}>{plant.scientificName}</Text>
+                        {plantLabel(plant)} — <Text style={styles.scientificName}>{plant.scientificName}</Text>
                       </Text>
                       {attributeLines.length > 0 && (
                         <Text style={styles.attributes}>{attributeLines.join(' · ')}</Text>

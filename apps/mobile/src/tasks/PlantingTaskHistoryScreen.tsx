@@ -177,19 +177,21 @@ export function PlantingTaskHistoryScreen() {
                 <View style={styles.historyActions}>
                   <Pressable
                     accessibilityRole="button"
-                    style={styles.buttonSecondary}
+                    accessibilityState={{ selected: entry.status === 'done' }}
+                    style={[styles.buttonSecondary, entry.status === 'done' && styles.buttonActive]}
                     disabled={entry.status === 'done'}
                     onPress={() => handleMark(entry.careTaskTemplateId, 'done')}
                   >
-                    <Text>Mark done</Text>
+                    <Text style={entry.status === 'done' && styles.buttonActiveText}>Mark done</Text>
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
-                    style={styles.buttonSecondary}
+                    accessibilityState={{ selected: entry.status === 'missed' }}
+                    style={[styles.buttonSecondary, entry.status === 'missed' && styles.buttonActive]}
                     disabled={entry.status === 'missed'}
                     onPress={() => handleMark(entry.careTaskTemplateId, 'missed')}
                   >
-                    <Text>Mark missed</Text>
+                    <Text style={entry.status === 'missed' && styles.buttonActiveText}>Mark missed</Text>
                   </Pressable>
                 </View>
               </View>
@@ -268,5 +270,12 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     paddingVertical: 8,
     paddingHorizontal: 12,
+  },
+  buttonActive: {
+    backgroundColor: '#2e7d32',
+  },
+  buttonActiveText: {
+    color: '#fff',
+    fontWeight: '600',
   },
 })
