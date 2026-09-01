@@ -20,4 +20,17 @@ describe('DashboardPage', () => {
       expect(screen.getByRole('link', { name: label })).toBeInTheDocument()
     }
   })
+
+  it('shows a link to Tasks & To-dos, reachable but not one of the three tiles', () => {
+    const { client } = createMockAuthClient(null)
+    render(
+      <MemoryRouter>
+        <AuthProvider client={client}>
+          <DashboardPage />
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByRole('link', { name: 'Tasks & To-dos' })).toHaveAttribute('href', '/tasks')
+  })
 })

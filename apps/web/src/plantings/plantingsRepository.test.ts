@@ -24,6 +24,26 @@ const INPUT: PlantingInput = {
   pin: { x: 5, y: 5 },
 }
 
+describe('PlantingsRepository.get', () => {
+  it('returns the matching Planting', async () => {
+    const { client } = createFakePlantingsDbClient([ROW_IN_BED_1, ROW_IN_BED_2])
+    const repository = new PlantingsRepository(client)
+
+    const result = await repository.get('planting-2')
+
+    expect(result?.id).toBe('planting-2')
+  })
+
+  it('returns null when no Planting matches', async () => {
+    const { client } = createFakePlantingsDbClient([ROW_IN_BED_1])
+    const repository = new PlantingsRepository(client)
+
+    const result = await repository.get('does-not-exist')
+
+    expect(result).toBeNull()
+  })
+})
+
 describe('PlantingsRepository.listByBeds', () => {
   it('returns only the Plantings belonging to the given Beds', async () => {
     const { client } = createFakePlantingsDbClient([ROW_IN_BED_1, ROW_IN_BED_2])

@@ -94,6 +94,13 @@ export class PlantingsRepository {
     return result.map(plantingFromRow)
   }
 
+  async get(id: string): Promise<Planting | null> {
+    const row = unwrap<PlantingRow | null>(
+      await this.client.from(PLANTINGS_TABLE).select('*').eq('id', id).maybeSingle(),
+    )
+    return row ? plantingFromRow(row) : null
+  }
+
   async create(input: PlantingInput): Promise<Planting> {
     const row = unwrap<PlantingRow>(
       await this.client.from(PLANTINGS_TABLE).insert(plantingInputToRow(input)).select().single(),

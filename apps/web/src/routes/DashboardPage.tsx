@@ -19,6 +19,10 @@ export function DashboardPage() {
           </li>
         ))}
       </ul>
+      {/* Not one of the three tiles above — CONTEXT.md's Dashboard entry keeps task lists reachable but not surfaced immediately. */}
+      <p>
+        <Link to="/tasks">Tasks &amp; To-dos</Link>
+      </p>
     </main>
   )
 }
