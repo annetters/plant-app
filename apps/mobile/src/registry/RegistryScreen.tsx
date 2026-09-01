@@ -36,10 +36,10 @@ import { usePropertiesRepository } from '../property/PropertiesRepositoryContext
  * fetched only to show each entry's Planting location(s); a failure loading
  * them doesn't block the primary Plant list, same reasoning as the web page.
  *
- * There is no native Map screen yet (#14 is still unbuilt) for a Planting
- * location to jump to, so unlike web's `Link to /map?plantingId=`, this
- * shows the Bed name as plain text rather than fake a navigation target
- * that doesn't exist yet.
+ * There is no native Map screen yet (#14 is still unbuilt), so unlike web's
+ * `Link to /map?plantingId=`, a Planting location links to its own detail
+ * screen (view + dated photo log, ticket #18) rather than a map that
+ * doesn't exist yet.
  */
 function plantAttributeLines(plant: Plant): string[] {
   const lines: string[] = []
@@ -240,7 +240,12 @@ export function RegistryScreen() {
                   const locations = plantingsByPlantId.get(plant.id) ?? []
                   const attributeLines = plantAttributeLines(plant)
                   return (
-                    <View key={plant.id} style={styles.listItem}>
+                    <Pressable
+                      key={plant.id}
+                      accessibilityRole="button"
+                      style={styles.listItem}
+                      onPress={() => navigation.navigate('PlantDetail', { plantId: plant.id })}
+                    >
                       <Text style={styles.plantName}>
                         {plant.commonName} — <Text style={styles.scientificName}>{plant.scientificName}</Text>
                       </Text>
@@ -252,14 +257,20 @@ export function RegistryScreen() {
                           {locations.map((planting) => {
                             const bed = bedsById.get(planting.bedId)
                             return (
-                              <Text key={planting.id} style={styles.location}>
-                                In {bed?.name ?? 'Bed'}
-                              </Text>
+                              <Pressable
+                                key={planting.id}
+                                accessibilityRole="button"
+                                onPress={() =>
+                                  navigation.navigate('PlantingDetail', { plantingId: planting.id })
+                                }
+                              >
+                                <Text style={styles.location}>View in {bed?.name ?? 'Bed'}</Text>
+                              </Pressable>
                             )
                           })}
                         </View>
                       )}
-                    </View>
+                    </Pressable>
                   )
                 })}
               </View>

@@ -1,6 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
+import { Text } from 'react-native'
 import { PlantsRepositoryProvider } from '../plants/PlantsRepositoryContext'
 import { PlantingsRepositoryProvider } from '../plantings/PlantingsRepositoryContext'
 import { BedsRepositoryProvider } from '../property/BedsRepositoryContext'
@@ -41,6 +42,12 @@ function renderRegistry({
             <NavigationContainer>
               <Stack.Navigator screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="Registry" component={RegistryScreen} />
+                <Stack.Screen name="PlantDetail">
+                  {({ route }: any) => <Text>plant detail: {route.params.plantId}</Text>}
+                </Stack.Screen>
+                <Stack.Screen name="PlantingDetail">
+                  {({ route }: any) => <Text>planting detail: {route.params.plantingId}</Text>}
+                </Stack.Screen>
               </Stack.Navigator>
             </NavigationContainer>
           </PlantsRepositoryProvider>
@@ -111,7 +118,30 @@ describe('RegistryScreen', () => {
       plantRows: [plantRow({ id: 'p1', common_name: 'Coneflower' })],
     })
 
-    expect(await screen.findByText('In Front border')).toBeTruthy()
+    expect(await screen.findByText('View in Front border')).toBeTruthy()
+  })
+
+  it('navigates to the Plant detail screen when a Plant row is pressed', async () => {
+    await renderRegistry({ plantRows: [plantRow({ id: 'p1', common_name: 'Coneflower' })] })
+    await screen.findByText(/Coneflower/)
+
+    await fireEvent.press(screen.getByRole('button', { name: /Coneflower/ }))
+
+    expect(await screen.findByText('plant detail: p1')).toBeTruthy()
+  })
+
+  it('navigates to the Planting detail screen when a Planting location is pressed', async () => {
+    await renderRegistry({
+      property: propertyRow({ id: 'property-1' }),
+      bedRows: [bedRow({ id: 'bed-1', property_id: 'property-1', name: 'Front border' })],
+      plantingRows: [plantingRow({ id: 'planting-1', plant_id: 'p1', bed_id: 'bed-1' })],
+      plantRows: [plantRow({ id: 'p1', common_name: 'Coneflower' })],
+    })
+    await screen.findByText('View in Front border')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'View in Front border' }))
+
+    expect(await screen.findByText('planting detail: planting-1')).toBeTruthy()
   })
 
   it('shows an error if the Plant list fails to load', async () => {

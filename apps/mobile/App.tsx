@@ -15,6 +15,10 @@ import { asPropertiesDbClient } from './src/property/propertiesRepository';
 import { PropertiesRepositoryProvider } from './src/property/PropertiesRepositoryContext';
 import { asTagScanDbClient } from './src/tagScan/tagScanRepository';
 import { TagScanRepositoryProvider } from './src/tagScan/TagScanRepositoryContext';
+import { asOneOffTodosDbClient } from './src/tasks/oneOffTodosRepository';
+import { OneOffTodosRepositoryProvider } from './src/tasks/OneOffTodosRepositoryContext';
+import { asTaskCompletionsDbClient } from './src/tasks/taskCompletionsRepository';
+import { TaskCompletionsRepositoryProvider } from './src/tasks/TaskCompletionsRepositoryContext';
 
 function AppShell() {
   useAuthDeepLinkHandler(supabase);
@@ -36,7 +40,11 @@ export default function App() {
             <BedsRepositoryProvider client={asBedsDbClient(supabase)}>
               <PlantingsRepositoryProvider client={asPlantingsDbClient(supabase)}>
                 <PlantsRepositoryProvider client={asPlantsDbClient(supabase)}>
-                  <AppShell />
+                  <OneOffTodosRepositoryProvider client={asOneOffTodosDbClient(supabase)}>
+                    <TaskCompletionsRepositoryProvider client={asTaskCompletionsDbClient(supabase)}>
+                      <AppShell />
+                    </TaskCompletionsRepositoryProvider>
+                  </OneOffTodosRepositoryProvider>
                 </PlantsRepositoryProvider>
               </PlantingsRepositoryProvider>
             </BedsRepositoryProvider>

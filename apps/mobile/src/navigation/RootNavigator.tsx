@@ -1,7 +1,9 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { useAuth } from '../auth/AuthContext'
 import { BloomTimelineScreen } from '../bloomTimeline/BloomTimelineScreen'
+import { PlantDetailScreen } from '../registry/PlantDetailScreen'
 import { RegistryScreen } from '../registry/RegistryScreen'
+import { PlantingDetailScreen } from '../plantings/PlantingDetailScreen'
 import { DashboardScreen } from '../screens/DashboardScreen'
 import { LoadingScreen } from '../screens/LoadingScreen'
 import { LoginScreen } from '../screens/LoginScreen'
@@ -11,6 +13,8 @@ import { TagScanCaptureScreen } from '../tagScan/TagScanCaptureScreen'
 import { TagScanDuplicateOfferScreen } from '../tagScan/TagScanDuplicateOfferScreen'
 import { TagScanMultipleReadingsScreen } from '../tagScan/TagScanMultipleReadingsScreen'
 import { TagScanReviewScreen } from '../tagScan/TagScanReviewScreen'
+import { PlantingTaskHistoryScreen } from '../tasks/PlantingTaskHistoryScreen'
+import { TasksScreen } from '../tasks/TasksScreen'
 import type { AuthStackParamList, MainStackParamList } from './types'
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>()
@@ -42,7 +46,11 @@ export function RootNavigator() {
     <MainStack.Navigator screenOptions={{ headerShown: false }}>
       <MainStack.Screen name="Dashboard" component={DashboardScreen} />
       <MainStack.Screen name="Registry" component={RegistryScreen} />
+      <MainStack.Screen name="PlantDetail" component={PlantDetailScreen} />
+      <MainStack.Screen name="PlantingDetail" component={PlantingDetailScreen} />
       <MainStack.Screen name="BloomTimeline" component={BloomTimelineScreen} />
+      <MainStack.Screen name="Tasks" component={TasksScreen} />
+      <MainStack.Screen name="PlantingTaskHistory" component={PlantingTaskHistoryScreen} />
       <MainStack.Screen name="TagScanCapture" component={TagScanCaptureScreen} />
       <MainStack.Screen name="TagScanMultipleReadings" component={TagScanMultipleReadingsScreen} />
       <MainStack.Screen name="TagScanReview" component={TagScanReviewScreen} />

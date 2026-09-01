@@ -1,25 +1,53 @@
-import type { PlantingRow } from '@plant-app/domain'
+import type { PlantingPhotoRow, PlantingRow } from '@plant-app/domain'
 import type { PlantingsDbClient } from '../plantings/plantingsRepository'
 
-type DbResult<T> = { data: T; error: { message: string } | null }
+type Row = Record<string, unknown>
+type Op = 'select' | 'insert' | 'delete'
+type StoredRow = Row & { id: string }
+type Table = 'plantings' | 'planting_photos'
 
-/** An in-memory stand-in for the read-only slice of Supabase's query builder PlantingsRepository calls. */
-export function createFakePlantingsDbClient(initialRows: PlantingRow[] = []) {
-  const rows = [...initialRows]
+const ID_PREFIX: Record<Table, string> = {
+  plantings: 'planting',
+  planting_photos: 'photo',
+}
 
-  function select(columns?: string) {
-    let inColumn: string | undefined
-    let inValues: string[] = []
+/**
+ * An in-memory stand-in for the slice of Supabase's client
+ * PlantingsRepository calls, spanning both tables it reads from. Mirrors
+ * apps/web's `createFakePlantingsDbClient` and this app's own
+ * `createFakePlantsDbClient`.
+ */
+export function createFakePlantingsDbClient(
+  initialPlantingRows: PlantingRow[] = [],
+  initialPhotoRows: PlantingPhotoRow[] = [],
+) {
+  const tables: Record<Table, StoredRow[]> = {
+    plantings: [...initialPlantingRows] as unknown as StoredRow[],
+    planting_photos: [...initialPhotoRows] as unknown as StoredRow[],
+  }
+  const nextId: Record<Table, number> = {
+    plantings: tables.plantings.length + 1,
+    planting_photos: tables.planting_photos.length + 1,
+  }
+  const userId = 'user-1'
+
+  function builder(table: Table, op: Op, payload?: Row) {
+    const eqFilters: Record<string, string> = {}
+    let inFilter: { column: string; values: string[] } | null = null
     let orderColumn: string | undefined
     let orderAscending = true
+    let single = false
 
     const chain = {
-      select(_columns?: string) {
+      select() {
+        return chain
+      },
+      eq(column: string, value: string) {
+        eqFilters[column] = value
         return chain
       },
       in(column: string, values: string[]) {
-        inColumn = column
-        inValues = values
+        inFilter = { column, values }
         return chain
       },
       order(column: string, options?: { ascending: boolean }) {
@@ -27,35 +55,100 @@ export function createFakePlantingsDbClient(initialRows: PlantingRow[] = []) {
         orderAscending = options?.ascending ?? true
         return chain
       },
+      single() {
+        single = true
+        return chain
+      },
+      maybeSingle() {
+        single = true
+        return chain
+      },
       then<T1 = unknown, T2 = never>(
-        onfulfilled?: ((value: DbResult<unknown>) => T1 | PromiseLike<T1>) | null,
+        onfulfilled?:
+          | ((value: { data: unknown; error: { message: string } | null }) => T1 | PromiseLike<T1>)
+          | null,
         onrejected?: ((reason: unknown) => T2 | PromiseLike<T2>) | null,
       ) {
         return Promise.resolve(execute()).then(onfulfilled, onrejected)
       },
     }
 
-    function execute(): DbResult<unknown> {
-      const filtered = inColumn
-        ? rows.filter((row) => inValues.includes(row[inColumn as keyof PlantingRow] as string))
-        : rows
-      const sorted = orderColumn
-        ? [...filtered].sort((a, b) => {
-            const comparison = String(a[orderColumn as keyof PlantingRow]).localeCompare(
-              String(b[orderColumn as keyof PlantingRow]),
-            )
-            return orderAscending ? comparison : -comparison
-          })
-        : filtered
-      return { data: sorted, error: null }
+    function matches(row: StoredRow): boolean {
+      if (!Object.entries(eqFilters).every(([column, value]) => row[column] === value)) {
+        return false
+      }
+      if (inFilter && !inFilter.values.includes(row[inFilter.column] as string)) {
+        return false
+      }
+      return true
     }
 
-    return chain.select(columns)
+    function execute() {
+      const rows = tables[table]
+
+      if (op === 'select') {
+        if (eqFilters.id !== undefined && single) {
+          const row = rows.find(matches) ?? null
+          return { data: row, error: null }
+        }
+        const filtered = rows.filter(matches)
+        const sorted = orderColumn
+          ? [...filtered].sort((a, b) => {
+              const av = String(a[orderColumn as string])
+              const bv = String(b[orderColumn as string])
+              const cmp = av < bv ? -1 : av > bv ? 1 : 0
+              return orderAscending ? cmp : -cmp
+            })
+          : filtered
+        return { data: sorted, error: null }
+      }
+      if (op === 'insert') {
+        const row: StoredRow = {
+          ...payload,
+          id: `${ID_PREFIX[table]}-${nextId[table]++}`,
+          created_at: '2026-01-01T00:00:00.000Z',
+        }
+        rows.push(row)
+        return { data: single ? row : [row], error: null }
+      }
+      // delete
+      tables[table] = rows.filter((r) => !matches(r))
+      return { data: null, error: null }
+    }
+
+    return chain
+  }
+
+  const storage = {
+    upload: jest.fn().mockResolvedValue({ data: { path: 'fake/path.jpg' }, error: null }),
+    remove: jest.fn().mockResolvedValue({ error: null }),
+    createSignedUrl: jest
+      .fn()
+      .mockResolvedValue({ data: { signedUrl: 'https://example.com/signed.jpg' }, error: null }),
   }
 
   const client: PlantingsDbClient = {
-    from: () => ({ select }),
+    from(table: Table) {
+      return {
+        select: () => builder(table, 'select'),
+        insert: (values: Row) => builder(table, 'insert', values),
+        delete: () => builder(table, 'delete'),
+      }
+    },
+    storage: {
+      from: () => storage,
+    },
+    auth: {
+      getUser: jest.fn().mockResolvedValue({ data: { user: { id: userId } }, error: null }),
+    },
   }
 
-  return { client, rows: () => rows }
+  return {
+    client,
+    storage,
+    userId,
+    plantingRows: () => tables.plantings as unknown as (PlantingRow & Record<string, unknown>)[],
+    photoRows: () =>
+      tables.planting_photos as unknown as (PlantingPhotoRow & Record<string, unknown>)[],
+  }
 }

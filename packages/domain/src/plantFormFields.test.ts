@@ -1,10 +1,10 @@
-import type { Plant } from '@plant-app/domain'
 import { describe, expect, it } from 'vitest'
+import type { Plant } from './plant.js'
 import {
   EMPTY_PLANT_FORM_FIELDS,
   plantFormFieldsFromPlant,
   plantInputFromFormFields,
-} from './plantFormFields'
+} from './plantFormFields.js'
 
 function plant(overrides: Partial<Plant> = {}): Plant {
   return {

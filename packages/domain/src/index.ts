@@ -182,3 +182,10 @@ export type {
   OneOffTodoValidationErrors,
   OneOffTodoValidationResult,
 } from "./oneOffTodo.js";
+
+export {
+  EMPTY_PLANT_FORM_FIELDS,
+  plantFormFieldsFromPlant,
+  plantInputFromFormFields,
+} from "./plantFormFields.js";
+export type { PlantFormFields } from "./plantFormFields.js";

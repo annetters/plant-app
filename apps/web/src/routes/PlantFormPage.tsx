@@ -1,27 +1,25 @@
 import {
+  EMPTY_PLANT_FORM_FIELDS,
   FOLIAGE_TYPES,
   HARDINESS_ZONE_NUMBERS,
   NATIVE_STATUSES,
   SUN_REQUIREMENTS,
   dateRangeWraps,
   formatOption,
+  plantFormFieldsFromPlant,
+  plantInputFromFormFields,
   validateCareTaskTemplateInput,
   validatePlantInput,
   type CareTaskTemplate,
   type CareTaskTemplateInput,
   type CareTaskTemplateValidationErrors,
+  type PlantFormFields,
   type PlantInput,
   type PlantValidationErrors,
   type TaskTrigger,
 } from '@plant-app/domain'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import {
-  EMPTY_PLANT_FORM_FIELDS,
-  plantFormFieldsFromPlant,
-  plantInputFromFormFields,
-  type PlantFormFields,
-} from '../plants/plantFormFields'
 import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
 
 function formatTrigger(trigger: TaskTrigger): string {
