@@ -1,13 +1,66 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-30 (updated: #16 closed — native Registry QA complete)
+**Date:** 2026-08-31 (updated: #12 closed — Task completion logging, history, and one-off todos)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
 
-**#16 (Native: Registry view) is now fully closed on GitHub** — phone
+**#12 (Task completion logging, history, and one-off todos) is now fully
+closed on GitHub** — implemented and manually QA'd by the user directly
+against the real linked Supabase project (dev server, not Playwright). See
+the closing comment on the issue for full detail.
+
+Built (commit `b8f5158`): `packages/domain/src/taskCompletion.ts`/
+`oneOffTodo.ts` (validation, row mapping, `buildPlantingTaskHistory` —
+always one entry per Care task template per Planting per year), new
+`task_completions`/`one_off_todos` tables (migrations `0019`-`0022`,
+pushed and live), and web UI: a `TasksPage` (one-off todos + a list of
+Plantings linking to their own task history) and
+`PlantingTaskHistoryPage` (mark done/missed per template, per year).
+Reachable from the Dashboard via a plain link, not a fourth tile.
+
+A `/code-review` pass (10 finder agents) caught two real issues before
+this landed: `recordTaskCompletion` did a racy select-then-insert-or-
+update instead of a single upsert against `task_completions`' own unique
+constraint (fixed); and the already-built `validateTaskCompletionInput`
+was never wired in, so a cleared/non-numeric year field could reach the
+DB with only a generic error (fixed). Also split the original combined
+repository into `TaskCompletionsRepository`/`OneOffTodosRepository`,
+matching this codebase's parent/child repository convention rather than
+bundling two unrelated aggregates in one.
+
+**Manual QA** covered every acceptance criterion plus edge cases: N
+templates producing N history rows (0 for a Plant with none, verified
+against a real Plant before/after adding templates); marking done/missed
+and persistence across reload; per-year scoping; one-off todo add/toggle/
+remove; the Dashboard link rendering as a plain link, not a tile;
+double-clicking "Mark done" (no error, no duplicate row); and the
+Planting-vs-Plant scoping — a Plant's Care task templates only produce
+task-history entries once that Plant has an actual Planting (a Pin on the
+map), confirmed via the Plant's own edit page rather than assumed. No
+real product bugs surfaced during QA. **Process note for next time**:
+bare `supabase db push` fails with "command not found" (the CLI is a
+local devDependency, not a global install) — use `npx supabase db push`
+or `npm run db:push` instead.
+
+Full monorepo typecheck/test suite green throughout (209 domain + 78
+mobile + 188 web at close).
+
+**#12's closure newly unblocks #18** (Native: Plant/Planting detail,
+tasks & todos) — confirmed directly against the API (`blocked_by: 0`,
+unassigned; it needed #2/#7/#12/#13, all now closed). **#14, #15, #17**
+remain frontier, unaffected by #12's closure. **A concurrent session is
+already working on what looks like #17** (Native: Bloom Timeline —
+`apps/mobile/src/bloomTimeline/`, a new shared `apps/mobile/src/
+components/ChipRow.tsx`, staged but not yet committed as of this update)
+— don't pick that up again; whoever resumes next should choose a
+different frontier ticket (#14, #15, or #18).
+
+---
+
+**Previous entry, superseded above** — #16 (Native: Registry view) is now fully closed on GitHub** — phone
 parity for the Registry, manually QA'd by the user directly on a real
 device against real Plant/Bed/Planting data. See the closing comment on
 the issue for full detail.
