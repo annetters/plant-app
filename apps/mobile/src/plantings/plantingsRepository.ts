@@ -1,11 +1,13 @@
 import type {
   Planting,
+  PlantingInput,
   PlantingPhoto,
   PlantingPhotoRow,
   PlantingRow,
 } from '@plant-app/domain'
 import {
   plantingFromRow,
+  plantingInputToRow,
   plantingPhotoFromRow,
   plantingPhotoInputToRow,
 } from '@plant-app/domain'
@@ -104,6 +106,14 @@ export class PlantingsRepository {
         .order('created_at', { ascending: true }),
     )
     return result.map(plantingFromRow)
+  }
+
+  /** The Pin drop's one write — the Bed and the Pin's real-world feet both come out of where the marker was dragged to, never a picker or a typed coordinate (CONTEXT.md's Pin entry). */
+  async create(input: PlantingInput): Promise<Planting> {
+    const row = unwrap<PlantingRow>(
+      await this.client.from(PLANTINGS_TABLE).insert(plantingInputToRow(input)).select().single(),
+    )
+    return plantingFromRow(row)
   }
 
   async get(id: string): Promise<Planting | null> {

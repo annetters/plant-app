@@ -1,9 +1,13 @@
 import type { Bed, BedInput, BedPoint, BedTool, Property } from '@plant-app/domain'
-import { pixelsPerFootForProperty, pixelsToFeet, validateBedInput } from '@plant-app/domain'
+import {
+  STAGE_SIZE_PX,
+  pixelsPerFootForProperty,
+  pixelsToFeet,
+  validateBedInput,
+} from '@plant-app/domain'
 import Konva from 'konva'
 import { useEffect, useRef, useState } from 'react'
 import { BaseMapBackground } from './BaseMapBackground'
-import { STAGE_SIZE_PX } from './baseMapTiles'
 import { buildOutlineLine } from './bedOutline'
 import { useBedsRepository } from './BedsRepositoryContext'
 import { ovalToPoints, rectangleToPoints } from './dragShapeGeometry'

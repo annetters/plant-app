@@ -10,6 +10,7 @@ export type TagScanPhotoIds = { frontTagPhotoId: string; backTagPhotoId?: string
 
 export type MainStackParamList = {
   Dashboard: undefined
+  Map: undefined
   Registry: undefined
   PlantDetail: { plantId: string }
   PlantingDetail: { plantingId: string }

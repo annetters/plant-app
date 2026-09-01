@@ -7,6 +7,8 @@ import {
   decimatePoints,
   feetToPixels,
   pixelsToFeet,
+  renderedBedOutlines,
+  renderedOutlinePoints,
   smoothBedOutline,
   validateBedInput,
   type BedInput,
@@ -196,6 +198,68 @@ describe("a Bed's geometry after its Property's base image is replaced", () => {
     // either scale — it was never coupled to a specific base image's pixels.
     expect(pixelsToFeet(pixelsBefore, scaleBeforeReplacement)).toEqual(feet);
     expect(pixelsToFeet(pixelsAfter, scaleAfterReplacement)).toEqual(feet);
+  });
+});
+
+describe("renderedOutlinePoints", () => {
+  const traced: BedPoint[] = Array.from({ length: 20 }, (_, i) => ({ x: i, y: i % 3 }));
+
+  it("smooths a freehand outline that asked for smoothing", () => {
+    expect(renderedOutlinePoints(traced, "freehand", true)).toEqual(
+      smoothBedOutline(traced, true),
+    );
+  });
+
+  it("leaves a freehand outline alone when smoothing is off", () => {
+    expect(renderedOutlinePoints(traced, "freehand", false)).toEqual(traced);
+  });
+
+  it("never smooths a shape tool, even with the flag set — only freehand traces have hand jitter to remove", () => {
+    for (const tool of ["rectangle", "oval", "pen"] as const) {
+      expect(renderedOutlinePoints(traced, tool, true)).toEqual(traced);
+    }
+  });
+
+  it("returns a copy, so a caller can't mutate the stored raw points through it", () => {
+    const result = renderedOutlinePoints(traced, "rectangle", false);
+    result[0] = { x: 999, y: 999 };
+    expect(traced[0]).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe("renderedBedOutlines", () => {
+  const freehandBed = {
+    id: "bed-1",
+    name: "Front border",
+    tool: "freehand" as const,
+    points: [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+    ],
+    smoothingEnabled: true,
+  };
+
+  it("swaps each Bed onto the outline it actually renders as", () => {
+    expect(renderedBedOutlines([freehandBed])[0].points).toEqual(
+      renderedOutlinePoints(freehandBed.points, "freehand", true),
+    );
+  });
+
+  it("carries each Bed's other fields through, so the resolved Bed is still identifiable", () => {
+    expect(renderedBedOutlines([freehandBed])[0]).toMatchObject({
+      id: "bed-1",
+      name: "Front border",
+    });
+  });
+
+  it("leaves the Beds it was given untouched", () => {
+    const before = [...freehandBed.points];
+
+    renderedBedOutlines([freehandBed]);
+
+    expect(freehandBed.points).toEqual(before);
   });
 });
 

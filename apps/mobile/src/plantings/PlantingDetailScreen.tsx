@@ -21,8 +21,9 @@ function todayIsoDate(): string {
  * panel. Quantity/year acquired/source nursery are view-only here, matching
  * web exactly: web itself has no way to edit those fields after a Planting
  * is created (only the photo log and the Planting's removal are ever
- * mutated post-creation) — see `PlantingMap.tsx`. There's no native Map
- * screen yet (#14 is still unbuilt) for a Pin to be re-dropped on anyway.
+ * mutated post-creation) — see `PlantingMap.tsx`. The Map screen (#14)
+ * drops a Pin when a Planting is created; neither surface re-drops one
+ * afterwards.
  */
 export function PlantingDetailScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>()

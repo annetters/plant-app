@@ -14,6 +14,7 @@ function renderDashboard(client: ReturnType<typeof createMockAuthClient>['client
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
+          <Stack.Screen name="Map">{() => <Text>map screen</Text>}</Stack.Screen>
           <Stack.Screen name="Registry">{() => <Text>registry screen</Text>}</Stack.Screen>
           <Stack.Screen name="BloomTimeline">{() => <Text>bloom timeline screen</Text>}</Stack.Screen>
           <Stack.Screen name="TagScanCapture">{() => <Text>tag scan capture screen</Text>}</Stack.Screen>
@@ -32,6 +33,15 @@ describe('DashboardScreen', () => {
     for (const label of ['Map', 'Registry', 'Bloom Timeline']) {
       expect(screen.getByText(label)).toBeTruthy()
     }
+  })
+
+  it('navigates to the Map screen when the Map tile is pressed', async () => {
+    const { client } = createMockAuthClient(null)
+    await renderDashboard(client)
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Map' }))
+
+    expect(await screen.findByText('map screen')).toBeTruthy()
   })
 
   it('navigates to the Registry screen when the Registry tile is pressed', async () => {

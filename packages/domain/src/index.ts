@@ -69,6 +69,15 @@ export type {
 } from "./property.js";
 
 export {
+  GRID_RADIUS,
+  STAGE_SIZE_PX,
+  TILE_SIZE_PX,
+  baseMapTiles,
+  svgPointsAttribute,
+} from "./baseMap.js";
+export type { BaseMapTile } from "./baseMap.js";
+
+export {
   derivePixelsPerFootFromScaleReference,
   validateScaleReferenceInput,
 } from "./scaleReference.js";
@@ -87,6 +96,8 @@ export {
   decimatePoints,
   feetToPixels,
   pixelsToFeet,
+  renderedBedOutlines,
+  renderedOutlinePoints,
   smoothBedOutline,
   validateBedInput,
 } from "./bed.js";
@@ -126,10 +137,12 @@ export {
   plantingInputToRow,
   plantingPhotoFromRow,
   plantingPhotoInputToRow,
+  resolvePinDrop,
   validatePlantingInput,
   validatePlantingPhotoInput,
 } from "./planting.js";
 export type {
+  PinDrop,
   Planting,
   PlantingInput,
   PlantingPhoto,

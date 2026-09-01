@@ -25,12 +25,22 @@ export function createFakePropertiesDbClient(initialRow: PropertyRow | null = nu
     return chain.select(columns)
   }
 
+  const storage = {
+    createSignedUrl: jest
+      .fn()
+      .mockResolvedValue({ data: { signedUrl: 'https://example.com/signed.jpg' }, error: null }),
+  }
+
   const client: PropertiesDbClient = {
     from: () => ({ select }),
+    storage: {
+      from: () => storage,
+    },
   }
 
   return {
     client,
+    storage,
     setRow: (next: PropertyRow | null) => {
       row = next
     },

@@ -117,6 +117,44 @@ export function smoothBedOutline(
   return chaikinSmooth(base, CHAIKIN_PASSES);
 }
 
+/**
+ * A Bed's outline as it's actually rendered — raw points as-is for
+ * rectangle/oval/pen, smoothed for freehand (ADR-0001: smoothing is
+ * computed at render time, never stored). The single source of truth for
+ * "which points represent this Bed right now", shared by every renderer
+ * (web's Konva outline, the phone's SVG polygon) and by the Pin-drop
+ * containment test — so a dragged Pin resolves against the same shape
+ * that's actually drawn on screen, on both surfaces.
+ */
+export function renderedOutlinePoints(
+  points: readonly BedPoint[],
+  tool: BedTool,
+  smoothingEnabled: boolean,
+): BedPoint[] {
+  return tool === "freehand" ? smoothBedOutline(points, smoothingEnabled) : [...points];
+}
+
+/**
+ * Every Bed swapped onto the outline it actually renders as (see
+ * `renderedOutlinePoints`) — the shape a dropped Pin must be tested against,
+ * since resolving against raw traced points would put a Pin in a Bed the
+ * gardener can plainly see it's outside of (a smoothed freehand corner sits
+ * well inside its own trace).
+ *
+ * Separate from `resolvePinDrop` (`planting.ts`) because a drag resolves on
+ * every frame while these outlines only change when the Beds do: compute
+ * this once per Bed list and hand the result to each `resolvePinDrop` call,
+ * rather than re-smoothing every Bed on every pointer move.
+ */
+export function renderedBedOutlines<
+  T extends { points: readonly BedPoint[]; tool: BedTool; smoothingEnabled: boolean },
+>(beds: readonly T[]): (Omit<T, "points"> & { points: BedPoint[] })[] {
+  return beds.map((bed) => ({
+    ...bed,
+    points: renderedOutlinePoints(bed.points, bed.tool, bed.smoothingEnabled),
+  }));
+}
+
 /** Rounds to the nearest thousandth of a foot — far finer than the app's ~1ft/px target, just enough to absorb floating-point noise from a pixel/feet round trip. */
 function roundFeet(value: number): number {
   return Math.round(value * 1000) / 1000;

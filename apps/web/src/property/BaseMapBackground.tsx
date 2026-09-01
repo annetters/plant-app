@@ -1,7 +1,6 @@
 import type { Property } from '@plant-app/domain'
+import { GRID_RADIUS, STAGE_SIZE_PX, baseMapTiles, svgPointsAttribute } from '@plant-app/domain'
 import { useEffect, useState } from 'react'
-import { baseMapTiles, GRID_RADIUS, STAGE_SIZE_PX } from './baseMapTiles'
-import { strokePoints } from './baseMapDrawing'
 import { useOptionalPropertiesRepository } from './PropertiesRepositoryContext'
 
 /**
@@ -77,7 +76,7 @@ export function BaseMapBackground({ property }: { property: Property }) {
       aria-label="Drawn base plan"
     >
       {(property.baseMapDrawing ?? []).map((stroke, i) => (
-        <polyline key={i} points={strokePoints(stroke)} fill="none" stroke="#333" strokeWidth={2} />
+        <polyline key={i} points={svgPointsAttribute(stroke)} fill="none" stroke="#333" strokeWidth={2} />
       ))}
     </svg>
   )

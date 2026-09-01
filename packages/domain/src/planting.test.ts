@@ -1,11 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { Bed } from "./bed.js";
+import { renderedBedOutlines, type Bed } from "./bed.js";
 import {
   findBedContainingPoint,
   plantingFromRow,
   plantingInputToRow,
   plantingPhotoFromRow,
   plantingPhotoInputToRow,
+  resolvePinDrop,
   validatePlantingInput,
   validatePlantingPhotoInput,
   type PlantingInput,
@@ -199,5 +200,73 @@ describe("findBedContainingPoint", () => {
 
   it("returns null when there are no Beds", () => {
     expect(findBedContainingPoint({ x: 5, y: 5 }, [])).toBeNull();
+  });
+});
+
+describe("resolvePinDrop", () => {
+  // 10ft x 10ft, drawn with a shape tool so no smoothing is involved — at
+  // 2px/ft it covers stage pixels 0..20.
+  const squareBed: Bed = {
+    id: "bed-1",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    propertyId: "property-1",
+    name: "Front border",
+    tool: "rectangle",
+    points: [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+    ],
+    smoothingEnabled: false,
+  };
+
+  it("converts the drop's pixels to the real-world feet a Pin is stored in", () => {
+    const outlines = renderedBedOutlines([squareBed]);
+
+    expect(resolvePinDrop({ x: 10, y: 6 }, 2, outlines).feet).toEqual({ x: 5, y: 3 });
+  });
+
+  it("resolves which Bed the drop landed in, with no Bed ever picked by hand", () => {
+    const outlines = renderedBedOutlines([squareBed]);
+
+    expect(resolvePinDrop({ x: 10, y: 10 }, 2, outlines).bed?.id).toBe("bed-1");
+  });
+
+  it("reports no Bed when the drop falls outside every outline", () => {
+    const outlines = renderedBedOutlines([squareBed]);
+
+    expect(resolvePinDrop({ x: 100, y: 100 }, 2, outlines).bed).toBeNull();
+  });
+
+  it("reports no Bed when the Property has none drawn yet", () => {
+    expect(resolvePinDrop({ x: 10, y: 10 }, 2, []).bed).toBeNull();
+  });
+});
+
+describe("resolvePinDrop against a smoothed Bed", () => {
+  // A traced right-angled corner: smoothing rounds it off, so a point just
+  // inside the raw corner sits outside what's actually drawn on screen.
+  const traced = [
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 10, y: 10 },
+    { x: 0, y: 10 },
+  ];
+  const freehandBed: Bed = {
+    id: "bed-1",
+    createdAt: "2026-01-01T00:00:00.000Z",
+    propertyId: "property-1",
+    name: "Front border",
+    tool: "freehand",
+    points: traced,
+    smoothingEnabled: true,
+  };
+
+  it("keeps a Pin out of a Bed whose drawn edge it fell outside, even though the raw trace contains it", () => {
+    const corner = { x: 0.4, y: 0.4 };
+
+    expect(findBedContainingPoint(corner, [freehandBed])).not.toBeNull();
+    expect(resolvePinDrop({ x: corner.x * 2, y: corner.y * 2 }, 2, renderedBedOutlines([freehandBed])).bed).toBeNull();
   });
 });

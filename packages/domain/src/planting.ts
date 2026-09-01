@@ -8,7 +8,7 @@
  * consistent frame.
  */
 
-import type { BedPoint } from "./bed.js";
+import { pixelsToFeet, type BedPoint } from "./bed.js";
 
 export interface PlantingInput {
   plantId: string;
@@ -202,4 +202,29 @@ export function findBedContainingPoint<T extends { points: readonly BedPoint[] }
     if (isPointInPolygon(point, bed.points)) return bed;
   }
   return null;
+}
+
+/** Where a dragged Pin ended up: the real-world feet it gets stored as, and the Bed it landed in (`null` if it's over bare map). */
+export interface PinDrop<T> {
+  feet: BedPoint;
+  bed: T | null;
+}
+
+/**
+ * The Pin-drop rule: a marker's position in the base map's pixel space
+ * becomes the real-world feet a Planting stores, plus the Bed it belongs to
+ * — never a Bed picker or a typed coordinate (CONTEXT.md's Pin entry).
+ * Shared by every surface that can drop a Pin (web's Konva map, the phone's
+ * SVG one), so "which Bed is this Pin in" can't drift between them.
+ *
+ * Takes outlines from `renderedBedOutlines` (`bed.ts`), not raw Beds — see
+ * there for why the distinction matters, and why it's a separate call.
+ */
+export function resolvePinDrop<T extends { points: readonly BedPoint[] }>(
+  stagePoint: BedPoint,
+  pixelsPerFootValue: number,
+  outlines: readonly T[],
+): PinDrop<T> {
+  const [feet] = pixelsToFeet([stagePoint], pixelsPerFootValue);
+  return { feet, bed: findBedContainingPoint(feet, outlines) };
 }

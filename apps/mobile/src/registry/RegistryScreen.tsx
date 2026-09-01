@@ -36,10 +36,11 @@ import { usePropertiesRepository } from '../property/PropertiesRepositoryContext
  * fetched only to show each entry's Planting location(s); a failure loading
  * them doesn't block the primary Plant list, same reasoning as the web page.
  *
- * There is no native Map screen yet (#14 is still unbuilt), so unlike web's
- * `Link to /map?plantingId=`, a Planting location links to its own detail
- * screen (view + dated photo log, ticket #18) rather than a map that
- * doesn't exist yet.
+ * Unlike web's `Link to /map?plantingId=`, a Planting location links
+ * straight to its own detail screen (view + dated photo log, ticket #18)
+ * rather than to the Map screen (#14): on a phone the detail screen is
+ * where everything about that Planting already is, and the Map is one tap
+ * away on the Dashboard for seeing it in place.
  */
 function plantAttributeLines(plant: Plant): string[] {
   const lines: string[] = []

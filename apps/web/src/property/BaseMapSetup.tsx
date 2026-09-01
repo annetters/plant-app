@@ -1,8 +1,6 @@
 import type { BaseMapSource, BedPoint, Property, ScalePoint, ScaleReferenceMode } from '@plant-app/domain'
-import { validateScaleReferenceInput } from '@plant-app/domain'
+import { STAGE_SIZE_PX, svgPointsAttribute, validateScaleReferenceInput } from '@plant-app/domain'
 import { useState, type MouseEvent as ReactMouseEvent } from 'react'
-import { strokePoints } from './baseMapDrawing'
-import { STAGE_SIZE_PX } from './baseMapTiles'
 import { usePropertiesRepository } from './PropertiesRepositoryContext'
 
 type Step = 'choose' | 'photo' | 'draw' | 'calibrate'
@@ -231,11 +229,11 @@ export function BaseMapSetup(props: BaseMapSetupProps) {
               style={{ width: '100%', height: '100%' }}
             >
               {strokes.map((stroke, i) => (
-                <polyline key={i} points={strokePoints(stroke)} fill="none" stroke="#333" strokeWidth={2} />
+                <polyline key={i} points={svgPointsAttribute(stroke)} fill="none" stroke="#333" strokeWidth={2} />
               ))}
               {currentStroke.length > 0 && (
                 <polyline
-                  points={strokePoints(currentStroke)}
+                  points={svgPointsAttribute(currentStroke)}
                   fill="none"
                   stroke="#1b4332"
                   strokeWidth={2}
@@ -287,7 +285,7 @@ export function BaseMapSetup(props: BaseMapSetupProps) {
             >
               {source === 'drawn' &&
                 strokes.map((stroke, i) => (
-                  <polyline key={i} points={strokePoints(stroke)} fill="none" stroke="#333" strokeWidth={2} />
+                  <polyline key={i} points={svgPointsAttribute(stroke)} fill="none" stroke="#333" strokeWidth={2} />
                 ))}
               {points.map((point, i) => (
                 <circle key={i} cx={point.x} cy={point.y} r={6} fill="#e63946" stroke="white" strokeWidth={1.5} />

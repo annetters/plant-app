@@ -6,6 +6,13 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAuth } from '../auth/AuthContext'
 import type { MainStackParamList } from '../navigation/types'
 
+/** Which native screen each shared Dashboard tile opens. Only routes taking no params belong here — the tile is a bare "go there" link. */
+const TILE_ROUTES: Record<string, 'Map' | 'Registry' | 'BloomTimeline'> = {
+  map: 'Map',
+  registry: 'Registry',
+  'bloom-timeline': 'BloomTimeline',
+}
+
 export function DashboardScreen() {
   const { user, logOut } = useAuth()
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>()
@@ -41,34 +48,27 @@ export function DashboardScreen() {
       </Pressable>
       <View style={styles.tiles}>
         {DASHBOARD_TILES.map((tile) => {
-          if (tile.id === 'registry') {
+          const route = TILE_ROUTES[tile.id]
+          // A tile with nowhere native to go yet renders inert rather than
+          // crashing on an unknown route — DASHBOARD_TILES is shared with
+          // web, so it can grow a tile before this app has a screen for it.
+          // That's exactly what the Map tile was until #14.
+          if (!route) {
             return (
-              <Pressable
-                key={tile.id}
-                accessibilityRole="button"
-                style={styles.tile}
-                onPress={() => navigation.navigate('Registry')}
-              >
+              <View key={tile.id} style={styles.tile}>
                 <Text>{tile.label}</Text>
-              </Pressable>
-            )
-          }
-          if (tile.id === 'bloom-timeline') {
-            return (
-              <Pressable
-                key={tile.id}
-                accessibilityRole="button"
-                style={styles.tile}
-                onPress={() => navigation.navigate('BloomTimeline')}
-              >
-                <Text>{tile.label}</Text>
-              </Pressable>
+              </View>
             )
           }
           return (
-            <View key={tile.id} style={styles.tile}>
+            <Pressable
+              key={tile.id}
+              accessibilityRole="button"
+              style={styles.tile}
+              onPress={() => navigation.navigate(route)}
+            >
               <Text>{tile.label}</Text>
-            </View>
+            </Pressable>
           )
         })}
       </View>

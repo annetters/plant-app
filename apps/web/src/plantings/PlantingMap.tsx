@@ -1,10 +1,11 @@
 import type { Bed, BedPoint, Plant, Planting, PlantingInput, PlantingPhoto, Property } from '@plant-app/domain'
 import {
+  STAGE_SIZE_PX,
   feetToPixels,
-  findBedContainingPoint,
   pixelsPerFootForProperty,
-  pixelsToFeet,
   plantLabel,
+  renderedBedOutlines,
+  resolvePinDrop,
   validatePlantingInput,
   validatePlantingPhotoInput,
 } from '@plant-app/domain'
@@ -12,8 +13,7 @@ import Konva from 'konva'
 import { useEffect, useRef, useState } from 'react'
 import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
 import { BaseMapBackground } from '../property/BaseMapBackground'
-import { STAGE_SIZE_PX } from '../property/baseMapTiles'
-import { buildOutlineLine, renderedOutlinePoints } from '../property/bedOutline'
+import { buildOutlineLine } from '../property/bedOutline'
 import { useBedsRepository } from '../property/BedsRepositoryContext'
 import { usePlantingsRepository } from './PlantingsRepositoryContext'
 
@@ -33,14 +33,6 @@ const EMPTY_FORM = {
 
 function todayIsoDate(): string {
   return new Date().toISOString().slice(0, 10)
-}
-
-/** Each Bed's outline in the same real-world-feet space Pins live in — see `renderedOutlinePoints`, so Pin-drop containment matches what's actually drawn on screen. */
-function bedOutlinesInFeet(beds: readonly Bed[]): { id: string; points: BedPoint[] }[] {
-  return beds.map((bed) => ({
-    id: bed.id,
-    points: renderedOutlinePoints(bed.points, bed.tool, bed.smoothingEnabled),
-  }))
 }
 
 /**
@@ -238,7 +230,8 @@ export function PlantingMap({
     // `resolve` below — TS doesn't carry narrowing of an outer variable
     // into a nested function declaration referenced from a later callback.
     const scale = pixelsPerFootValue
-    const outlines = bedOutlinesInFeet(beds)
+    // Computed once per Bed list, not per drag frame — see `renderedBedOutlines`.
+    const outlines = renderedBedOutlines(beds)
     const start = newPinPxRef.current
     const circle = new Konva.Circle({
       x: start.x,
@@ -252,8 +245,7 @@ export function PlantingMap({
 
     function resolve(x: number, y: number) {
       newPinPxRef.current = { x, y }
-      const [feet] = pixelsToFeet([{ x, y }], scale)
-      const bed = findBedContainingPoint(feet, outlines)
+      const { feet, bed } = resolvePinDrop({ x, y }, scale, outlines)
       if (bed) {
         setPinFeet(feet)
         setResolvedBedId(bed.id)

@@ -35,6 +35,31 @@ describe('PlantingsRepository', () => {
     expect(await repository.listByBeds([])).toEqual([])
   })
 
+  it('creates a Planting from a dropped Pin, mapped back out of the inserted row', async () => {
+    const { client, plantingRows } = createFakePlantingsDbClient([])
+    const repository = new PlantingsRepository(client)
+
+    const created = await repository.create({
+      plantId: 'plant-1',
+      bedId: 'bed-1',
+      quantity: 3,
+      pin: { x: 12.5, y: 7.25 },
+      yearAcquired: 2025,
+      sourceNursery: 'Prairie Moon',
+    })
+
+    expect(created).toMatchObject({
+      plantId: 'plant-1',
+      bedId: 'bed-1',
+      quantity: 3,
+      pin: { x: 12.5, y: 7.25 },
+      yearAcquired: 2025,
+      sourceNursery: 'Prairie Moon',
+    })
+    // The Pin's real-world feet go to the row's own two columns, not a blob.
+    expect(plantingRows()[0]).toMatchObject({ pin_x: 12.5, pin_y: 7.25 })
+  })
+
   it('gets a single Planting by id, mapped from the row', async () => {
     const { client } = createFakePlantingsDbClient([plantingRow({ id: 'planting-1', quantity: 3 })])
     const repository = new PlantingsRepository(client)
