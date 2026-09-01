@@ -1,5 +1,5 @@
 import type { BedRow, PlantingPhotoRow, PlantingRow, PlantRow, PropertyRow } from '@plant-app/domain'
-import { propertyFromRow } from '@plant-app/domain'
+import { GRID_RADIUS, propertyFromRow } from '@plant-app/domain'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -165,9 +165,12 @@ function renderMap({
 }
 
 describe('PlantingMap', () => {
-  it('prompts to draw a Bed first when there are none yet', async () => {
+  it('prompts to draw a Bed first when there are none yet, under the section heading', async () => {
     renderMap({ bedRows: [] })
     expect(await screen.findByText('Draw a Bed first before adding Plantings.')).toBeInTheDocument()
+    // The heading stays even with nothing to show under it (#25) — it's what
+    // anchors the prompt to the Plantings section rather than the Bed editor.
+    expect(screen.getByRole('heading', { name: 'Plantings' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add Planting' })).not.toBeInTheDocument()
   })
 
@@ -310,6 +313,38 @@ describe('PlantingMap', () => {
     await screen.findByText(/Coneflower ×3/)
     await userEvent.click(screen.getByRole('button', { name: 'Remove Coneflower Planting' }))
     expect(screen.queryByText(/Coneflower ×3/)).not.toBeInTheDocument()
+  })
+})
+
+describe('PlantingMap — the map surface before any Bed exists (#25)', () => {
+  it('keeps the map surface in the DOM, but hidden', async () => {
+    renderMap({ bedRows: [] })
+    await screen.findByText('Draw a Bed first before adding Plantings.')
+
+    // Hidden, never unmounted — see PlantingMap.tsx's comment above the map
+    // surface for the #8 stage-mount bug that makes the distinction matter.
+    const surface = screen.getByTestId('planting-map-surface')
+    expect(surface).toBeInTheDocument()
+    expect(surface).not.toBeVisible()
+  })
+
+  it('does not load the base map behind a surface no one can use yet', async () => {
+    renderMap({ bedRows: [] })
+    await screen.findByText('Draw a Bed first before adding Plantings.')
+
+    // This Property is aerial, so `BaseMapBackground` would render a grid of
+    // ArcGIS tiles — real network requests a `display: none` ancestor does
+    // not prevent. With no Beds and no Plantings, any <img> on screen would
+    // be one of those tiles.
+    expect(document.querySelectorAll('img')).toHaveLength(0)
+  })
+
+  it('shows the surface and its base map once a Bed exists', async () => {
+    renderMap()
+    expect(await screen.findByRole('button', { name: 'Add Planting' })).toBeInTheDocument()
+
+    expect(screen.getByTestId('planting-map-surface')).toBeVisible()
+    expect(document.querySelectorAll('img')).toHaveLength((GRID_RADIUS * 2 + 1) ** 2)
   })
 })
 

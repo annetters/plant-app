@@ -240,6 +240,16 @@ describe('PropertyPage — existing Property', () => {
   it('renders the base map imagery behind the Bed editor for an available property (no separate thumbnail)', async () => {
     renderPage(availableRow)
     expect(await screen.findByText('10 Main St, Cambridge, MA')).toBeInTheDocument()
+
+    // Nothing renders imagery until the drawing surface is actually opened:
+    // the standalone thumbnail above it was removed in #6, and with no Beds
+    // drawn yet PlantingMap's hidden surface skips its own copy of the base
+    // map (#25). This assertion is why the click below matters — without it
+    // the tiles found afterward could be PlantingMap's, not the editor's.
+    expect(document.querySelectorAll('img')).toHaveLength(0)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Draw a Bed' }))
+
     // BaseMapBackground's tiles are decorative (alt=""), so they're excluded
     // from the accessible "img" role — query the DOM directly instead.
     const tiles = document.querySelectorAll('img')

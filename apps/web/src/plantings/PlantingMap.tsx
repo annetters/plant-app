@@ -447,9 +447,26 @@ export function PlantingMap({
         // forever, even after Beds arrived and the container appeared, so
         // no Pin ever resolved into a Bed. Keeping the surface unconditional
         // means the container exists on that very first effect run.
+        //
+        // Before any Bed exists there's nothing to plant into, so the
+        // surface is *hidden* rather than removed (#25) — a full 768x768
+        // canvas that does nothing is worse than no canvas at all. Hiding
+        // keeps containerRef attached, so the bug above stays fixed.
+        // BaseMapBackground, by contrast, is genuinely skipped: nothing
+        // holds a ref into it, so it re-mounts cleanly once a Bed arrives,
+        // and leaving it mounted-but-hidden would still fetch its nine
+        // ArcGIS tiles (a display:none ancestor doesn't stop an <img>
+        // loading) or round-trip Supabase for a photo's signed URL.
       }
-      <div style={{ position: 'relative', width: STAGE_SIZE_PX, height: STAGE_SIZE_PX }}>
-        <BaseMapBackground property={property} />
+      <div
+        style={{
+          display: beds.length === 0 ? 'none' : undefined,
+          position: 'relative',
+          width: STAGE_SIZE_PX,
+          height: STAGE_SIZE_PX,
+        }}
+      >
+        {beds.length > 0 && <BaseMapBackground property={property} />}
         <div
           ref={containerRef}
           data-testid="planting-map-surface"
