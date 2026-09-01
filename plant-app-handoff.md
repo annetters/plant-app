@@ -1,13 +1,29 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-08-31 (updated: #18's manual QA passed, all findings fixed)
+**Date:** 2026-09-01 (updated: PAUSED mid-QA — a HEIC photo bug found and fixed, not yet verified or committed)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
 
-**#18 (Native: Plant/Planting detail, tasks & todos) has now been manually QA'd by the user directly on a real device, every finding from that pass is fixed, and the full monorepo suite is green — not yet closed on GitHub, that's the next action.** See "Previous entry, superseded above" below for what was originally built; this entry covers the QA round on top of it.
+**PAUSED HERE at the user's request — resume by having them verify the fix below on a real device, then commit it.** Everything in "Previous entry, superseded above" (all of #18's originally-scoped QA) is done, fixed, and already committed (`e0ca214`, `f1b0664`). What follows is a **new** bug the user found immediately after — opening a Plant on web that they'd just edited a photo for on mobile — that hasn't gone through the same commit-once-confirmed cycle yet.
+
+**The bug**: a reference photo uploaded from the phone showed as a broken image on web — no intrinsic height, stayed broken even with a height hardcoded in the inspector. The signed URL the user pasted in ended in `...IMG_4538.heic`. Root cause: iOS's camera captures in HEIC by default (unless the device's Camera Format setting is "Most Compatible"), `expo-image-picker` hands that format straight back, and the app's `pickPhoto()` helper uploaded it as-is. Chrome/Firefox/Edge cannot decode HEIC in an `<img>` tag at all (only Safari has partial support), so any photo captured this way was silently broken on web from the moment it was uploaded — this affects **both** Plant reference photos and a Planting's dated photo log, since both go through the same shared `pickPhoto()` helper.
+
+**Fix (implemented, tested, NOT YET COMMITTED — sitting as uncommitted changes in the working tree right now)**: added `expo-image-manipulator` (`apps/mobile/package.json`/`package-lock.json`) and updated `apps/mobile/src/lib/pickPhoto.ts` so every picked photo — camera or library, whatever format the OS hands back — is re-encoded to JPEG via `ImageManipulator.manipulate(uri).renderAsync().saveAsync({format: SaveFormat.JPEG})` before the caller ever sees its `uri`. Verified against Expo SDK 54's actual current docs (fetched live, not assumed) that this non-hook `manipulate()` API — not the newer `useImageManipulator` React hook, which only works inside component render — is the right one for a plain utility function. Updated `pickPhoto.test.ts` (now asserts a HEIC-named asset comes back as `.jpg`) and added a pass-through `expo-image-manipulator` mock to `PlantDetailScreen.test.tsx`/`PlantingDetailScreen.test.tsx`, since `jest-expo` has no built-in mock for this module's new context-based API. Full suite green: mobile typecheck clean, 154/154 mobile tests passing.
+
+**What the user needs to verify on their device before this gets committed** (this is the resume point):
+1. **Rebuild or reload first** — a new native module was added. If testing via **Expo Go**, just reload the app (it's bundled already). If testing via the **custom dev client** built for Tag Scan's Vision OCR, it needs rebuilding (`npx expo prebuild` + reinstall via Xcode) since a custom dev client only includes native modules present at build time — reloading alone won't pick up the new dependency.
+2. **This does NOT retroactively fix the already-broken photo** — the HEIC file already sitting in storage stays broken forever; that's expected, not a new bug. The user needs to **remove that existing reference photo and re-add it** from the Plant/Planting detail screen so it goes through the fixed upload path.
+3. After re-adding, **open the same Plant on the web app and confirm the photo actually renders** (not a broken image). This is the real end-to-end check — the automated tests only verify the JPEG conversion happens, they can't verify a browser actually renders the result.
+4. If it works: tell me (or whoever resumes) it's confirmed, and the pending changes get committed then — same "don't commit until QA confirms it" rule this whole session has followed. If it's still broken: don't assume the fix is wrong first — check the storage object's actual `Content-Type` header and the file extension on the newly-uploaded path, since that'll show whether `ImageManipulator` actually produced a real JPEG or silently no-opped.
+
+**Git state right now**: uncommitted changes in the working tree (`apps/mobile/package.json`, `package-lock.json`, `apps/mobile/src/lib/pickPhoto.ts`/`.test.ts`, `apps/mobile/src/registry/PlantDetailScreen.test.tsx`, `apps/mobile/src/plantings/PlantingDetailScreen.test.tsx`) — nothing lost, just deliberately not committed yet. Three commits ahead of `origin/main` from the prior QA round (`0f2c1ad`, `e0ca214`, `f1b0664`) — none of those have been pushed either; push wasn't requested this session.
+
+---
+
+**Previous entry, superseded above** — **#18 (Native: Plant/Planting detail, tasks & todos) has now been manually QA'd by the user directly on a real device, every finding from that pass is fixed, and the full monorepo suite is green — not yet closed on GitHub, that's the next action.** See "Previous entry, superseded above" below for what was originally built; this entry covers the QA round on top of it.
 
 **Real QA findings, all fixed (commit `e0ca214`)**:
 - **Registry's Plant/Beds/Plantings lists went stale after editing a Plant and tapping "Back to Registry"** — the change only showed up after a full app reload. Root cause: React Navigation's native stack keeps `RegistryScreen` mounted in the background while `PlantDetailScreen`/`PlantingDetailScreen` are pushed on top of it, so Registry's mount-only `useEffect` fetches never re-ran on the way back. Fixed by switching those fetches to `useFocusEffect`, which re-runs every time the screen regains focus — this also fixes the identical latent staleness a removed/edited Planting would have caused in Registry's location links, not just the Plant-edit case actually reported.
