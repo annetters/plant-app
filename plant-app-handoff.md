@@ -1,13 +1,82 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-01 (updated: HEIC photo bug fix committed; #18 deliberately left open)
+**Date:** 2026-09-01 (updated: #14 Native Map screen built and committed, awaiting the user's device QA)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
 
-**The HEIC photo fix described below is now committed (`0b5d141`) — the user asked to commit it but explicitly asked NOT to close #18.** Everything else from #18's QA (see "Previous entry, superseded above") was already committed (`e0ca214`, `f1b0664`). **#18 stays open on GitHub — do not close it without the user asking again**, even though every known finding against it is now fixed and committed.
+**#14 (Native: Map view — view Beds, place/view Pins) is implemented, code-reviewed and committed (`c6f9497`), but NOT closed on GitHub and NOT yet QA'd on a device.** The user went on a break at exactly this point and asked for the QA list below. Same posture as every prior ticket here: real, tested code held open pending their own manual pass.
+
+### ⚠️ A rebuild is required before the Map screen will run at all
+
+`react-native-svg` (15.12.1, the Expo SDK 54-pinned version, added via `npx expo install`) is a **native** module. The custom Tag Scan dev client will not have it until it is rebuilt — a plain Metro reload is not enough, and the Map screen will crash or render nothing without it. Same dance as the `expo-image-manipulator` fix from the previous session:
+
+```
+cd apps/mobile
+npx expo prebuild --platform ios
+open ios/mobile.xcworkspace
+```
+
+Then in Xcode: choose the iPhone in the device dropdown along the top, press the ▶ Play button, and let it reinstall the dev client. (The user is an Xcode novice — walk through the GUI steps explicitly, don't assume.)
+
+### What to QA (nothing below has been run on a device)
+
+Everything here has only been exercised through Jest/RNTL, which mocks every Supabase-shaped repository client and renders `react-native-svg` as inert host components — no real rendering, no real touch, no real network. Reach the screen via the Dashboard's **Map** tile.
+
+**The drag interaction — the highest-risk item, and the reason a real device matters.** The pin marker is a plain RN `PanResponder`, and the map sits inside a `ScrollView`:
+1. Does dragging the new-Planting pin actually track your fingertip, or does it lag/jump? The drag converts screen pixels back through the map's shrink-to-fit scale (`mapSurface.ts`) — if that conversion is wrong it will feel subtly slow or fast, not obviously broken.
+2. **Does a downward drag move the pin, or does the ScrollView steal it and scroll the page instead?** `onPanResponderTerminationRequest: () => false` is supposed to prevent exactly this. Untested against a real scroll gesture.
+3. Is the marker grabbable? Its touch target is 44px (deliberately larger than the 22px dot drawn inside it — a `/code-review` finding), but that's an untested guess at fingertip size.
+4. Fling the pin hard past the edge of the map: it should park on the border, not vanish (`draggedStagePoint` clamps to the surface — a deliberate divergence from web, where Konva lets the marker drag off-stage freely).
+
+**Pin placement correctness:**
+5. Drop a pin inside a Bed — does the form say "Pin is in <Bed name>."? Drop it on bare map — does it say "Drag the pin onto a Bed to place this Planting." and keep Save disabled?
+6. Save a Planting and check on **web** that its Pin lands in the same real-world spot. This is the cross-surface claim the whole ticket rests on, and it's the one thing no test can prove.
+7. Near a Bed's edge, especially a **smoothed freehand** Bed: the pin should resolve against the rounded outline you can see, not the raw trace. Test right at a rounded corner.
+
+**Rendering, per base-map source.** The user's own Property is the only realistic test of these — the tests use synthetic 2px/ft scales:
+8. **Aerial**: do all 9 tiles load over the network and line up as one continuous image, with no seams or gaps? Tile size is `size / 3`, which can land on a fractional pixel.
+9. **Photo** (photographed plot plan): does it appear at all? It needs a signed URL from the new mobile `getBaseMapPhotoUrl` against the `property-base-map-photos` bucket — **the RLS path for that bucket has never been exercised from the phone before**, so a permissions failure is plausible and would show as a silently blank backdrop.
+10. **Drawn**: are the traced lines thick enough to see? Their width is divided back out of the shrink-to-fit scale so they stay ~2 device px, but that was reasoned about, not looked at.
+11. Do Bed outlines sit correctly over the base map, at the right size and place?
+
+**The rest:**
+12. Tap a Pin → does the right Planting open? Pins close together are the interesting case (36px hit circles can overlap).
+13. Tap a row in the Plantings list below the map → same destination.
+14. Remove a Planting from its detail screen, come back: is its Pin gone from the map? (`useFocusEffect` is what makes this work — the same staleness bug #18's QA found in Registry.)
+15. Empty states, if reachable: no Beds drawn yet; a Property with no scale.
+16. Larger text sizes — same accessibility check that is still outstanding for #17.
+
+### Known gaps, deliberate — not QA findings
+
+- **A screen reader cannot place a Pin.** Dragging is the only way to move the marker, and VoiceOver can't drive a drag. Web's Konva marker has the identical gap, so this is parity, not a regression — but it is a real accessibility hole in both surfaces, worth its own ticket if it matters.
+- **The Registry's Planting links still go to the Planting detail screen, not the Map**, unlike web's `?plantingId=` deep link. The mobile Map has no equivalent "jump to this Pin" parameter. Not in #14's acceptance criteria; left as a deliberate call, since on a phone the detail screen is where everything about that Planting already is.
+- **Pan/zoom is absent**, as on web. The whole map is scaled to fit the phone's width instead (~0.45x on a typical phone), so fine detail is genuinely smaller than on desktop. If that turns out to be unusable in the garden, it's a new ticket, not a bug in this one.
+
+### What was built (commit `c6f9497`)
+
+New on mobile, under `apps/mobile/src/property/`: `MapScreen.tsx` (the map surface, the drag-to-place flow, and a plain Plantings list — a dot is a poor tap target, and SVG shapes take no `accessibilityRole`, so the list doubles as the only screen-reader route to a Planting), `NativeBaseMap.tsx` (backdrop for all three base-map sources), and `mapSurface.ts` (fitting the fixed base-map square onto a phone, and converting a finger's drag back through that scale — the pure seam, unit-tested). Plus `PlantingsRepository.create` and `PropertiesRepository.getBaseMapPhotoUrl` on mobile, a `Map` route, and the Dashboard's Map tile wired up (its tile cascade collapsed to a `TILE_ROUTES` lookup).
+
+**Promoted into `packages/domain`**, now that both surfaces render the same map: `STAGE_SIZE_PX`/`GRID_RADIUS`/`TILE_SIZE_PX`/`baseMapTiles`/`svgPointsAttribute` (from web's now-deleted `baseMapTiles.ts` and `baseMapDrawing.ts`), `renderedOutlinePoints` and a new `renderedBedOutlines` (both in `bed.ts`), and `resolvePinDrop` (`planting.ts`). Two copies of the stage size would be a silent correctness bug, not mere duplication — a Scale Reference calibrated against one stage size and rendered against another is off by exactly the ratio between them. **Web's `PlantingMap` now resolves a dropped Pin through that shared rule instead of its own copy**; web behaviour is unchanged and its full suite confirms it.
+
+**`/code-review` caught three real things before this landed**, all fixed in the commit:
+1. **An ADR was cited wrongly, and the UI copy followed it.** The empty states said base map and Scale Reference were "desktop-only by design (ADR-0001)". ADR-0003 says the opposite — *"Scale Reference calibration is **not** bundled with 'drawing' … It ships at full parity"* — and ADR-0001 is about Konva bed outlines, not base-map setup. Only **drawing** is desktop-only. Copy now says these aren't in the phone app *yet* (they're #15), and a test that had locked the mistake in (asserting the strings "base map"/"scale reference" never render) was narrowed to actual drawing tools.
+2. **A Beds-fetch failure was reported as "you have no Property"** — both loads shared one `.catch`. Now independent: the map still draws and only the Beds error shows. Regression test added.
+3. **The drag marker had a smaller touch target (22px) than the Pins you merely tap (36px)** — backwards, since grabbing it is the entire interaction. Now 44px with the dot still drawn at 22px.
+
+**Full monorepo green**: 235 domain + 183 mobile + 183 web, typecheck clean across all three workspaces, web lint unchanged (warnings only, all pre-existing).
+
+**Git state**: committed to `main` as `c6f9497`. `origin/main` is now **6 commits behind** `HEAD` — nothing has been pushed this session or the last; push has not been requested.
+
+**#14's closure won't unblock anything new** — #15 (Native: Scale Reference calibration) is already frontier and independent of it.
+
+**Still true from the previous entry: #18 also stays open on GitHub — do not close it without the user asking again**, even though every known finding against it is fixed and committed.
+
+---
+
+**Previous entry, superseded above** — **The HEIC photo fix described below is now committed (`0b5d141`) — the user asked to commit it but explicitly asked NOT to close #18.** Everything else from #18's QA (see "Previous entry, superseded above") was already committed (`e0ca214`, `f1b0664`). **#18 stays open on GitHub — do not close it without the user asking again**, even though every known finding against it is now fixed and committed.
 
 **The bug**: a reference photo uploaded from the phone showed as a broken image on web — no intrinsic height, stayed broken even with a height hardcoded in the inspector. The signed URL the user pasted in ended in `...IMG_4538.heic`. Root cause: iOS's camera captures in HEIC by default (unless the device's Camera Format setting is "Most Compatible"), `expo-image-picker` hands that format straight back, and the app's `pickPhoto()` helper uploaded it as-is. Chrome/Firefox/Edge cannot decode HEIC in an `<img>` tag at all (only Safari has partial support), so any photo captured this way was silently broken on web from the moment it was uploaded — this affects **both** Plant reference photos and a Planting's dated photo log, since both go through the same shared `pickPhoto()` helper.
 
