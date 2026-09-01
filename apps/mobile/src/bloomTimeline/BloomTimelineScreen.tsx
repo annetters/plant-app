@@ -35,13 +35,21 @@ const AXIS_HEIGHT = 24
 
 const MONTH_OPTIONS = MONTH_NAMES.map((_, index) => String(index + 1))
 
+// Every month's start, as the same pixel offset a bar's own start/end use —
+// computed once rather than per row. Drives tick marks each bar's own track
+// draws behind itself (matching web's `.bloom-month-tick`), so a bar's
+// position can be read directly off its own row, not just the axis above —
+// and so an empty stretch of track still shows *something*, rather than a
+// bare background indistinguishable from a rendering failure.
+const MONTH_START_OFFSETS = MONTH_NAMES.map((_, index) => dayOfYear({ month: index + 1, day: 1 }) - 1)
+
 type BloomTimelineView = 'chart' | 'list'
 
 function dayOffsetPx(dayOfYearValue: number): number {
   return (dayOfYearValue / DAYS_IN_YEAR) * CHART_WIDTH
 }
 
-/** The year-view chart's horizontal track for one bar, positioned in pixels against CHART_WIDTH. A wrapping bloom window (e.g. Nov 15 -> Feb 15) draws as two segments rather than one bar running backwards. */
+/** The year-view chart's horizontal track for one bar, positioned in pixels against CHART_WIDTH. A wrapping bloom window (e.g. Nov 15 -> Feb 15) draws as two segments rather than one bar running backwards. The track itself has a visible rail (background + border, matching web's `.bloom-bar-track`) so the timeline reads as a timeline even where no bar is drawn. */
 function BarTrack({ bar }: { bar: BloomTimelineBar }) {
   const startPx = dayOffsetPx(dayOfYear(bar.bloomWindow.start) - 1)
   const endPx = dayOffsetPx(dayOfYear(bar.bloomWindow.end))
@@ -49,18 +57,23 @@ function BarTrack({ bar }: { bar: BloomTimelineBar }) {
   const label = `Blooms ${formatMonthDay(bar.bloomWindow.start)} – ${formatMonthDay(bar.bloomWindow.end)}`
 
   return (
-    <View style={styles.track} accessible accessibilityLabel={label}>
-      {wraps ? (
-        <>
-          <View
-            testID="bloom-bar-segment"
-            style={[styles.barSegment, { left: startPx, width: CHART_WIDTH - startPx }]}
-          />
-          <View testID="bloom-bar-segment" style={[styles.barSegment, { left: 0, width: endPx }]} />
-        </>
-      ) : (
-        <View testID="bloom-bar-segment" style={[styles.barSegment, { left: startPx, width: endPx - startPx }]} />
-      )}
+    <View style={styles.trackRow}>
+      <View style={styles.rail} accessible accessibilityLabel={label}>
+        {MONTH_START_OFFSETS.map((offset, index) => (
+          <View key={index} testID="bloom-month-tick" style={[styles.monthTick, { left: dayOffsetPx(offset) }]} />
+        ))}
+        {wraps ? (
+          <>
+            <View
+              testID="bloom-bar-segment"
+              style={[styles.barSegment, { left: startPx, width: CHART_WIDTH - startPx }]}
+            />
+            <View testID="bloom-bar-segment" style={[styles.barSegment, { left: 0, width: endPx }]} />
+          </>
+        ) : (
+          <View testID="bloom-bar-segment" style={[styles.barSegment, { left: startPx, width: endPx - startPx }]} />
+        )}
+      </View>
     </View>
   )
 }
@@ -347,14 +360,30 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 12,
   },
-  track: {
+  trackRow: {
     height: ROW_HEIGHT,
     justifyContent: 'center',
   },
+  rail: {
+    height: 20,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 4,
+    backgroundColor: '#f4f3ec',
+    overflow: 'hidden',
+  },
+  monthTick: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    width: 1,
+    backgroundColor: '#ddd',
+  },
   barSegment: {
     position: 'absolute',
-    height: 12,
-    borderRadius: 6,
+    top: 0,
+    bottom: 0,
+    borderRadius: 4,
     backgroundColor: '#2e7d32',
   },
   list: {

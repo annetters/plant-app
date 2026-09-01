@@ -333,6 +333,19 @@ describe('BloomTimelineScreen — bar positioning', () => {
     const segments = within(track).getAllByTestId('bloom-bar-segment')
     expect(segments).toHaveLength(2)
   })
+
+  it("gives every row a visible rail and month ticks, so an empty stretch of track still reads as a timeline rather than a rendering failure", async () => {
+    await renderScreen({ plantRows: [CONEFLOWER] })
+
+    const track = await screen.findByLabelText('Blooms June 1 – August 15')
+    const railStyle = Array.isArray(track.props.style)
+      ? Object.assign({}, ...track.props.style)
+      : track.props.style
+    expect(railStyle.backgroundColor).toBeTruthy()
+    expect(railStyle.borderColor).toBeTruthy()
+
+    expect(within(track).getAllByTestId('bloom-month-tick')).toHaveLength(12)
+  })
 })
 
 describe('BloomTimelineScreen — Beds-fetch error', () => {
