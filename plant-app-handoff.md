@@ -1,11 +1,81 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-01 (updated: #14 Native Map screen built and committed, awaiting the user's device QA)
+**Date:** 2026-09-01 (updated: #25 web map-canvas gating built and committed, awaiting the user's browser QA — #14's device QA still outstanding underneath it)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
+
+**Two QA passes are now queued, on two different surfaces. Neither has been run.**
+
+1. **#25 (web, in a browser)** — built this session, committed `a96caee`, checklist immediately below.
+2. **#14 (native, on a real iPhone, needs an Xcode rebuild first)** — built last session, committed `c6f9497`, its 16-item checklist is further down and is **not** superseded by #25. Don't lose it.
+
+They're independent — #25 is web-only and touches nothing the native Map screen uses.
+
+---
+
+## #25: hide the Plantings map canvas until a Bed exists
+
+**Implemented, code-reviewed, committed (`a96caee`), NOT closed on GitHub, NOT yet QA'd in a browser.** Same posture as every prior ticket here: real, tested code held open pending the user's own manual pass. The issue also still carries its original `needs-triage` label — implementing it settled the direction in conversation, not on GitHub, so relabel or close only when the user asks.
+
+### What changed, in one paragraph
+
+On `/map`, `PlantingMap` used to render its full 768x768 canvas and its own copy of the base map unconditionally, so a gardener with no Beds saw a big, fully-rendered, non-functional map sitting above "Draw a Bed first before adding Plantings." Now the map area is hidden with `display: none` while `beds.length === 0`, and `<BaseMapBackground>` is skipped outright in that state. The two are treated differently on purpose: the ref'd container **must** stay mounted (#8's bug — the Konva stage-mount effect only depends on `pixelsPerFootValue`, so it runs once, and a null `containerRef.current` on that single run means no Pin ever resolves into a Bed again), whereas nothing holds a ref into `BaseMapBackground`, so skipping it is safe and avoids fetching nine ArcGIS tiles — a `display: none` ancestor does **not** stop an `<img>` loading — or round-tripping Supabase for a photographed plot plan's signed URL. The "Plantings" heading and the prompt both stay.
+
+### What to QA (nothing below has been run)
+
+Run against the dev server (`npm run dev`, web workspace) and the real linked Supabase project. Items 2 and 4 are the ones that actually matter; the rest are confirmation.
+
+**The empty state — the thing the ticket is about:**
+1. On a Property with **no Beds drawn**, open `/map`. Expect the "Beds" section, then the "Plantings" heading and "Draw a Bed first before adding Plantings." — and **no map canvas at all**. Specifically check there's no leftover blank/grey box, no 768px gap, and no scroll space where the canvas used to be. (The div is still in the DOM, hidden — `display: none` should collapse it completely, but that's the thing to eyeball.)
+
+2. **⚠️ Draw your first Bed without reloading the page — the highest-risk item.** With no Beds, click "Draw a Bed", draw one, save it. Then, *without reloading*:
+   - Does the Plantings map appear immediately, with the base map behind it?
+   - Does the new Bed's outline draw on it, in the right place?
+   - Click "Add Planting", drag the red pin into that Bed. **Does it resolve** — "Drop the pin inside a Bed." goes away and Save enables?
+   - Save it. Does its Pin appear on the map?
+
+   This exact path is what #8's null-ref bug broke, and it's the one thing the hidden-not-unmounted design exists to protect. If the pin never resolves no matter where you drop it, that's the bug back, and it's a real regression, not a cosmetic one.
+
+3. **All three base-map sources.** The gating is source-agnostic in code, but they fail differently: aerial is 9 network tiles, a photographed plot plan needs a signed URL from Supabase, a drawn plan is inline SVG with no network at all. For each source you have a Property for: nothing renders with no Beds; the right backdrop appears once a Bed exists.
+
+4. **⚠️ The load-order flash — new, a genuine trade this fix makes, and the thing most worth your eyes.** On a Property that **does** have Beds, reload `/map` and watch the first second. The base map now waits for the Beds list to arrive before it starts loading, so it appears roughly one round-trip later than it used to, and "Draw a Bed first before adding Plantings." may flash briefly before the canvas replaces it. Code review raised this; it's inherent to "skip the base map while `beds.length === 0`" as the issue scoped it, since on first paint an empty list and a not-yet-loaded list look identical. **If it looks bad, it's fixable** — distinguishing "no Beds" from "Beds not loaded yet" needs one more piece of state, which is a small, clean change but genuinely more than #25 asked for. Worth a decision either way.
+
+**Regression checks on the normal path (a Property that already has Beds):**
+5. Reload `/map`: map renders as before, existing Pins in the right places, tapping a Pin opens that Planting's details.
+6. The Registry's "View on the map" link (`/map?plantingId=…`) still lands on the right Planting.
+
+**Environment coverage:**
+7. **Phone width / a narrow window.** Bed drawing is desktop-only, so a phone gardener with no Beds now sees no imagery anywhere on `/map`. Check that reads as deliberate rather than broken — it's arguably more correct than the old behaviour (a map they could do nothing with), but it's a real change in what a phone shows.
+8. **Safari/WebKit.** `display: none` isn't exotic, so this is low-risk, but this repo has real history of WebKit-only bugs slipping past desktop Chromium (#5's dropdown). One pass.
+
+**Optional, if you want the proof rather than the appearance:**
+9. DevTools → Network, filter to `arcgisonline`. On a no-Beds Property: **zero** tile requests while just viewing `/map`. Click "Draw a Bed" and the Bed editor requests its own 9 — that's correct, it needs something to draw on. Before this change you'd have seen 9 fired on load with nothing to use them for.
+
+### Already covered by automated tests — no need to re-check by hand
+
+The surface staying mounted-but-hidden with no Beds, no `<img>` rendering in that state, the surface plus its 9 tiles appearing once a Bed exists, and the heading and prompt surviving. `apps/web/src/plantings/PlantingMap.test.tsx`, describe block "PlantingMap — the map surface before any Bed exists (#25)". What tests can't cover is everything above involving real Konva dragging, real network timing, or how it actually looks — jsdom stubs Konva entirely.
+
+### Decisions taken this session, so they don't get relitigated
+
+- **Web only, deliberately.** `apps/mobile/src/property/MapScreen.tsx` has the identical shape — it renders its map surface and `NativeBaseMap` unconditionally, then shows "No Beds drawn yet — Beds are drawn on the desktop app." underneath. It was left alone: #25 names `PlantingMap.tsx` specifically, native's surface is declarative SVG with no Konva ref lifecycle (so it's a simpler, different fix), and #14's own device QA hasn't run yet, so that screen's empty state is still unverified ground. **This has not been filed as its own issue yet** — worth doing, and it wasn't done here because filing it wasn't asked for.
+- **The heading stays.** With no Beds the section shows "Plantings" + the prompt, not a bare floating sentence. The issue's text listed the heading among what renders unconditionally, so the other reading was defensible; this was the user's call.
+
+### What `/code-review` caught, fixed before the commit
+
+One real thing, in the **existing** suite rather than the new code: `PropertyPage.test.tsx`'s "renders the base map imagery behind the Bed editor for an available property" was **passing for the wrong reason**. It asserted on `document.querySelectorAll('img')` immediately after render, but `BedEditor` only renders its base map once its drawing panel is open (`open` state, after clicking "Draw a Bed") — so the tiles it found were `PlantingMap`'s unconditional copy, i.e. the very thing #25 removes. The test named for the Bed editor was never testing the Bed editor. Now it asserts zero imagery before opening the panel, clicks "Draw a Bed", and *then* checks the tiles — so it genuinely tests its own name. This is the second time in this repo a test has locked in behaviour its name disclaimed (see #14's ADR mis-citation test); worth a glance whenever a test starts failing for a change that "shouldn't" affect it.
+
+Three smaller review notes also applied: the tile count now derives from `GRID_RADIUS` rather than a hardcoded `9`, the new tests use `document.querySelectorAll` matching the repo's existing idiom instead of introducing a second one, and the duplicated explanation of #8's stage-mount bug in the test was cut to a pointer at the component's own comment, so the two can't drift.
+
+**Full monorepo green**: 235 domain + 183 mobile + 186 web (web +3 from this ticket), typecheck clean across all three workspaces, web lint unchanged at 11 warnings — all pre-existing, verified against a stashed baseline rather than assumed.
+
+**Git state**: committed to `main` as `a96caee`. `origin/main` is now **9 commits behind** `HEAD` — nothing has been pushed for several sessions; push has not been requested.
+
+---
+
+**Previous entry, still live — #14's device QA has NOT been done and is not superseded by the above.**
 
 **#14 (Native: Map view — view Beds, place/view Pins) is implemented, code-reviewed and committed (`c6f9497`), but NOT closed on GitHub and NOT yet QA'd on a device.** The user went on a break at exactly this point and asked for the QA list below. Same posture as every prior ticket here: real, tested code held open pending their own manual pass.
 
