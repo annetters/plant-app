@@ -15,6 +15,18 @@ jest.mock('expo-image-picker', () => ({
   launchImageLibraryAsync: jest.fn(),
 }))
 
+// pickPhoto() re-encodes every picked photo to JPEG — see pickPhoto.test.ts
+// for coverage of that conversion itself. Here it's a pass-through so these
+// screen-level tests aren't coupled to expo-image-manipulator's API shape.
+jest.mock('expo-image-manipulator', () => ({
+  ImageManipulator: {
+    manipulate: jest.fn((uri: string) => ({
+      renderAsync: () => Promise.resolve({ saveAsync: () => Promise.resolve({ uri }) }),
+    })),
+  },
+  SaveFormat: { JPEG: 'jpeg' },
+}))
+
 const originalFetch = globalThis.fetch
 
 beforeEach(() => {
