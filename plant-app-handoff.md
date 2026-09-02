@@ -1,11 +1,15 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-01 (updated: #25's browser QA run to completion by the user — every #25-scoped item passes, two incidental bugs found, fixed and committed, two more filed)
+**Date:** 2026-09-02 (updated: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
+
+> **Also read "After both QA passes" further down.** It was written later and
+> corrects this entry's git state, the standing instruction about #18, and
+> every "not pushed yet" line in this doc.
 
 **#25's browser QA checklist is complete, but #25 is NOT ready to close** —
 one unresolved thread is a real behavior change caused by #25 itself, not a
@@ -63,7 +67,51 @@ by commit message.
 
 **Full monorepo suite**: web 187/187 passing (+1 from the new regression test), typecheck clean. Domain and mobile untouched this session.
 
-**Git state**: `b6ff131` is the tip as of this update, layered on the peer session's `8d50e3b`/`3e26c80`/`25340f3`. `origin/main` remains unpushed — push has not been requested.
+**Git state**: `b6ff131` was the tip when this entry was written. Superseded — see "After both QA passes" immediately below.
+
+---
+
+## After both QA passes — later the same session
+
+Written after both entries above. Each item here invalidates something stated
+elsewhere in this doc — check it before trusting an older claim.
+
+**Everything is pushed.** `origin/main` and `main` are level as of `ce789cd`.
+Every "push has not been requested" / "remains unpushed" line further down is
+historical — they were true when written and are not any more. 17 commits went
+up in one go, covering #18's fixes, #14's Map screen and QA fixes, and #25's
+gating and QA fixes.
+
+**#18 is CLOSED — by the user, on 2026-09-02.** This matters because two
+places further down still carry the old standing instruction ("#18 stays open
+on GitHub — do not close it without the user asking again"). **That instruction
+is spent; do not act on it, and do not reopen #18.** The likeliest reason it
+was being held has also been resolved: the HEIC photo fix, recorded for weeks
+as never independently verified, was confirmed working on web by the user.
+
+**The QA orphaned by earlier closures is now tracked in #34.** #3, #7, #8 and
+#17 were each closed while manual QA against them was still unrun — 14 items in
+total, confirmed by the user as genuinely still outstanding rather than
+abandoned. Those four tickets **stay closed** by the user's choice; #34
+(`ready-for-human`) collects the remaining work and groups it by what a sitting
+actually needs — a WebKit pass, a real mouse, a phone with Larger Text on, and
+a few quick browser checks. #3's cross-account URL check is excluded: it passed
+on 2026-09-02, and was the only item across those lists with an access-control
+failure mode.
+
+**Never close an issue in this repo without the user explicitly asking.** Now
+recorded in `CLAUDE.md` under "Closing issues". It supersedes the earlier
+practice visible throughout this doc, where tickets closed as a matter of
+course once QA passed (#6, #9, #10, #11, #12, #16, #17, #20) — those entries
+are history, not precedent. #14 is open under this rule with its QA complete
+and nothing outstanding against it. #25 is open for a stronger reason as well
+— the unresolved freshly-created-Property gap named at the top of this doc.
+
+**Open and waiting**: #14, #25 (both QA'd, held open deliberately), #34
+(`ready-for-human`), and #28–#33 (`needs-triage`, filed across the two passes).
+**Frontier build work**: #15 is the last unbuilt ticket under the spec; #31
+(no manual Plant creation on mobile) is the parity gap the user rated most
+significant.
 
 ---
 
