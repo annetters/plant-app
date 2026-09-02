@@ -1,5 +1,5 @@
 import { STAGE_SIZE_PX } from '@plant-app/domain'
-import { draggedStagePoint, mapDisplayScale } from './mapSurface'
+import { draggedStagePoint, indicesWithinTapRange, mapDisplayScale } from './mapSurface'
 
 describe('mapDisplayScale', () => {
   it('shrinks the surface to fit a phone screen narrower than it', () => {
@@ -42,5 +42,39 @@ describe('draggedStagePoint', () => {
       x: STAGE_SIZE_PX,
       y: STAGE_SIZE_PX,
     })
+  })
+})
+
+describe('indicesWithinTapRange', () => {
+  const target = { x: 100, y: 100 }
+
+  it('finds only the tapped Pin when nothing else is near it', () => {
+    const points = [target, { x: 400, y: 400 }]
+
+    expect(indicesWithinTapRange(points, target, 18, 1)).toEqual([0])
+  })
+
+  it('finds every Pin one fingertip could have meant', () => {
+    // Two tap radii is 36 surface px at full size, so 30 away is ambiguous
+    // and 40 away is not.
+    const points = [target, { x: 130, y: 100 }, { x: 140, y: 100 }]
+
+    expect(indicesWithinTapRange(points, target, 18, 1)).toEqual([0, 1])
+  })
+
+  it('widens its reach in surface pixels as the map is shrunk, since a fingertip does not shrink with it', () => {
+    // At half size, 36 *screen* px of fingertip covers 72 surface px.
+    const points = [target, { x: 160, y: 100 }]
+
+    expect(indicesWithinTapRange(points, target, 18, 1)).toEqual([0])
+    expect(indicesWithinTapRange(points, target, 18, 0.5)).toEqual([0, 1])
+  })
+
+  it('measures diagonally, not per axis, so a Pin off the corner is not swept in', () => {
+    // 30 on each axis is ~42 apart, past the 36px threshold, though each
+    // individual axis is within it.
+    const points = [target, { x: 130, y: 130 }]
+
+    expect(indicesWithinTapRange(points, target, 18, 1)).toEqual([0])
   })
 })

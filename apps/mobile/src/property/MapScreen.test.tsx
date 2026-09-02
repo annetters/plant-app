@@ -64,6 +64,12 @@ const CONEFLOWER: PlantRow = plantRow({
   scientific_name: 'Echinacea purpurea',
 })
 
+const BEE_BALM: PlantRow = plantRow({
+  id: 'plant-beebalm',
+  common_name: 'Bee Balm',
+  scientific_name: 'Monarda didyma',
+})
+
 /** A `PropertiesDbClient` whose every query rejects — none of the fakes support a failure path. Mirrors BloomTimelineScreen.test's own. */
 function createFailingPropertiesDbClient(): PropertiesDbClient {
   const failingChain = {
@@ -293,6 +299,119 @@ describe('MapScreen — viewing a Planting', () => {
 
     expect(await screen.findByText('Planting detail for planting-1')).toBeTruthy()
   })
+
+  /** 21ft/30ft against PLANTED's 20ft/30ft — 2 surface pixels apart at this Property's 2px/ft, well inside one fingertip. */
+  const PLANTED_BESIDE_IT: PlantingRow = plantingRow({
+    id: 'planting-2',
+    plant_id: 'plant-beebalm',
+    bed_id: 'bed-front',
+    quantity: 1,
+    pin_x: 21,
+    pin_y: 30,
+  })
+
+  it('offers the choice when a tap lands on more than one Pin, instead of picking by draw order', async () => {
+    await renderScreen({
+      plantRows: [CONEFLOWER, BEE_BALM],
+      plantingRows: [PLANTED, PLANTED_BESIDE_IT],
+    })
+
+    await fireEvent.press(await screen.findByTestId('map-pin-planting-1'))
+
+    expect(await screen.findByText('2 Plantings here')).toBeTruthy()
+
+    // Reaching the *other* Planting from a tap that landed on its neighbour is
+    // the whole point — draw order alone could never get here.
+    await fireEvent.press(screen.getByTestId('cluster-choice-planting-2'))
+
+    expect(await screen.findByText('Planting detail for planting-2')).toBeTruthy()
+  })
+
+  // The sheet covers the lower screen, so without this the gardener is told
+  // "2 Plantings here" with no way to see where "here" is.
+  it('rings the Pins on the map while the chooser is open, and stops when it closes', async () => {
+    await renderScreen({
+      plantRows: [CONEFLOWER, BEE_BALM],
+      plantingRows: [PLANTED, PLANTED_BESIDE_IT],
+    })
+
+    expect(screen.queryByTestId('cluster-highlight')).toBeNull()
+
+    await fireEvent.press(await screen.findByTestId('map-pin-planting-1'))
+
+    expect(await screen.findByTestId('cluster-highlight')).toBeTruthy()
+
+    await fireEvent.press(screen.getByText('Cancel'))
+
+    expect(screen.queryByTestId('cluster-highlight')).toBeNull()
+  })
+
+  /** Same Plant, same quantity, same spot, differing only in when they were added. */
+  function addedAt(id: string, pinX: number, time: string): PlantingRow {
+    return plantingRow({
+      id,
+      plant_id: 'plant-coneflower',
+      bed_id: 'bed-front',
+      quantity: 1,
+      pin_x: pinX,
+      pin_y: 30,
+      created_at: `2026-03-12T${time}:00.000Z`,
+    })
+  }
+
+  // The gardener's actual case: a group of the same Plant put in during one
+  // sitting, so name, quantity, year, nursery *and* date are all shared. The
+  // time is the only thing left, and position can't help — these Pins are in
+  // the chooser precisely because they overlap.
+  it('separates Plantings of the same Plant added on the same day', async () => {
+    await renderScreen({
+      plantingRows: [
+        addedAt('planting-a', 20, '09:14'),
+        addedAt('planting-b', 21, '09:21'),
+        addedAt('planting-c', 22, '09:26'),
+      ],
+    })
+
+    await fireEvent.press(await screen.findByTestId('map-pin-planting-a'))
+
+    expect(await screen.findByText('3 Plantings here')).toBeTruthy()
+    // Asserted as "every row reads differently" rather than against literal
+    // times, which would pin this test to whatever timezone it runs in.
+    const details = screen.getAllByText(/^added /)
+    const rendered = details.map((node) => node.props.children)
+    expect(details).toHaveLength(3)
+    expect(new Set(rendered).size).toBe(3)
+  })
+
+  it('leads with the year and nursery when a Planting has them', async () => {
+    const FROM_A_NURSERY: PlantingRow = plantingRow({
+      ...addedAt('planting-a', 20, '09:14'),
+      year_acquired: 2024,
+      source_nursery: 'Prairie Moon',
+    })
+    await renderScreen({ plantingRows: [FROM_A_NURSERY, addedAt('planting-b', 21, '09:21')] })
+
+    await fireEvent.press(await screen.findByTestId('map-pin-planting-a'))
+
+    expect(
+      await screen.findByText('acquired 2024 · Prairie Moon · added', { exact: false }),
+    ).toBeTruthy()
+  })
+
+  it('opens straight through when the nearest other Pin is far enough to tell apart', async () => {
+    const FAR_OFF: PlantingRow = plantingRow({
+      id: 'planting-3',
+      plant_id: 'plant-beebalm',
+      bed_id: 'bed-front',
+      pin_x: 55,
+      pin_y: 55,
+    })
+    await renderScreen({ plantRows: [CONEFLOWER, BEE_BALM], plantingRows: [PLANTED, FAR_OFF] })
+
+    await fireEvent.press(await screen.findByTestId('map-pin-planting-1'))
+
+    expect(await screen.findByText('Planting detail for planting-1')).toBeTruthy()
+  })
 })
 
 describe('MapScreen — placing a Pin', () => {
@@ -301,8 +420,35 @@ describe('MapScreen — placing a Pin', () => {
     await fireEvent.press(await screen.findByText('Add Planting'))
 
     // The marker starts at the middle of the map, which is bare ground here.
-    expect(await screen.findByText('Drag the pin onto a Bed to place this Planting.')).toBeTruthy()
+    // Matched loosely: the same line also carries the Plant requirement (see
+    // the test below), which is a separate concern from this one.
+    expect(
+      await screen.findByText('Drag the pin onto a Bed to place this Planting.', { exact: false }),
+    ).toBeTruthy()
     expect(screen.getByText('Save Planting').parent?.props.accessibilityState?.disabled).toBe(true)
+  })
+
+  // A fingertip covers the marker completely while dragging it (#14's device
+  // QA), so the crosshair's arms are the only thing left saying where the Pin
+  // actually is. It exists only during the drag — a permanent one would just
+  // be clutter over the map.
+  it('draws a crosshair through the marker only while it is being dragged', async () => {
+    await renderScreen()
+    await fireEvent.press(await screen.findByText('Add Planting'))
+
+    expect(screen.queryByTestId('pin-crosshair')).toBeNull()
+
+    const marker = await screen.findByTestId('new-pin')
+    const held = { x: 200, y: 200 }
+    const moved = { x: 220, y: 220 }
+    await fireEvent(marker, 'responderGrant', touchEvent(held, held, 1000, 1000))
+    await fireEvent(marker, 'responderMove', touchEvent(moved, held, 1100, 1000))
+
+    expect(screen.getByTestId('pin-crosshair')).toBeTruthy()
+
+    await fireEvent(marker, 'responderRelease', touchEvent(moved, moved, 1100, 1100, false))
+
+    expect(screen.queryByTestId('pin-crosshair')).toBeNull()
   })
 
   it('resolves the Bed from wherever the Pin was dragged, with no Bed ever picked by hand', async () => {
@@ -311,7 +457,25 @@ describe('MapScreen — placing a Pin', () => {
 
     await dragPinTo({ x: 70, y: 70 })
 
-    expect(await screen.findByText('Pin is in Front border.')).toBeTruthy()
+    expect(await screen.findByText('Pin is in Front border.', { exact: false })).toBeTruthy()
+  })
+
+  // Save is disabled on two conditions, and #14's device QA found only one of
+  // them was ever explained: a placed Pin with no Plant chosen left an
+  // encouraging "Pin is in X." above a dead grey button.
+  it('says a Plant is still needed while the Pin is placed but none is chosen', async () => {
+    await renderScreen()
+    await fireEvent.press(await screen.findByText('Add Planting'))
+
+    await dragPinTo({ x: 70, y: 70 })
+
+    expect(await screen.findByText('Choose a Plant to save.', { exact: false })).toBeTruthy()
+    expect(screen.getByText('Save Planting').parent?.props.accessibilityState?.disabled).toBe(true)
+
+    await fireEvent.press(await screen.findByText('Coneflower'))
+
+    expect(screen.queryByText('Choose a Plant to save.', { exact: false })).toBeNull()
+    expect(screen.getByText('Save Planting').parent?.props.accessibilityState?.disabled).toBe(false)
   })
 
   it('saves the dragged Pin as the new Planting’s Bed and real-world location', async () => {

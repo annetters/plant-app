@@ -47,3 +47,32 @@ export function draggedStagePoint(
 function clampToSurface(value: number): number {
   return Math.min(Math.max(value, 0), STAGE_SIZE_PX)
 }
+
+/**
+ * Which of `points` sit close enough to `target` that one fingertip can't
+ * choose between them.
+ *
+ * Two markers of radius `tapRadiusPx` start overlapping once their centres are
+ * within two radii of each other, so that's the threshold. It's measured in
+ * *screen* pixels — a fingertip is a fixed physical size however far the map
+ * has been shrunk to fit — while `points` and `target` are in the surface's
+ * own coordinates, which is what `displayScale` reconciles.
+ *
+ * Returns indices rather than the points themselves, so the caller keeps
+ * whatever it had attached to each one.
+ */
+export function indicesWithinTapRange(
+  points: readonly BedPoint[],
+  target: BedPoint,
+  tapRadiusPx: number,
+  displayScale: number,
+): number[] {
+  const maxSurfaceDistance = (tapRadiusPx * 2) / displayScale
+  const found: number[] = []
+  points.forEach((point, index) => {
+    if (Math.hypot(point.x - target.x, point.y - target.y) <= maxSurfaceDistance) {
+      found.push(index)
+    }
+  })
+  return found
+}
