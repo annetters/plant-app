@@ -1,18 +1,156 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-01 (updated: #25 web map-canvas gating built and committed, awaiting the user's browser QA — #14's device QA still outstanding underneath it)
+**Date:** 2026-09-01 (updated: #14's device QA run to completion by the user — 15 of 16 items pass, eight findings fixed and committed. #25's browser QA is now the only outstanding pass)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
 
-**Two QA passes are now queued, on two different surfaces. Neither has been run.**
+**#14's device QA is DONE.** The user ran the full 16-item checklist on a real
+iPhone. 15 items pass, three are recorded untested with reasons, and the eight
+findings it produced are fixed, tested and committed (`a8fc23e`, `d7d558f`,
+`25340f3`). Full write-up immediately below. **#14 is still open on GitHub** —
+the standing rule here is that nothing closes without the user asking.
 
-1. **#25 (web, in a browser)** — built this session, committed `a96caee`, checklist immediately below.
-2. **#14 (native, on a real iPhone, needs an Xcode rebuild first)** — built last session, committed `c6f9497`, its 16-item checklist is further down and is **not** superseded by #25. Don't lose it.
+**#25's browser QA remains unrun** — its checklist is further down and is
+**not** superseded. It also picked up a real finding during #14's pass without
+being formally started: see "#25 already has a finding" below.
 
-They're independent — #25 is web-only and touches nothing the native Map screen uses.
+**Four issues were filed during the pass**: #28, #29, #30, #31 — all
+`needs-triage`, none blocking. #31 (no manual Plant creation on mobile) is the
+one the user judged most significant.
+
+---
+
+## #14: device QA complete, eight findings fixed
+
+**Run by the user on a real iPhone**, not Playwright — this is a native screen,
+no browser involved.
+
+### Getting it to run at all cost real time — read this before the next rebuild
+
+The previous entry's rebuild recipe (`npx expo prebuild --platform ios`, then
+Xcode) was **not sufficient, and failed silently**. `prebuild` found an
+existing `ios/` directory, printed `reusing /ios`, **skipped CocoaPods
+entirely**, and exited cleanly having changed nothing that mattered.
+`ios/Podfile.lock` stayed three days stale and contained neither
+`react-native-svg` nor `expo-image-manipulator`, so Xcode built a fresh binary
+of the wrong thing and the app died on launch with "Cannot find native module
+'ExpoImageManipulator'".
+
+**The reliable check is whether `ios/Podfile.lock` actually names the module you
+just added** — not whether `prebuild` exited cleanly. Fixed with an explicit
+`pod install`. `npx expo run:ios` does prebuild + pods + build + install as one
+step and is what CocoaPods itself now recommends; the tradeoff is a terminal
+build rather than Xcode's GUI.
+
+Also worth knowing: Metro had been running for **3.5 days across 22 commits**,
+including all three changes to `apps/mobile/package.json`. It didn't turn out
+to be the cause of anything, but `npx expo start --dev-client --clear` is the
+first thing to try on any inexplicable staleness.
+
+### The eight findings, all fixed and committed
+
+1. **"Add Planting" rendered over 100px tall.** `styles.button` carried
+   `flex: 1` — correct inside the form's row, but stretching *vertically* as a
+   direct child of the screen's own column. Moved to a `formActionButton`
+   style. It would also have shrunk below its own padding once the Plantings
+   list overflowed.
+2. **The page scrolled during a Pin drag.**
+   `onShouldBlockNativeResponder` is **Android-only** — RN's own source says so
+   at `PanResponder.js:107` — so the protection the code's comment claimed was
+   a no-op on iOS, where `UIScrollView` runs its own pan recogniser in
+   parallel. Fixed by suspending the ScrollView (`scrollEnabled={!dragging}`)
+   for the duration of a drag.
+3. **A near-miss on the marker scrolled the page** rather than merely failing
+   to grab it — a much worse outcome than a missed tap. Grab radius 44pt → 64pt.
+4. **A fingertip covers the marker it is dragging.** A crosshair now marks the
+   Pin's real position, visible only mid-drag.
+5. **Save was disabled with no reason given** when no Plant had been chosen —
+   the only status line on screen talked about the Pin, so a placed Pin plus no
+   Plant showed an encouraging "Pin is in X." above a dead grey button. **Web
+   had the identical gap and was worse** (its message goes null once the Pin
+   lands, so there was no message at all); fixed on both surfaces.
+6. **Overlapping Pins resolved by draw order** — arbitrary and invisible. A tap
+   landing on more than one now opens a bottom sheet chooser, with a ring drawn
+   on the map around the Pins it means.
+7. **Rows in that chooser read identically** for Plantings of the same Plant.
+   They now carry year, nursery, and **always the added time to the minute** —
+   a group planted in one sitting shares everything else, and the date alone
+   still left three identical rows. Note **position cannot help here**: those
+   Pins are in the chooser precisely because they overlap, so an earlier
+   suggestion to move the ring per row was wrong and was withdrawn.
+8. **The chooser's backdrop flew up as a hard-edged box**, because `Modal`'s
+   own `animationType="slide"` moves the entire modal, backdrop included. It
+   fades now; only the sheet travels.
+
+**Beyond #14's scope, fixed in the same pass** (`a8fc23e`): only the two auth
+screens had keyboard avoidance, so the same bug behind finding 5's neighbour
+was waiting on `PlantDetailScreen`, `PlantingDetailScreen`, `TasksScreen`,
+`PlantingTaskHistoryScreen` and `TagScanReviewScreen`. Extracted into
+`components/KeyboardAwareScrollView.tsx`. **Its ref must forward to the inner
+ScrollView** — `PlantDetailScreen` scrolls itself to the top on a failed Save
+(an #18 QA finding), and swallowing the ref undoes that with every test still
+green. This is likely the un-root-caused "keyboard closes with difficulty"
+item from #18's QA.
+
+### Recorded untested — deliberate, with reasons
+
+- **Item 10, the drawn base map.** Needs a Property that uses one; base-map
+  source can't be changed once a Property has a scale, so it needs its own
+  throwaway account. It's a line-thickness aesthetic check — judged not worth
+  a second account.
+- **Item 15b, the "no scale" empty state.** **Effectively unreachable by
+  design**: `BaseMapSetup` keeps everything in local state until "Save Scale
+  Reference" persists it in one call, specifically so a Property never sits
+  half-configured. Only an aerial address with no coverage at zoom 18–21 could
+  produce it, which ArcGIS makes rare.
+- **Item 16, larger text sizes.** Deferred by the user to a dedicated pass
+  across multiple screens, which also covers #17's outstanding item.
+
+### Filed during the pass
+
+- **#28** — nothing anywhere indicates whether a Property's base map has a
+  calibrated scale, and there's no way to recalibrate one that already has a
+  (possibly wrong) scale.
+- **#29** — PropertyPage claims "No aerial imagery is available" for *any*
+  uncalibrated Property, whatever its base-map source. Stale copy from before
+  #6 made base-map source an up-front choice.
+- **#30** — no way to see the aerial imagery *before* creating a Property from
+  an address. Buildable entirely client-side; the write-up has the details.
+- **#31** — **mobile cannot create a Plant manually at all.** Tag Scan is the
+  only path and it requires a tag photo, so an untagged plant can't be added
+  from the phone. ADR-0003 puts everything except drawing at full parity, so
+  this is a gap rather than a scoping call — it fell between #16 (Registry as
+  a view) and #18 (detail as view/edit). Cheap to build: `PlantDetailScreen`'s
+  form plus the already-shared `plantFormFields` helpers.
+
+**Declined by the user, deliberately not filed**: that a Pin can't be
+repositioned after saving. Worth knowing the cost if it resurfaces —
+`planting_photos.planting_id` is `on delete cascade`, so remove-and-recreate
+destroys a Planting's entire dated photo history to fix a Pin that's a foot
+off.
+
+### #25 already has a finding, before its own QA has started
+
+The user hit it twice, from two different base-map sources: **a freshly created
+Property shows no imagery at all until "Draw a Bed" is clicked.** `PlantingMap`
+hides its canvas while `beds.length === 0` (#25's change), and `BedEditor` only
+renders its base map once its drawing panel is open — so nothing shows the
+imagery in between. Before #25, `PlantingMap`'s unconditional canvas was what
+confirmed your address had resolved correctly.
+
+This is every gardener's first experience of the app. **Suggested fix, raised
+and not yet agreed**: render the base map in `BedEditor`'s closed state. Small,
+and it undoes nothing #25 set out to do. Left for whoever runs #25's pass.
+
+**Full monorepo green**: 235 domain + 194 mobile + 186 web, typecheck clean
+across both app workspaces.
+
+**Git state**: `a8fc23e`, `d7d558f`, `25340f3` on `main`. `origin/main` is now
+**12 commits behind** `HEAD` — nothing has been pushed for several sessions;
+push has still not been requested.
 
 ---
 
@@ -75,7 +213,7 @@ Three smaller review notes also applied: the tile count now derives from `GRID_R
 
 ---
 
-**Previous entry, still live — #14's device QA has NOT been done and is not superseded by the above.**
+**Previous entry, superseded — #14's device QA has since been run to completion; see the top of this doc. Kept for what it records about how the screen was built.** The rebuild instructions immediately below are the ones that turned out to be insufficient — see "Getting it to run at all" at the top before following them.
 
 **#14 (Native: Map view — view Beds, place/view Pins) is implemented, code-reviewed and committed (`c6f9497`), but NOT closed on GitHub and NOT yet QA'd on a device.** The user went on a break at exactly this point and asked for the QA list below. Same posture as every prior ticket here: real, tested code held open pending their own manual pass.
 
