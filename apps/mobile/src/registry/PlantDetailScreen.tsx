@@ -17,6 +17,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useEffect, useRef, useState } from 'react'
 import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { KeyboardAwareScrollView } from '../components/KeyboardAwareScrollView'
 import { ChipRow } from '../components/ChipRow'
 import { pickPhoto, type PhotoSource } from '../lib/pickPhoto'
 import type { MainStackParamList } from '../navigation/types'
@@ -216,7 +217,7 @@ export function PlantDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <ScrollView ref={scrollViewRef} contentContainerStyle={styles.container}>
+      <KeyboardAwareScrollView ref={scrollViewRef} contentContainerStyle={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>{fields.commonName || 'Plant'}</Text>
           <Pressable accessibilityRole="button" onPress={() => navigation.goBack()}>
@@ -440,7 +441,7 @@ export function PlantDetailScreen() {
         >
           <Text style={styles.deleteButtonText}>Delete Plant</Text>
         </Pressable>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   )
 }

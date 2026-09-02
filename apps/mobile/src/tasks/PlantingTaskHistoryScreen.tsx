@@ -13,6 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useEffect, useMemo, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { KeyboardAwareScrollView } from '../components/KeyboardAwareScrollView'
 import type { MainStackParamList } from '../navigation/types'
 import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
 import { usePlantingsRepository } from '../plantings/PlantingsRepositoryContext'
@@ -145,7 +146,7 @@ export function PlantingTaskHistoryScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <KeyboardAwareScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
           <Text style={styles.title}>{plantLabel(plant ?? undefined)} task history</Text>
           <Pressable accessibilityRole="button" onPress={() => navigation.goBack()}>
@@ -198,7 +199,7 @@ export function PlantingTaskHistoryScreen() {
             ))}
           </View>
         )}
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   )
 }

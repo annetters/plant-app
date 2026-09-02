@@ -13,6 +13,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, TextInput } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { KeyboardAwareScrollView } from '../components/KeyboardAwareScrollView'
 import type { MainStackParamList, TagScanPhotoIds } from '../navigation/types'
 import { useTagScanRepository } from './TagScanRepositoryContext'
 
@@ -191,7 +192,7 @@ export function TagScanReviewScreen() {
     const { input, traits } = pendingCreation
     return (
       <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.container}>
+        <KeyboardAwareScrollView contentContainerStyle={styles.container}>
           <Pressable accessibilityRole="button" disabled={busy} onPress={cancelScan}>
             <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
@@ -228,14 +229,14 @@ export function TagScanReviewScreen() {
           >
             <Text>Skip suggested traits</Text>
           </Pressable>
-        </ScrollView>
+        </KeyboardAwareScrollView>
       </SafeAreaView>
     )
   }
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <KeyboardAwareScrollView contentContainerStyle={styles.container}>
         <Pressable accessibilityRole="button" disabled={busy} onPress={cancelScan}>
           <Text style={styles.cancelText}>Cancel</Text>
         </Pressable>
@@ -288,7 +289,7 @@ export function TagScanReviewScreen() {
         >
           <Text style={styles.buttonText}>Continue</Text>
         </Pressable>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   )
 }
