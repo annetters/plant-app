@@ -1608,7 +1608,7 @@ see the closing comment on #5 for full detail.
 
 ### Deferred QA (ticket #8) — NOT RUN, and #8 was closed anyway
 
-**#8 was closed on GitHub 2026-08-24 with every item below still unrun.** The
+**#8 was closed on GitHub 2026-08-24 with every item below still unrun.** **Tracked in #34.** The
 user confirmed on 2026-09-02 that these remain genuinely outstanding and are
 waiting on their own QA. Item 2 (touch/mobile) is arguably now answered by
 #14's device QA, which exercised real Pin dragging on the native equivalent.
@@ -1655,7 +1655,7 @@ picking up before leaning on this feature for real garden-planning use:
 
 ### Deferred QA (ticket #7) — NOT RUN, and #7 was closed anyway
 
-**#7 was closed on GitHub 2026-08-23 with every item below still unrun.** The
+**#7 was closed on GitHub 2026-08-23 with every item below still unrun.** **Tracked in #34.** The
 user confirmed on 2026-09-02 that these remain genuinely outstanding and are
 waiting on their own QA — closing the ticket did not retire them.
 
@@ -1689,7 +1689,8 @@ before leaning on this feature for real garden-planning use:
 
 **#3 was closed on GitHub 2026-08-20 with these items still unrun.** They are
 genuinely outstanding, not abandoned — the user confirmed on 2026-09-02 that
-they are still waiting on their own QA.
+they are still waiting on their own QA. **Tracked in #34** along with #7's,
+#8's and #17's.
 
 1. ~~**Direct URL to another account's plant ID**~~ — **done, passed**
    (confirmed by the user 2026-09-02). Logging in as another account and
