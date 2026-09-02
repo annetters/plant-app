@@ -19,3 +19,13 @@ When the user asks to check in, confirm, or see a plan before work starts (e.g. 
 ### Manual QA ownership
 
 Before starting a QA pass (e.g. after `/implement` or when a ticket's handoff notes list deferred QA items), ask the user whether they want to run it themselves or have it done via Playwright/automated browser driving. Don't assume and jump straight into scripting a Playwright pass — "start QA" is not by itself authorization to automate it. This applies even when prior sessions in this repo used a Playwright-driven pass for similar tickets; that history isn't standing authorization for the next one.
+
+### Closing issues
+
+**Never close a GitHub issue unless the user explicitly asks.** This applies to every issue in this repo, without exception — not just ones that have been singled out.
+
+A ticket being finished is not authorization to close it. Implemented, code-reviewed, fully tested, manually QA'd, findings fixed and committed — none of that, alone or together, means closed. The user decides when an issue closes, and they may be holding it open for reasons that aren't visible in the code or the tracker: work they intend to come back to, a check they haven't run yet, or a judgement about whether the ticket actually delivered what they wanted.
+
+Earlier sessions closed tickets as a matter of course once QA passed (#6, #9, #10, #11, #12, #16, #17, #20). **That precedent is superseded by this rule** — don't cite it as a reason to close something. If a ticket looks finished and closable, say so and ask; then leave it alone until you get an answer.
+
+The same caution applies to anything that reads as closure by proxy: don't relabel a ticket to mark it done, and don't mark it resolved in the handoff doc as though it were closed. Recording "QA passed, awaiting the user's closure" is accurate and fine.

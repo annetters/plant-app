@@ -10,8 +10,20 @@
 **#14's device QA is DONE.** The user ran the full 16-item checklist on a real
 iPhone. 15 items pass, three are recorded untested with reasons, and the eight
 findings it produced are fixed, tested and committed (`a8fc23e`, `d7d558f`,
-`25340f3`). Full write-up immediately below. **#14 is still open on GitHub** —
-the standing rule here is that nothing closes without the user asking.
+`25340f3`). Full write-up immediately below.
+
+**#14 STAYS OPEN on GitHub — the user asked for this explicitly, on 2026-09-01,
+after its QA passed.** They built up to it, took a break, and always intended
+to come back to it themselves; a passing QA does not settle that. Do not close
+it, do not relabel it as done, and do not treat "everything on the checklist
+passed" as authorization.
+
+**New standing rule, set the same day and now recorded in `CLAUDE.md`: never
+close *any* issue in this repo without the user explicitly asking.** This
+replaces the earlier practice visible further down this doc, where tickets were
+closed as a matter of course once their QA passed (#6, #9, #10, #11, #12, #16,
+#17, #20). Those entries are history, not precedent — don't cite them. If
+something looks finished and closable, say so and ask.
 
 **#25's browser QA remains unrun** — its checklist is further down and is
 **not** superseded. It also picked up a real finding during #14's pass without
