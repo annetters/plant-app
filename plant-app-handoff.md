@@ -1606,7 +1606,13 @@ Property row was deleted afterward; the throwaway auth user itself remains
 in the project (no service-role access from this session to remove it) —
 see the closing comment on #5 for full detail.
 
-### Deferred QA (ticket #8)
+### Deferred QA (ticket #8) — NOT RUN, and #8 was closed anyway
+
+**#8 was closed on GitHub 2026-08-24 with every item below still unrun.** The
+user confirmed on 2026-09-02 that these remain genuinely outstanding and are
+waiting on their own QA. Item 2 (touch/mobile) is arguably now answered by
+#14's device QA, which exercised real Pin dragging on the native equivalent.
+
 
 Not run — these need real hardware/browsers or human judgment, not the
 synthetic Playwright pass this session already ran (create/view/photo-log/
@@ -1647,7 +1653,12 @@ picking up before leaning on this feature for real garden-planning use:
    actual file sizes, multiple photos in one log, and confirming they list
    most-recent-first.
 
-### Deferred QA (ticket #7)
+### Deferred QA (ticket #7) — NOT RUN, and #7 was closed anyway
+
+**#7 was closed on GitHub 2026-08-23 with every item below still unrun.** The
+user confirmed on 2026-09-02 that these remain genuinely outstanding and are
+waiting on their own QA — closing the ticket did not retire them.
+
 
 Not run — these need human judgment or a real device/browser, not the
 synthetic Playwright pass this session already ran (all four tools drawn,
@@ -1674,14 +1685,17 @@ before leaning on this feature for real garden-planning use:
    8px/5px discard threshold), drawing a Bed that overlaps another Bed, and
    clicking "Clear" mid-draw for each of the four tools.
 
-### Deferred QA (ticket #3)
+### Deferred QA (ticket #3) — item 1 done, three still not run
 
-Not run yet, lower priority than the core checklist (which passed in full):
+**#3 was closed on GitHub 2026-08-20 with these items still unrun.** They are
+genuinely outstanding, not abandoned — the user confirmed on 2026-09-02 that
+they are still waiting on their own QA.
 
-1. **Direct URL to another account's plant ID** — log in as account A, copy
-   a plant's `/registry/<id>` URL, log in as account B, paste it directly.
-   Expected: "Plant not found." (RLS `.maybeSingle()` returns null), not a
-   data leak or raw error.
+1. ~~**Direct URL to another account's plant ID**~~ — **done, passed**
+   (confirmed by the user 2026-09-02). Logging in as another account and
+   pasting a plant's `/registry/<id>` URL directly gives "Plant not found."
+   via RLS, not a data leak. This was the only item here with an
+   access-control failure mode rather than a cosmetic one.
 2. **Direct URL to a nonexistent plant ID** — same expected result.
 3. **Reload persistence for photos** — upload a reference photo, refresh
    the page, confirm the thumbnail still renders (exercises the signed-URL
