@@ -1,7 +1,8 @@
 import type { Bed, BedRow, PropertyRow } from '@plant-app/domain'
 import { propertyFromRow } from '@plant-app/domain'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import Konva from 'konva'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createFakeBedsDbClient } from '../test/fakeBedsDbClient'
 import { BedEditor } from './BedEditor'
@@ -20,15 +21,32 @@ vi.mock('konva', () => {
     off() {}
     destroy() {}
   }
-  class FakeContainer extends FakeNode {
+  class FakeStage extends FakeNode {
     add() {}
     destroyChildren() {}
     batchDraw() {}
-  }
-  class FakeStage extends FakeContainer {
     getPointerPosition() {
       return null
     }
+  }
+  // Tracks its own instances, in creation order, so tests can reach into
+  // whichever Layer BedEditor made (bedsLayer/draftLayer/previewLayer are
+  // created in that order every time the editor opens) and inspect what
+  // was actually drawn onto it.
+  class FakeLayer extends FakeNode {
+    static instances: FakeLayer[] = []
+    children: unknown[] = []
+    constructor() {
+      super()
+      FakeLayer.instances.push(this)
+    }
+    add(...nodes: unknown[]) {
+      this.children.push(...nodes)
+    }
+    destroyChildren() {
+      this.children = []
+    }
+    batchDraw() {}
   }
   class FakeShape extends FakeNode {
     attrs: Record<string, unknown>
@@ -40,7 +58,7 @@ vi.mock('konva', () => {
   return {
     default: {
       Stage: FakeStage,
-      Layer: FakeContainer,
+      Layer: FakeLayer,
       Line: FakeShape,
       Rect: FakeShape,
       Ellipse: FakeShape,
@@ -90,6 +108,10 @@ function renderEditor(bedRows: BedRow[] = [], onBedsChange?: (beds: Bed[]) => vo
 }
 
 describe('BedEditor', () => {
+  beforeEach(() => {
+    ;(Konva.Layer as unknown as { instances: { children: unknown[] }[] }).instances = []
+  })
+
   afterEach(() => {
     vi.unstubAllGlobals()
   })
@@ -138,6 +160,35 @@ describe('BedEditor', () => {
       ])
       expect(await screen.findByText('Front border')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Remove Front border' })).toBeInTheDocument()
+    })
+
+    it('draws previously-saved Beds onto the canvas once the editor opens', async () => {
+      // Regression: the Beds fetch almost always resolves before the editor
+      // is opened, which used to leave the canvas's saved-Beds Konva layer
+      // permanently empty — the effect that draws onto it depended on
+      // `[beds, pixelsPerFootValue]`, neither of which changes again once
+      // the fetch has already resolved once. Waiting for the list here,
+      // before opening, reproduces that exact ordering.
+      renderEditor([
+        {
+          id: 'bed-1',
+          property_id: 'property-1',
+          name: 'Front border',
+          tool: 'freehand',
+          points: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 5 }],
+          smoothing_enabled: false,
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
+      ])
+      await screen.findByText('Front border')
+
+      await userEvent.click(screen.getByRole('button', { name: 'Draw a Bed' }))
+
+      const bedsLayer = (Konva.Layer as unknown as { instances: { children: unknown[] }[] })
+        .instances[0]
+      await waitFor(() => {
+        expect(bedsLayer.children).toHaveLength(1)
+      })
     })
 
     it('removes a Bed from the list', async () => {

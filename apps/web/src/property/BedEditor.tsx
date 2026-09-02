@@ -365,6 +365,16 @@ export function BedEditor({
   // Renders saved Beds — independent of the in-progress draft, so drawing
   // or toggling smoothing doesn't pay to re-smooth/rebuild every other
   // already-saved Bed on the property.
+  //
+  // `open` is in the dependency list even though it's never read in the
+  // body: the Beds fetch almost always resolves before the editor is ever
+  // opened, so this effect's first real run finds `bedsLayerRef.current`
+  // still null (the stage-mount effect below hasn't created it yet) and
+  // exits without drawing anything. Without `open` here, `beds` and
+  // `pixelsPerFootValue` never change again once that happens, so the
+  // layer would stay permanently empty — saved Beds would never appear on
+  // the drawing canvas. Including `open` makes this effect re-run right
+  // after the stage (and its now-non-null layer) mounts.
   useEffect(() => {
     const layer = bedsLayerRef.current
     if (!layer || pixelsPerFootValue === null) return
@@ -379,7 +389,7 @@ export function BedEditor({
       )
     }
     layer.batchDraw()
-  }, [beds, pixelsPerFootValue])
+  }, [beds, pixelsPerFootValue, open])
 
   // Renders just the in-progress (committed-but-not-saved) draft outline.
   useEffect(() => {
