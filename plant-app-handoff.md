@@ -7,15 +7,37 @@
 
 ## What to do next
 
-**#25's browser QA is DONE.** The user ran the checklist below against the dev
-server and the real linked Supabase project. Every item scoped to #25 itself
-passed. Along the way, two real bugs surfaced that are unrelated to #25 — both
-fixed, tested, and committed; two more (also unrelated to #25) were filed
-instead of fixed, at the user's choice.
+**#25's browser QA checklist is complete, but #25 is NOT ready to close** —
+one unresolved thread is a real behavior change caused by #25 itself, not a
+side-finding, and it wasn't covered by this session's checklist. See
+"Not yet resolved — blocks closing #25" immediately below before doing
+anything else with this ticket.
 
-**#25 STAYS OPEN on GitHub — same standing rule as #14 below: never close an
-issue without the user explicitly asking**, regardless of how cleanly its QA
-passed.
+The checklist itself: every item scoped to #25 passed (see "#25 checklist
+results" below for the walkthrough). Two unrelated real bugs surfaced along
+the way and are fixed, tested, and committed; two more unrelated ones were
+filed instead of fixed, at the user's choice.
+
+**#25 STAYS OPEN on GitHub regardless — same standing rule as #14 below: never
+close an issue without the user explicitly asking**, even once the item below
+is resolved and the checklist is fully clean.
+
+### Not yet resolved — blocks closing #25
+
+**A freshly created Property shows no imagery at all until "Draw a Bed" is
+clicked** — found during the peer session's #14 pass (see "#25 already has a
+finding, before its own QA has started" further down for the original
+write-up), not by this session's checklist. Neither `PlantingMap` (hidden
+while `beds.length === 0`, #25's own change) nor `BedEditor` (base map only
+renders once its drawing panel is open) shows anything in the gap between —
+before #25, `PlantingMap`'s unconditional canvas was what confirmed a new
+address had resolved correctly. This session's checklist tested "no Beds yet"
+on an *existing* Property, not a Property that was *just created*, so this
+specific path is still unverified against the current code. A fix was
+suggested (render the base map in `BedEditor`'s closed state) but never agreed
+or implemented. **Next step: decide on that fix (or an alternative), test the
+freshly-created-Property path specifically, then #25 is closable** (pending
+the user's explicit ask, per the standing rule above).
 
 **This session ran concurrently with a peer session also working in this
 repo** (the one that did #14's device QA, below). Both sessions shared one
@@ -37,7 +59,7 @@ by commit message.
 
 **Also found, unrelated to #25, filed rather than fixed (user's choice):** leaving "Bed name" blank and clicking "Save Bed" shows no visible error. Validation does run and does produce "Name is required.", but the `<p role="alert">` renders at the very top of `BedEditor`'s `<section>` — above the 768px canvas and the Save button, off-screen from where the user is actually looking when they click Save. Same class of bug already fixed once for `PlantDetailScreen` on native (a failed Save with the invalid field scrolled out of view gave no visible feedback). **Filed as #32**.
 
-**Still open from the peer session's #14 pass, not acted on by this one either** — see "#25 already has a finding, before its own QA has started" further down: a freshly created Property shows no imagery at all until "Draw a Bed" is clicked, since neither `PlantingMap` (hidden while `beds.length === 0`) nor `BedEditor` (base map only renders once its panel is open) shows anything in the gap between. A suggested fix was raised there (render the base map in `BedEditor`'s closed state) but never agreed or implemented. Worth deciding on next — this session's checklist didn't cover a *freshly created* Property specifically, only "no Beds yet" on an existing one.
+**The freshly-created-Property gap is not covered by items 1–9 above** — see "Not yet resolved — blocks closing #25" at the top of this doc.
 
 **Full monorepo suite**: web 187/187 passing (+1 from the new regression test), typecheck clean. Domain and mobile untouched this session.
 
