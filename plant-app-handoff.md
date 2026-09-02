@@ -1,11 +1,51 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-01 (updated: #14's device QA run to completion by the user — 15 of 16 items pass, eight findings fixed and committed. #25's browser QA is now the only outstanding pass)
+**Date:** 2026-09-01 (updated: #25's browser QA run to completion by the user — every #25-scoped item passes, two incidental bugs found, fixed and committed, two more filed)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
 ## What to do next
+
+**#25's browser QA is DONE.** The user ran the checklist below against the dev
+server and the real linked Supabase project. Every item scoped to #25 itself
+passed. Along the way, two real bugs surfaced that are unrelated to #25 — both
+fixed, tested, and committed; two more (also unrelated to #25) were filed
+instead of fixed, at the user's choice.
+
+**#25 STAYS OPEN on GitHub — same standing rule as #14 below: never close an
+issue without the user explicitly asking**, regardless of how cleanly its QA
+passed.
+
+**This session ran concurrently with a peer session also working in this
+repo** (the one that did #14's device QA, below). Both sessions shared one
+working tree, so commit `25340f3` — nominally a #14 fix — also carries this
+session's uncommitted `PlantingMap.tsx` transparency fix; it got swept in when
+the peer session committed. Not a mistake, just how two sessions in one
+working tree can interleave. Worth knowing if the two don't obviously line up
+by commit message.
+
+### #25 checklist results
+
+1. **Passes.** Empty state renders with no leftover canvas, grey box, or scroll gap.
+2. **Passes** — draw-and-save-without-reloading still resolves a Pin into the new Bed exactly as before. Along the way, the user found Beds hard to see against the base map: `PlantingMap.tsx`'s `BED_FILL` was `rgba(82,183,136,0.12)`, diverging from `BedEditor.tsx`'s `0.2` despite a code comment claiming the two render identically. **Fixed** — bumped to `0.2` to match (landed in `25340f3`, see above).
+3. **All three base-map sources checked; aerial and photo backdrops correct.** The user found the separate **drawn base-map creation flow** (Property setup, `BaseMapSetup.tsx` — a different screen from anything #25 touches) confusing: dragging to trace a line does nothing until mouseup, because that screen is click-to-place-points by design, not freehand, and nothing in the UI makes that obvious mid-drag. Real UX gap, not a #25 regression. **Filed as #33**, not fixed.
+4. **Inconclusive.** On this pass, Beds and the base map arrived close enough together on reload that the load-order flash wasn't visibly distinguishable either way. No action taken — still an open design trade-off (see #25's own writeup below) if it turns out to matter later.
+5–7. **Pass** — reload with existing Beds, the Registry's `?plantingId=` deep link, and phone-width layout all behave as expected.
+8. **Passes in Safari**, and surfaced a real, pre-existing, non-Safari-specific bug along the way: opening "Draw a Bed" never showed previously-saved Beds on the editor's own canvas, even though they showed correctly in the Beds list below it. Root cause: the effect drawing saved Beds onto the Konva layer depended on `[beds, pixelsPerFootValue]` alone — neither changes again once the Beds fetch resolves, and that fetch almost always resolves before the editor is ever opened, so the effect's one real run found the layer still `null` and never fired again once the layer existed. Same *shape* of bug as #8's original null-ref issue, which #25's own code comment (below) describes. **Fixed and tested** (`b6ff131`): added `open` to the effect's dependency list so it re-runs once the Konva stage actually mounts. A regression test was added and confirmed to fail without the fix before landing it.
+9. **Not testable as written** on the Property used for this pass — its base-map source is an uploaded photo, so genuinely zero `arcgisonline` requests is correct, not a bug. Optional item to begin with; left unverified against an aerial-source Property.
+
+**Also found, unrelated to #25, filed rather than fixed (user's choice):** leaving "Bed name" blank and clicking "Save Bed" shows no visible error. Validation does run and does produce "Name is required.", but the `<p role="alert">` renders at the very top of `BedEditor`'s `<section>` — above the 768px canvas and the Save button, off-screen from where the user is actually looking when they click Save. Same class of bug already fixed once for `PlantDetailScreen` on native (a failed Save with the invalid field scrolled out of view gave no visible feedback). **Filed as #32**.
+
+**Still open from the peer session's #14 pass, not acted on by this one either** — see "#25 already has a finding, before its own QA has started" further down: a freshly created Property shows no imagery at all until "Draw a Bed" is clicked, since neither `PlantingMap` (hidden while `beds.length === 0`) nor `BedEditor` (base map only renders once its panel is open) shows anything in the gap between. A suggested fix was raised there (render the base map in `BedEditor`'s closed state) but never agreed or implemented. Worth deciding on next — this session's checklist didn't cover a *freshly created* Property specifically, only "no Beds yet" on an existing one.
+
+**Full monorepo suite**: web 187/187 passing (+1 from the new regression test), typecheck clean. Domain and mobile untouched this session.
+
+**Git state**: `b6ff131` is the tip as of this update, layered on the peer session's `8d50e3b`/`3e26c80`/`25340f3`. `origin/main` remains unpushed — push has not been requested.
+
+---
+
+**Previous entry, superseded above** — **#14's device QA run to completion by the user — 15 of 16 items pass, eight findings fixed and committed.**
 
 **#14's device QA is DONE.** The user ran the full 16-item checklist on a real
 iPhone. 15 items pass, three are recorded untested with reasons, and the eight
