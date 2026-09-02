@@ -18,7 +18,7 @@ import { useBedsRepository } from '../property/BedsRepositoryContext'
 import { usePlantingsRepository } from './PlantingsRepositoryContext'
 
 const BED_STROKE = '#52b788'
-const BED_FILL = 'rgba(82,183,136,0.12)'
+const BED_FILL = 'rgba(82,183,136,0.2)'
 const PIN_FILL = '#2d6a4f'
 const NEW_PIN_FILL = '#e63946'
 const PIN_RADIUS_PX = 7
@@ -485,6 +485,13 @@ export function PlantingMap({
           ) : (
             <section aria-label="Add Planting">
               {pinMessage && <p>{pinMessage}</p>}
+              {/* Save is disabled on exactly two conditions — no Bed under the
+                  pin, and no Plant chosen — and nothing on screen named the
+                  second. Worse here than on native: `pinMessage` goes null
+                  once the pin lands, so a placed pin with no Plant chosen left
+                  no message at all above a disabled button. Found during #14's
+                  device QA against the native twin of this form. */}
+              {!form.plantId && <p>Choose a Plant to save.</p>}
 
               <label htmlFor="planting-plant">Plant *</label>
               <select
