@@ -27,8 +27,8 @@ What changed instead:
 - **`CONTEXT.md`** — the four task glossary entries now lead with "Built and
   working, but outside the MVP commitment", plus the Plant field list and the
   Dashboard entry. Deliberately *not* Landmark's "deferred" wording, which
-  would be false here: Landmark was never built, this was. **These edits are
-  uncommitted** — see "Current state" below.
+  would be false here: Landmark was never built, this was. Committed and
+  pushed in `7ccff8a`, along with this doc's own updates.
 - **#1 (the spec)** — 15 `[POST-MVP]` tags across the Solution bullet, user
   stories 10–12 and 48–51, and the Task model / Task completion /
   no-per-Planting-overrides bullets. The native-parity claim no longer
@@ -1848,9 +1848,10 @@ Domain glossary: `CONTEXT.md`
 
 ## Current state
 
-**Working tree is NOT clean as of 2026-09-03** — `CONTEXT.md` carries the
-uncommitted task-scope edits described in "Scope change" at the top of this
-doc. Everything below was written on 2026-09-02, when the tree *was* clean.
+**Working tree is clean and everything is pushed as of 2026-09-03** — the
+task-scope edits described in "Scope change" at the top of this doc landed in
+`7ccff8a`. As always, verify with `git status` and `git log origin/main..HEAD`
+run fresh rather than trusting this line; it has drifted before.
 
 **#6, #10, and #11 have now
 all been manually verified** (#6 and #10 in earlier updates this same
