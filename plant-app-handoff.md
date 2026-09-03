@@ -1,7 +1,51 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-02 (updated: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
+**Date:** 2026-09-03 (updated: the task system was removed from the MVP commitment — see "Scope change" immediately below, which also corrects the "working tree is clean" claim in "Current state". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
 **Repo:** `annetters/plant-app` · branch `main`
+
+---
+
+## Scope change (2026-09-03): the task system is out of the MVP
+
+**Care task templates, task triggers, task completion logging, and one-off
+todos are no longer part of what the MVP promises.** Decided with the user
+through a `/grill-with-docs` session. This was a scope call, not a quality
+one — scheduling garden care simply matters less than the rest of the
+registry, and holding MVP for its remaining polish wasn't worth it.
+
+**No code was removed, and none should be.** The feature is built, migrated,
+tested, and still fully working on both platforms.
+`packages/domain/src/{careTaskTemplate,taskCompletion,oneOffTodo}.ts`,
+migrations `0003`/`0004`/`0019`/`0020`/`0021`/`0022`, `apps/web/src/tasks/`,
+`TasksPage`, `PlantingTaskHistoryPage` and their native equivalents are
+**not dead code** — do not delete them, and do not treat them as unfinished
+MVP work. **#4, #12 and #18 stay closed** and remain accurate history of work
+that was genuinely done.
+
+What changed instead:
+
+- **`CONTEXT.md`** — the four task glossary entries now lead with "Built and
+  working, but outside the MVP commitment", plus the Plant field list and the
+  Dashboard entry. Deliberately *not* Landmark's "deferred" wording, which
+  would be false here: Landmark was never built, this was. **These edits are
+  uncommitted** — see "Current state" below.
+- **#1 (the spec)** — 15 `[POST-MVP]` tags across the Solution bullet, user
+  stories 10–12 and 48–51, and the Task model / Task completion /
+  no-per-Planting-overrides bullets. The native-parity claim no longer
+  promises task management; three task example tests moved out of the MVP
+  acceptance list into their own marked bullet; a new Out of Scope entry; and
+  a dated amendment in Further Notes carrying the retention rule above. Story
+  numbering was left unchanged on purpose, so existing references stay valid.
+- **New `post-mvp` label**, applied to **#21** (single-day trigger UX — the
+  only piece of task work never built), which stays open with the reasoning
+  commented on it.
+
+Two things a later session may want to revisit: the **`[POST-MVP]` tag
+convention is new**, invented for this and used only in #1 so far; and
+**`post-mvp` is a scope label, not a triage role**, so it was deliberately
+*not* added to `docs/agents/triage-labels.md`, whose table maps the five
+`/triage` roles to this repo's strings. #21 still carries `needs-triage`
+alongside it, since it genuinely hasn't been triaged.
 
 ---
 
@@ -1804,7 +1848,11 @@ Domain glossary: `CONTEXT.md`
 
 ## Current state
 
-**Working tree is clean** as of this update. **#6, #10, and #11 have now
+**Working tree is NOT clean as of 2026-09-03** — `CONTEXT.md` carries the
+uncommitted task-scope edits described in "Scope change" at the top of this
+doc. Everything below was written on 2026-09-02, when the tree *was* clean.
+
+**#6, #10, and #11 have now
 all been manually verified** (#6 and #10 in earlier updates this same
 day; #11 this update, by the user directly against the dev server — not
 Playwright) and are closed on GitHub. #11 turned out to need no new
@@ -2035,7 +2083,14 @@ extract learnings only. Full reasoning lives in `docs/adr/`.
   identical on desktop and phone.
 - **Landmark (distance-based pin refinement) is deferred, not required for
   MVP** — superseded once the map itself became trustworthy. May return
-  later as an optional precision-assist suggestion.
+  later as an optional precision-assist suggestion. Never built.
+
+**Tasks (out of the MVP commitment as of 2026-09-03):**
+- The whole task system — care task templates, triggers, completion logging,
+  one-off todos — is **built and live, but outside what the MVP promises**.
+  A different status from Landmark's: this one exists and works. Don't
+  re-litigate the cut, and **don't delete the code** — see "Scope change" at
+  the top of this doc for the retention rule and the file list.
 
 **Tag Scan:**
 - Photograph a nursery tag → OCR extracts candidates → human always confirms.
@@ -2091,6 +2146,11 @@ CLI. See `docs/agents/issue-tracker.md` for the full workflow.
 
 Triage labels: `needs-triage`, `needs-info`, `ready-for-agent`,
 `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+Also `post-mvp` (added 2026-09-03) — **a scope label, not a triage role**:
+built or filed, but outside the MVP commitment, may be revisited. It is
+intentionally absent from `docs/agents/triage-labels.md`, which maps the five
+`/triage` roles only. An issue can carry both (`#21` currently does).
 
 **#1** is the spec, labeled `ready-for-agent`. **#2–#20** are the 19
 tracer-bullet tickets `/to-tickets` split it into, each also `ready-for-agent`

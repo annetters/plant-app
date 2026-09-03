@@ -7,8 +7,9 @@ A species- or variety-level record. Fields: common name, scientific name,
 cultivar, flower color, bloom window, sun/shade requirement, mature height
 and spread, USDA hardiness zone, deciduous/evergreen, native/non-native,
 reference photos (visual identification only — see Tag Scan for a separate,
-non-mixed category of photo), and care task templates. One Plant record may
-underlie many Plantings. Never use "plant" to mean both Plant and Planting.
+non-mixed category of photo), and care task templates (outside the MVP
+commitment — see Care task template). One Plant record may underlie many
+Plantings. Never use "plant" to mean both Plant and Planting.
 
 ### Tag Scan
 Creating or enriching a Plant record from a photographed nursery tag. OCR
@@ -146,21 +147,32 @@ A Plant's typical flowering period, stored as start and end month/day
 (year-independent). Displayed as bars on the Bloom Timeline.
 
 ### Care task template
+**Built and working, but outside the MVP commitment.** The whole task system
+— this, Task trigger, Task completion, and One-off todo — is finished on both
+platforms and stays available to use; it is simply not part of what the MVP
+promises, so it is not held to MVP polish or QA. Scheduling garden care
+turned out to matter less than the rest of the registry. Nothing is deleted
+and nothing is hidden; scope may widen to include it again later. Note this
+is a different status from Landmark's, which was never built at all.
+
 A recurring care instruction defined on a Plant, inherited by all its
 Plantings. Has a name and a trigger. Not overridable per Planting.
 
 ### Task trigger
+**Outside the MVP commitment — see Care task template.**
 The scheduling mechanism for a care task template. Two types only:
 - **Date-range**: fixed calendar window (e.g. "April 1–15"), auto-computed.
 - **Seasonal-marker**: freeform reminder text, no computed date.
 
 ### Task completion
+**Outside the MVP commitment — see Care task template.**
 A log entry (done or missed) keyed by Care task template, Planting, and
 calendar year. All three are needed: a Plant with three Care task templates
 produces three Task completions per year for each of its Plantings. Forms a
 reviewable care history per Planting.
 
 ### One-off todo
+**Outside the MVP commitment — see Care task template.**
 A manual, non-recurring reminder outside the care task template system.
 
 ### Registry
@@ -179,4 +191,5 @@ across every Bed" as distinct from "every Plant in the Registry."
 
 ### Dashboard
 The home screen. Quick access to Map, Registry, and Bloom Timeline. Task
-lists not surfaced immediately — reachable within 2–3 taps.
+lists not surfaced immediately — reachable within 2–3 taps, though tasks
+themselves are outside the MVP commitment (see Care task template).
