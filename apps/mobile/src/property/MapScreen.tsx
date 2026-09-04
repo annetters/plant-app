@@ -128,10 +128,10 @@ const CENTER_OF_SURFACE: BedPoint = { x: STAGE_SIZE_PX / 2, y: STAGE_SIZE_PX / 2
  * Beds.
  *
  * Base-map photo upload and Scale Reference calibration are a different
- * matter — ADR-0003 puts both at *full* phone parity, they're just not built
- * natively yet (#15). So the empty states below say they aren't in the phone
- * app yet and point at the desktop app for now, rather than claiming a
- * design boundary that doesn't exist.
+ * matter — ADR-0003 puts both at *full* phone parity, and #15 built them:
+ * both empty states below hand off to `BaseMapSetupScreen` rather than to
+ * the desktop app. Creating a Property from an *address* is still web-only,
+ * which is why the no-Property state mentions that one specifically.
  *
  * The map is the same fixed `STAGE_SIZE_PX` square web draws, scaled down to
  * the phone's width — see `mapSurface`, which owns that conversion so a
@@ -431,18 +431,48 @@ export function MapScreen() {
     }
     if (property === null) {
       return (
-        <Text>
-          You don’t have a Property yet. Creating one isn’t in the phone app yet — set it up on the
-          desktop app.
-        </Text>
+        <>
+          <Text>
+            You don’t have a Property yet. Photograph a plot plan or survey and set its scale, and
+            your Beds and Plantings will show here.
+          </Text>
+          <Text>
+            Prefer to start from your address and aerial imagery? That’s on the desktop app.
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            style={styles.button}
+            onPress={() => navigation.navigate('BaseMapSetup')}
+          >
+            <Text style={styles.buttonText}>Photograph a plot plan</Text>
+          </Pressable>
+        </>
       )
     }
     if (pixelsPerFootValue === null) {
+      // Only an aerial Property is offered the photo route: completing one
+      // whose address had no imagery is the single exception CONTEXT.md
+      // allows to "the base-map choice is made once, at creation", and
+      // setting a photo up here rewrites the whole base map, which would
+      // discard an existing drawn plan.
       return (
-        <Text>
-          This Property has no map scale yet. Calibrating one isn’t in the phone app yet — finish its
-          base map and Scale Reference on the desktop app, and its Beds and Pins will show here.
-        </Text>
+        <>
+          <Text>
+            This Property has no map scale yet. Photograph a plot plan or survey and set its scale,
+            and its Beds and Pins will show here.
+          </Text>
+          {property.baseMapSource === 'aerial' ? (
+            <Pressable
+              accessibilityRole="button"
+              style={styles.button}
+              onPress={() => navigation.navigate('BaseMapSetup')}
+            >
+              <Text style={styles.buttonText}>Set up its base map</Text>
+            </Pressable>
+          ) : (
+            <Text>Finish setting this one up on the desktop app.</Text>
+          )}
+        </>
       )
     }
 

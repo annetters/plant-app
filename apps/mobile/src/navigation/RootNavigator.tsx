@@ -4,6 +4,7 @@ import { BloomTimelineScreen } from '../bloomTimeline/BloomTimelineScreen'
 import { PlantDetailScreen } from '../registry/PlantDetailScreen'
 import { RegistryScreen } from '../registry/RegistryScreen'
 import { PlantingDetailScreen } from '../plantings/PlantingDetailScreen'
+import { BaseMapSetupScreen } from '../property/BaseMapSetupScreen'
 import { MapScreen } from '../property/MapScreen'
 import { DashboardScreen } from '../screens/DashboardScreen'
 import { LoadingScreen } from '../screens/LoadingScreen'
@@ -47,6 +48,7 @@ export function RootNavigator() {
     <MainStack.Navigator screenOptions={{ headerShown: false }}>
       <MainStack.Screen name="Dashboard" component={DashboardScreen} />
       <MainStack.Screen name="Map" component={MapScreen} />
+      <MainStack.Screen name="BaseMapSetup" component={BaseMapSetupScreen} />
       <MainStack.Screen name="Registry" component={RegistryScreen} />
       <MainStack.Screen name="PlantDetail" component={PlantDetailScreen} />
       <MainStack.Screen name="PlantingDetail" component={PlantingDetailScreen} />

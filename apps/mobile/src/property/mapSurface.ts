@@ -1,4 +1,4 @@
-import { STAGE_SIZE_PX, type BedPoint } from '@plant-app/domain'
+import { STAGE_SIZE_PX, type BedPoint, type ScalePoint } from '@plant-app/domain'
 
 /**
  * Fitting the base map onto a phone.
@@ -41,6 +41,31 @@ export function draggedStagePoint(
   return {
     x: clampToSurface(start.x + dx / displayScale),
     y: clampToSurface(start.y + dy / displayScale),
+  }
+}
+
+/**
+ * Where a tap landed on the surface, in the surface's own pixels — the Scale
+ * Reference's two points come in this way rather than by dragging (see
+ * `scaleReference.ts`: two points plus a real-world distance).
+ *
+ * `locationX`/`locationY` are already relative to the touched element, so
+ * unlike `draggedStagePoint` there is no starting position to add — only the
+ * display scale to divide back out.
+ *
+ * Clamped for the same reason a drag is, but with sharper consequences: a
+ * touchable can report a position a pixel or two outside its own bounds, and
+ * a point captured off the base map would calibrate the whole Property
+ * against pixels the map never covered.
+ */
+export function tappedStagePoint(
+  locationX: number,
+  locationY: number,
+  displayScale: number,
+): ScalePoint {
+  return {
+    x: clampToSurface(locationX / displayScale),
+    y: clampToSurface(locationY / displayScale),
   }
 }
 

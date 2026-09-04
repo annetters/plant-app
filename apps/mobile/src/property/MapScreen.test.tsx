@@ -120,6 +120,7 @@ async function renderScreen({
               <Stack.Navigator screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="Map" component={MapScreen} />
                 <Stack.Screen name="PlantingDetail" component={PlantingDetailStub} />
+                <Stack.Screen name="BaseMapSetup" component={BaseMapSetupStub} />
               </Stack.Navigator>
             </NavigationContainer>
           </PlantsRepositoryProvider>
@@ -128,6 +129,11 @@ async function renderScreen({
     </PropertiesRepositoryProvider>,
   )
   return { ...view, plantings }
+}
+
+/** Stands in for the real base-map setup screen (#15), so the Map's empty states can be asserted to route somewhere without pulling that screen's own loading and photo picker in. */
+function BaseMapSetupStub() {
+  return <Text>Base map setup</Text>
 }
 
 /** Stands in for the real Planting detail screen (#18), so "tap a Pin to view its Planting" can be asserted without pulling that whole screen's own data loading in. */
@@ -217,18 +223,43 @@ describe('MapScreen — viewing the Property', () => {
     expect(await screen.findByTestId('base-map-drawn')).toBeTruthy()
   })
 
-  it('says where to go when the account has no Property yet', async () => {
+  it('offers to set a base map up here when the account has no Property yet (#15)', async () => {
     await renderScreen({ property: null })
 
     expect(await screen.findByText(/don’t have a Property yet/)).toBeTruthy()
+    await fireEvent.press(screen.getByText('Photograph a plot plan'))
+
+    expect(await screen.findByText('Base map setup')).toBeTruthy()
   })
 
-  it('says where to go when the Property has no scale to draw against yet', async () => {
+  // An aerial Property whose address had no imagery coverage is the only way
+  // a Property can really reach this state: migration 0017's
+  // `properties_base_map_source_consistent` forbids a photo/drawn row whose
+  // scale_reference is null.
+  it('offers to calibrate here when an aerial Property has no imagery to scale from (#15)', async () => {
+    await renderScreen({
+      property: propertyRow({
+        base_map_source: 'aerial',
+        imagery_zoom: null,
+        imagery_available: false,
+        scale_reference: null,
+      }),
+    })
+
+    expect(await screen.findByText(/no map scale yet/)).toBeTruthy()
+    await fireEvent.press(screen.getByText('Set up its base map'))
+
+    expect(await screen.findByText('Base map setup')).toBeTruthy()
+  })
+
+  it('does not offer the photo route for a drawn base map, which setting one up would discard', async () => {
     await renderScreen({
       property: propertyRow({ base_map_source: 'drawn', base_map_drawing: [], scale_reference: null }),
     })
 
     expect(await screen.findByText(/no map scale yet/)).toBeTruthy()
+    expect(screen.queryByText('Set up its base map')).toBeNull()
+    expect(screen.getByText('Finish setting this one up on the desktop app.')).toBeTruthy()
   })
 
   it('still draws the map when only the Beds fail to load, rather than claiming there is no Property', async () => {

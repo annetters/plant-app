@@ -1,5 +1,10 @@
 import { STAGE_SIZE_PX } from '@plant-app/domain'
-import { draggedStagePoint, indicesWithinTapRange, mapDisplayScale } from './mapSurface'
+import {
+  draggedStagePoint,
+  indicesWithinTapRange,
+  mapDisplayScale,
+  tappedStagePoint,
+} from './mapSurface'
 
 describe('mapDisplayScale', () => {
   it('shrinks the surface to fit a phone screen narrower than it', () => {
@@ -76,5 +81,27 @@ describe('indicesWithinTapRange', () => {
     const points = [target, { x: 130, y: 130 }]
 
     expect(indicesWithinTapRange(points, target, 18, 1)).toEqual([0])
+  })
+})
+
+describe('tappedStagePoint', () => {
+  it('converts a tap’s screen position into the surface’s own pixels', () => {
+    // Half-size display: a tap 60 screen px in is 120 px into the surface.
+    expect(tappedStagePoint(60, 30, 0.5)).toEqual({ x: 120, y: 60 })
+  })
+
+  it('lands one-for-one when the surface is shown at full size', () => {
+    expect(tappedStagePoint(60, 30, 1)).toEqual({ x: 60, y: 30 })
+  })
+
+  it('keeps a point on the map when a tap lands just off its edge', () => {
+    // Touchables report positions slightly outside their own bounds; a Scale
+    // Reference point off the surface would derive a distance against pixels
+    // the base map never covered.
+    expect(tappedStagePoint(-4, -4, 1)).toEqual({ x: 0, y: 0 })
+    expect(tappedStagePoint(9999, 9999, 1)).toEqual({
+      x: STAGE_SIZE_PX,
+      y: STAGE_SIZE_PX,
+    })
   })
 })
