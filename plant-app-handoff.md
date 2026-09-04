@@ -1,7 +1,128 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-03 (updated: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
+**Date:** 2026-09-03 (updated: **#15 is built and committed — the last unbuilt ticket under the spec**; see "#15: native Scale Reference calibration" immediately below. It needs device QA that has not been run, and it is NOT closed. Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
 **Repo:** `annetters/plant-app` · branch `main`
+
+---
+
+## #15: native Scale Reference calibration — built and committed, NOT QA'd, NOT closed
+
+**Commit `5d103f4`.** A gardener can photograph a plot plan or survey and
+calibrate its scale entirely from the phone. This was the **last unbuilt
+ticket under the spec (#1)** — every #2–#20 ticket now has code.
+
+**Not QA'd on a device, and not closed on GitHub.** Same posture as every
+prior ticket here: real, tested code held open pending the user's own pass.
+Per `CLAUDE.md`, closing is the user's call and hasn't been asked for.
+
+### What's there
+
+New `apps/mobile/src/property/BaseMapSetupScreen.tsx`, reached from the Map
+screen's two former dead-end empty states. Two entry paths, told apart by
+whether a Property already exists rather than by a route param, since an
+account has at most one:
+
+- **No Property yet** — name, photo, calibrate. Needs no address, no
+  geocoder and no Edge Function, because a photo Property skips geocoding
+  entirely by design; that's why the phone can create one without either
+  Edge Function being ported.
+- **An aerial Property whose address had no imagery** — photo, calibrate,
+  updating the existing row.
+
+Also: `tappedStagePoint` in `mapSurface.ts` (the tap counterpart to
+`draggedStagePoint`, keeping every screen-pixel conversion in one place), and
+`uploadBaseMapPhoto`/`createWithBaseMap`/`updateBaseMap` on mobile's
+`PropertiesRepository`, ported from web but taking a `PickedPhoto` rather
+than a `File` — React Native has none, so it uses the fetch-to-`ArrayBuffer`
+path the other mobile repositories already use.
+
+**No new dependency and no native module — so no dev client rebuild.** Given
+how much time rebuilds have cost in this repo (see #14's entry), that's worth
+knowing: a plain Metro reload picks this up.
+
+### Deliberately not built
+
+- **The drawn base-map source.** Desktop-only per ADR-0003. There is no
+  `'choose'` step on the phone, only photo.
+- **Creating a Property from an address.** That's #5's native parity, not
+  #15's; it would need `search-addresses`/`create-property` ported.
+- **OCR-extracted candidate measurements** for known-measurement mode.
+  `CONTEXT.md` floats them, but web doesn't implement them either, so
+  building them here would have exceeded parity.
+- **Recalibrating a Property that already has a scale** — that's #28.
+
+### What `/code-review` caught, all fixed before the commit
+
+1. **The distance field was `number-pad`, which has no decimal key on iOS**
+   — a tape-measured 42.5 ft simply couldn't be typed, making the phone's
+   calibration silently coarser than web's (`step="any"`). Now `decimal-pad`.
+   Every *other* numeric field in the app is a true integer, which is why the
+   existing convention was the wrong one to copy here.
+2. **A drawn-plan Property could have had its drawing destroyed.** Saving
+   rewrites all four base-map columns as one set, and the entry point was
+   gated only on "has no scale". Guarded now in both screens. It was
+   unreachable in production — migration 0017's
+   `properties_base_map_source_consistent` forbids an uncalibrated
+   photo/drawn row — but **the MapScreen test covering that state was
+   asserting against a row the constraint makes impossible**, so it gave
+   false confidence. It now uses the aerial-without-imagery case, which is
+   the only way a Property can really lack a scale. Third time in this repo a
+   test has quietly pinned the wrong thing (see #25's and #14's entries).
+3. **A failed Property load fell through into create mode** — a gardener
+   could have photographed and calibrated a whole plan before hitting the
+   one-Property-per-account index at the final save.
+4. **No chance to review an uploaded photo before calibrating**, unlike web.
+   A plan photographed at arm's length is easily blurry or cropped, and the
+   two calibration points are about to be tapped against it.
+
+One review finding was **not** taken: that "Name your map" drifts from the
+glossary's *Property*. It's verbatim web's existing copy
+(`PropertyPage.tsx:141`), so changing it on the phone alone would make the
+two surfaces disagree. Worth fixing on both together, or not at all.
+
+### What to QA (nothing below has been run)
+
+Needs a real device — camera, a real photo library, and touch accuracy
+against a real plan. **No rebuild needed first.** Reach it from the
+Dashboard's Map tile.
+
+1. **The whole create path**: no Property → "Photograph a plot plan" → name →
+   camera *and* library → the review step → calibrate → save. Does the Map
+   then draw the plan with a sensible scale?
+2. **Tap accuracy** — the two points are the entire calibration. Do they land
+   where your finger went, at phone width? This is the one thing the unit
+   tests genuinely can't prove.
+3. **Is the plan legible enough to calibrate against at phone width?** The
+   surface is the same fixed square web uses, shrunk to fit (~0.45x). A plan
+   that's readable on a laptop may not be here — and if it isn't, that's a
+   real finding, not a nitpick.
+4. **Both modes**, and a **fractional distance** (e.g. 42.5) — the decimal
+   keyboard is a fix made from code review, never seen on a device.
+5. **Replace a photo** at the review step; confirm the *second* one is what
+   gets calibrated and saved.
+6. **Cross-check against web**: the same Property's Beds and Pins should sit
+   in the same real-world places on both surfaces. A wrong scale shows up
+   here and nowhere else.
+7. **The aerial-fallback path**, if you can reach an address with no imagery
+   coverage.
+8. **Storage RLS from the phone** — uploading to `property-base-map-photos`
+   has never been exercised from a device before, only reading has. A
+   permissions failure would show as "Could not upload this photo."
+
+### Known gaps, deliberate — not QA findings
+
+- **Abandoning setup after picking a photo orphans that object in storage.**
+  Web does the same thing. Replacing a photo also leaves the previous one
+  behind. Nothing references them and nothing breaks; worth a ticket if
+  storage tidiness ever matters.
+- **A screen reader can't place the two points** — same gap as Pin dragging
+  on both surfaces, and for the same reason.
+
+**Full monorepo green**: 235 domain + 218 mobile + 199 web, typecheck clean
+across all three workspaces.
+
+**Git state**: `5d103f4` on `main`, **not pushed** — push wasn't requested.
+Verify with `git log origin/main..HEAD` rather than trusting this line.
 
 ---
 
