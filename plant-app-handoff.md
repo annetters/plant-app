@@ -1,11 +1,11 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-03 (updated: **#15 is built, device-QA'd by the user, and its two findings are fixed and committed — the last unbuilt ticket under the spec now has code and a passing pass**; see "#15: native Scale Reference calibration" immediately below. It is NOT closed. Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
+**Date:** 2026-09-04 (updated: **#15 is built, device-QA'd, closed by the user, and pushed — every ticket #2–#20 under the spec now has code, and no build work remains on the frontier**; see "#15: native Scale Reference calibration" immediately below. Previously 2026-09-03: Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
-## #15: native Scale Reference calibration — built, QA'd on a device, NOT closed
+## #15: native Scale Reference calibration — built, QA'd on a device, CLOSED
 
 **Commits `5d103f4` (build) and `ceb07b9` (QA findings).** A gardener can
 photograph a plot plan or survey and calibrate its scale entirely from the
@@ -24,8 +24,15 @@ That path is built and unit-tested but has **never run on a device** — the
 same standing caveat #14's item 10 and 15b carry. Everything else, including
 the first real upload to `property-base-map-photos` from a phone, passed.
 
-**NOT closed on GitHub.** Per `CLAUDE.md`, closing is the user's call and
-hasn't been asked for — a passing QA is explicitly not authorization.
+**Closed on GitHub by the user, 2026-09-04**, with a summary comment on the
+issue. Note the sequence, since it matters for the standing rule: the user
+closed it themselves and *then* asked for it to be closed, so the `gh issue
+close` was a no-op. The rule in `CLAUDE.md` held throughout — a passing QA
+was not treated as authorization, and closure waited for the explicit ask.
+
+**#15's closure unblocks nothing** — confirmed directly against the API: every
+remaining open issue already shows `blocked_by: 0`. The dependency graph the
+original 19 tickets carried is now fully drained.
 
 ### What's there
 
@@ -167,9 +174,30 @@ place, instead of needing a fresh throwaway signup per round.
 **Full monorepo green**: 235 domain + 223 mobile + 199 web, typecheck clean
 across all three workspaces.
 
-**Git state**: `5d103f4` and `ceb07b9` on `main`, **not pushed** — push wasn't
-requested. Verify with `git log origin/main..HEAD` rather than trusting this
-line; this doc's push claims have drifted before.
+**Git state**: pushed. `origin/main` and `main` were level at `f691eb2` when
+this was written, covering `5d103f4` (build), `ceb07b9` (QA findings) and this
+doc's own updates. Verify with `git log origin/main..HEAD` run fresh rather
+than trusting this line; this doc's push claims have drifted before.
+
+### Where that leaves the project
+
+**No build work is left on the frontier.** #2–#20 all have code, and the
+frontier query (`blocked_by == 0`, unassigned) no longer discriminates —
+every open issue passes it. What remains:
+
+- **#34** (`ready-for-human`) — the 14 orphaned manual-QA items from #3, #7,
+  #8 and #17, grouped by what a sitting needs.
+- **#31** (`needs-triage`) — mobile still can't create a Plant without a tag
+  to scan. The user rated this the most significant parity gap, and it is
+  cheap: `PlantDetailScreen`'s form plus the shared `plantFormFields`.
+- **#14** — QA'd and complete, held open by the user's own choice.
+- Twelve `needs-triage` issues (#21, #23, #24, #26–#33, #35), none blocking.
+
+Two small carried-over items: `apps/mobile/AGENTS.md` points at the Expo
+**v57** docs while the app is pinned to **54.0.37** (the SDK 54 docs are the
+right ones — see #13's entry for why the downgrade happened); and the
+`[POST-MVP]` tag convention introduced in the task-scope change is still used
+only in #1.
 
 ---
 
