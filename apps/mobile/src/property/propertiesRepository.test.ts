@@ -175,4 +175,25 @@ describe('PropertiesRepository', () => {
       ).rejects.toThrow('boom')
     })
   })
+
+  describe('remove (#15 QA: a Property created on the phone must be undoable there)', () => {
+    it("frees the account's one-Property slot", async () => {
+      const fake = createFakePropertiesDbClient(propertyRow({ id: 'property-1' }))
+      const repository = new PropertiesRepository(fake.client)
+
+      await repository.remove('property-1')
+
+      expect(fake.row()).toBeNull()
+      expect(await repository.get()).toBeNull()
+    })
+
+    it('throws when the delete fails, rather than reporting a Property gone that is still there', async () => {
+      const fake = createFakePropertiesDbClient(propertyRow({ id: 'property-1' }))
+      fake.failNextWrite({ message: 'boom' })
+      const repository = new PropertiesRepository(fake.client)
+
+      await expect(repository.remove('property-1')).rejects.toThrow('boom')
+      expect(fake.row()).not.toBeNull()
+    })
+  })
 })

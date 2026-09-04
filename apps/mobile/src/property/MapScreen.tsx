@@ -13,6 +13,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
+  Alert,
   Animated,
   Easing,
   Modal,
@@ -299,6 +300,7 @@ export function MapScreen() {
 
   // Suspends the ScrollView for the duration of a drag — see the PanResponder
   // below for why nothing in the responder config can do that on iOS.
+  const [deleting, setDeleting] = useState(false)
   const [dragging, setDragging] = useState(false)
 
   // The drag reads these through refs because `PanResponder` is built once
@@ -420,6 +422,42 @@ export function MapScreen() {
     } finally {
       setSaving(false)
     }
+  }
+
+  /**
+   * Deleting is at parity per ADR-0003, and it is what keeps the phone's new
+   * base-map setup (#15) a two-way door: a Property created here can be
+   * undone here, rather than stranding the account until someone opens the
+   * desktop app. Web grew the same control for the same reason during #5's QA.
+   *
+   * The confirm is `Alert`, matching how a Planting's removal already asks.
+   */
+  function handleDeleteProperty() {
+    if (!property) return
+    Alert.alert(
+      'Delete this Property?',
+      'Its Beds and Plantings go with it. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true)
+            try {
+              await propertiesRepository.remove(property.id)
+              setProperty(null)
+              setBeds([])
+              setPlantings([])
+            } catch {
+              setPropertyError('Could not delete this Property. Please try again.')
+            } finally {
+              setDeleting(false)
+            }
+          },
+        },
+      ],
+    )
   }
 
   function renderBody() {
@@ -785,6 +823,20 @@ export function MapScreen() {
         </View>
         {loadError && <Text style={styles.error}>{loadError}</Text>}
         {renderBody()}
+
+        {/* Outside `renderBody` on purpose: an uncalibrated Property needs
+            this every bit as much as a working one — more so, since there is
+            nothing else to do with it on this screen. */}
+        {property && (
+          <Pressable
+            accessibilityRole="button"
+            disabled={deleting}
+            style={[styles.buttonSecondary, deleting && styles.buttonDisabled]}
+            onPress={handleDeleteProperty}
+          >
+            <Text>{deleting ? 'Deleting…' : 'Delete Property'}</Text>
+          </Pressable>
+        )}
       </KeyboardAwareScrollView>
 
       {/* A sheet rather than a section further down the page: the whole

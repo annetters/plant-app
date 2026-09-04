@@ -2,7 +2,7 @@ import type { PropertyRow } from '@plant-app/domain'
 import type { PropertiesDbClient } from '../property/propertiesRepository'
 
 type Row = Record<string, unknown>
-type Op = 'select' | 'insert' | 'update'
+type Op = 'select' | 'insert' | 'update' | 'delete'
 type DbResult<T> = { data: T; error: { message: string } | null }
 
 /**
@@ -66,6 +66,14 @@ export function createFakePropertiesDbClient(initialRow: PropertyRow | null = nu
         return { data: row, error: null }
       }
 
+      if (op === 'delete') {
+        if (row && !matches(row)) {
+          return { data: null, error: { message: 'Row not found.' } }
+        }
+        row = null
+        return { data: null, error: null }
+      }
+
       // update
       if (!row || !matches(row)) {
         return { data: null, error: { message: 'Row not found.' } }
@@ -89,6 +97,7 @@ export function createFakePropertiesDbClient(initialRow: PropertyRow | null = nu
       select: () => builder('select'),
       insert: (values: Row) => builder('insert', values),
       update: (values: Row) => builder('update', values),
+      delete: () => builder('delete'),
     }),
     storage: {
       from: () => storage,

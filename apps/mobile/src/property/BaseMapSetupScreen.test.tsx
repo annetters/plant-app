@@ -146,10 +146,10 @@ describe('BaseMapSetupScreen — creating a Property from a photo', () => {
     await fireEvent.press(screen.getByText('Continue'))
     await pickAPhoto()
 
-    await fireEvent.press(screen.getByText('Measured object'))
     const scale = displayScale()
     await tapSurface(0, 0)
     await tapSurface(100 * scale, 0)
+    await fireEvent.press(screen.getByText('Measured object'))
     await fireEvent.changeText(screen.getByLabelText('Real-world distance (feet)'), '40')
     await fireEvent.press(screen.getByText('Save Scale Reference'))
 
@@ -197,17 +197,25 @@ describe('BaseMapSetupScreen — refusing to save something uncalibrated', () =>
     return fake
   }
 
-  it('asks for two points before it will save', async () => {
-    const fake = await reachCalibration()
+  it('does not ask about the distance until there are two points for it to be about', async () => {
+    await reachCalibration()
+
+    expect(screen.getByText('Tap the first point to begin.')).toBeTruthy()
+    expect(screen.queryByText('How do you know this distance?')).toBeNull()
+    expect(screen.queryByLabelText('Real-world distance (feet)')).toBeNull()
+    expect(screen.queryByText('Save Scale Reference')).toBeNull()
 
     await tapSurface(0, 0)
-    await fireEvent.changeText(screen.getByLabelText('Real-world distance (feet)'), '25')
-    await fireEvent.press(screen.getByText('Save Scale Reference'))
 
-    await waitFor(() =>
-      expect(screen.getByText('Tap two points on the base map to calibrate its scale.')).toBeTruthy(),
-    )
-    expect(fake.row()).toMatchObject({ base_map_source: 'aerial' })
+    expect(screen.getByText(/Now tap the second point/)).toBeTruthy()
+    expect(screen.queryByText('How do you know this distance?')).toBeNull()
+    expect(screen.queryByText('Save Scale Reference')).toBeNull()
+
+    await tapSurface(100 * displayScale(), 0)
+
+    expect(screen.getByText('How do you know this distance?')).toBeTruthy()
+    expect(screen.getByLabelText('Real-world distance (feet)')).toBeTruthy()
+    expect(screen.getByText('Save Scale Reference')).toBeTruthy()
   })
 
   it('rejects a zero distance through the shared domain validation', async () => {
@@ -246,6 +254,10 @@ describe('BaseMapSetupScreen — refusing to save something uncalibrated', () =>
     await tapSurface(0, 0)
     await tapSurface(10 * scale, 0)
     await tapSurface(300 * scale, 0)
+    // Back to one point, so the distance question withdraws until the pair is
+    // complete again — otherwise a half-restarted pair would still show a
+    // Save button for the previous one.
+    expect(screen.queryByText('Save Scale Reference')).toBeNull()
     await tapSurface(500 * scale, 0)
     await fireEvent.changeText(screen.getByLabelText('Real-world distance (feet)'), '25')
     await fireEvent.press(screen.getByText('Save Scale Reference'))

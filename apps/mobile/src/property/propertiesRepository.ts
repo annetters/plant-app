@@ -15,12 +15,13 @@ interface PropertiesQuery extends PromiseLike<DbResult<unknown>> {
   single(): PropertiesQuery
 }
 
-/** The narrow shape of a Supabase client this app needs — mirrors apps/web's PropertiesDbClient pattern, trimmed to what the Map screen reads and what base-map setup (#15) writes. Still no `delete`/`functions`: deleting a Property and creating one from an address both stay web-only for now. */
+/** The narrow shape of a Supabase client this app needs — mirrors apps/web's PropertiesDbClient pattern, trimmed to what the Map screen reads and what base-map setup (#15) writes and deletes. Still no `functions`: creating a Property from an *address* stays web-only, since that path needs the `search-addresses`/`create-property` Edge Functions. */
 export interface PropertiesDbClient {
   from(table: 'properties'): {
     select(columns?: string): PropertiesQuery
     insert(values: Row): PropertiesQuery
     update(values: Row): PropertiesQuery
+    delete(): PropertiesQuery
   }
   storage: {
     from(bucket: string): {
@@ -162,6 +163,22 @@ export class PropertiesRepository {
       throw new Error(message)
     }
     return propertyFromRow(data as PropertyRow)
+  }
+
+  /**
+   * Frees the account's one-Property slot (MVP has no edit — delete and
+   * re-create instead). Mirrors apps/web's identical method.
+   *
+   * At parity per ADR-0003, and not optional now that the phone can *create*
+   * a Property: without this, a plan photographed on the phone could only be
+   * undone from the desktop, which is exactly the dead end #5's own QA hit
+   * before web grew this control.
+   *
+   * The Beds and Plantings underneath go with it, via the FK cascade.
+   */
+  async remove(id: string): Promise<void> {
+    const { error } = await this.client.from(TABLE).delete().eq('id', id)
+    if (error) throw new Error(error.message)
   }
 
   /**

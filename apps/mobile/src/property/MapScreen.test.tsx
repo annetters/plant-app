@@ -3,7 +3,7 @@ import { STAGE_SIZE_PX } from '@plant-app/domain'
 import { NavigationContainer, useRoute, type RouteProp } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
-import { Text } from 'react-native'
+import { Alert, Text } from 'react-native'
 import type { MainStackParamList } from '../navigation/types'
 import { PlantsRepositoryProvider } from '../plants/PlantsRepositoryContext'
 import { PlantingsRepositoryProvider } from '../plantings/PlantingsRepositoryContext'
@@ -250,6 +250,52 @@ describe('MapScreen — viewing the Property', () => {
     await fireEvent.press(screen.getByText('Set up its base map'))
 
     expect(await screen.findByText('Base map setup')).toBeTruthy()
+  })
+
+  it('deletes the Property after confirming, so one created on the phone can be undone there (#15)', async () => {
+    const properties = createFakePropertiesDbClient(propertyRow({ id: 'property-1' }))
+    jest
+      .spyOn(Alert, 'alert')
+      .mockImplementation((_title, _message, buttons) => {
+        const confirm = buttons?.find((button) => button.style === 'destructive')
+        void confirm?.onPress?.()
+      })
+
+    await renderScreen({ propertiesClient: properties.client })
+    await screen.findByTestId('map-overlay')
+    await fireEvent.press(screen.getByText('Delete Property'))
+
+    await waitFor(() => expect(properties.row()).toBeNull())
+    expect(Alert.alert).toHaveBeenCalled()
+  })
+
+  it('can delete an uncalibrated Property too, which is otherwise a dead end on the phone', async () => {
+    const properties = createFakePropertiesDbClient(
+      propertyRow({ id: 'property-1', base_map_source: 'aerial', imagery_zoom: null, scale_reference: null }),
+    )
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      void buttons?.find((button) => button.style === 'destructive')?.onPress?.()
+    })
+
+    await renderScreen({ propertiesClient: properties.client })
+    await screen.findByText(/no map scale yet/)
+    await fireEvent.press(screen.getByText('Delete Property'))
+
+    await waitFor(() => expect(properties.row()).toBeNull())
+  })
+
+  it('keeps the Property when the delete confirmation is dismissed', async () => {
+    const properties = createFakePropertiesDbClient(propertyRow({ id: 'property-1' }))
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      const cancel = buttons?.find((button) => button.style === 'cancel')
+      void cancel?.onPress?.()
+    })
+
+    await renderScreen({ propertiesClient: properties.client })
+    await screen.findByTestId('map-overlay')
+    await fireEvent.press(screen.getByText('Delete Property'))
+
+    expect(properties.row()).not.toBeNull()
   })
 
   it('does not offer the photo route for a drawn base map, which setting one up would discard', async () => {

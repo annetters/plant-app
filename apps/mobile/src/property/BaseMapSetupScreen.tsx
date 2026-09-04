@@ -155,6 +155,9 @@ export function BaseMapSetupScreen() {
   }
 
   async function handleSave() {
+    // Unreachable from the UI, which only shows Save once both points are
+    // placed — kept because it is what makes `points[0]`/`points[1]` below
+    // safe, and because the check is one line against a silent miscalibration.
     if (points.length < 2) {
       setError('Tap two points on the base map to calibrate its scale.')
       return
@@ -387,6 +390,20 @@ export function BaseMapSetupScreen() {
           </Svg>
         </View>
 
+        {/* The distance question only means anything once there are two
+            points for it to be about — asking "how do you know this
+            distance?" above an untouched plan puts the question before the
+            thing it refers to. Web gets away with the same order because its
+            wider layout doesn't read as one sequence; stacked on a phone, it
+            does. */}
+        {points.length < 2 ? (
+          <Text style={styles.hint}>
+            {points.length === 0
+              ? 'Tap the first point to begin.'
+              : 'Now tap the second point — the other end of something you can put a real number on.'}
+          </Text>
+        ) : (
+          <>
         <Text style={styles.label}>How do you know this distance?</Text>
         <View style={styles.modeRow}>
           {MODES.map((option) => (
@@ -435,6 +452,8 @@ export function BaseMapSetupScreen() {
         >
           <Text style={styles.buttonText}>{saving ? 'Saving…' : 'Save Scale Reference'}</Text>
         </Pressable>
+          </>
+        )}
       </>
     )
   }
