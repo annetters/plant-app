@@ -1,6 +1,6 @@
 import type { Bed, BedRow, PropertyRow } from '@plant-app/domain'
 import { propertyFromRow } from '@plant-app/domain'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Konva from 'konva'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -96,12 +96,20 @@ function setViewport(width: number, coarsePointer: boolean) {
   )
 }
 
-function renderEditor(bedRows: BedRow[] = [], onBedsChange?: (beds: Bed[]) => void) {
+function renderEditor(
+  bedRows: BedRow[] = [],
+  onBedsChange?: (beds: Bed[]) => void,
+  onOpenChange?: (open: boolean) => void,
+) {
   const property = propertyFromRow(AVAILABLE_ROW)
   const beds = createFakeBedsDbClient(bedRows)
   render(
     <BedsRepositoryProvider client={beds.client}>
-      <BedEditor property={property} onBedsChange={onBedsChange} />
+      <BedEditor
+        property={property}
+        onBedsChange={onBedsChange}
+        onOpenChange={onOpenChange}
+      />
     </BedsRepositoryProvider>,
   )
   return beds
@@ -135,6 +143,31 @@ describe('BedEditor', () => {
       }
       expect(screen.getByLabelText('Bed name')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Save Bed' })).toBeDisabled()
+    })
+
+    it('names the missing Bed name next to the Save button (#32)', async () => {
+      renderEditor()
+      await userEvent.click(await screen.findByRole('button', { name: 'Draw a Bed' }))
+
+      expect(screen.getByText('Enter a Bed name to save.')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Save Bed' })).toBeDisabled()
+
+      await userEvent.type(screen.getByLabelText('Bed name'), 'Front border')
+      expect(screen.queryByText('Enter a Bed name to save.')).not.toBeInTheDocument()
+    })
+
+    it('puts that hint below the drawing canvas, where the Save button actually is (#32)', async () => {
+      renderEditor()
+      await userEvent.click(await screen.findByRole('button', { name: 'Draw a Bed' }))
+
+      // The whole of #32: validation did run and did produce "Name is
+      // required.", but it rendered at the top of the section — above the
+      // toolbar and a 768px canvas — so by the time you had scrolled down
+      // to draw and click Save it was far off-screen and read as nothing
+      // happening at all.
+      const surface = screen.getByTestId('bed-drawing-surface')
+      const hint = screen.getByText('Enter a Bed name to save.')
+      expect(surface.compareDocumentPosition(hint) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
     it('shows the smoothing toggle only for the freehand tool', async () => {
@@ -221,6 +254,49 @@ describe('BedEditor', () => {
 
       await screen.findByText('Front border')
       expect(onBedsChange).toHaveBeenLastCalledWith([expect.objectContaining({ id: 'bed-1' })])
+    })
+
+    it('stays silent until the Beds fetch settles, so a caller can tell "none yet" from "not known yet"', async () => {
+      const bedRow: BedRow = {
+        id: 'bed-1',
+        property_id: 'property-1',
+        name: 'Front border',
+        tool: 'freehand',
+        points: [{ x: 0, y: 0 }, { x: 10, y: 0 }, { x: 10, y: 5 }],
+        smoothing_enabled: false,
+        created_at: '2026-01-01T00:00:00.000Z',
+      }
+      const onBedsChange = vi.fn()
+      renderEditor([bedRow], onBedsChange)
+
+      // The initial `[]` used to be reported on mount, which reads as a
+      // Property with no Beds — PropertyPage's base-map preview would mount
+      // and fetch a whole base map on that, then tear it down when the real
+      // list arrived a moment later.
+      expect(onBedsChange).not.toHaveBeenCalled()
+
+      await screen.findByText('Front border')
+      expect(onBedsChange).toHaveBeenCalledTimes(1)
+      expect(onBedsChange).toHaveBeenCalledWith([expect.objectContaining({ id: 'bed-1' })])
+    })
+
+    it('reports the drawing panel as closed once the viewport stops being a desktop one', async () => {
+      const onOpenChange = vi.fn()
+      renderEditor([], undefined, onOpenChange)
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Draw a Bed' }))
+      expect(onOpenChange).toHaveBeenLastCalledWith(true)
+
+      // The editor drops its canvas (and the base map behind it) on a narrow
+      // viewport whatever `open` is left set to. A caller still told "open"
+      // hides its own base map for a canvas that is no longer on screen.
+      setViewport(500, false)
+      fireEvent(window, new Event('resize'))
+
+      await waitFor(() => expect(onOpenChange).toHaveBeenLastCalledWith(false))
+      expect(
+        screen.getByText('Bed drawing is available on a larger, non-touch screen.'),
+      ).toBeInTheDocument()
     })
   })
 

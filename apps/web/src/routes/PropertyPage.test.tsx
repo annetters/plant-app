@@ -1,5 +1,5 @@
 import type { BedRow, PlantingRow, PlantRow, PropertyRow } from '@plant-app/domain'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
@@ -52,9 +52,9 @@ vi.mock('konva', () => {
   }
 })
 
-function renderPage(initialRow: PropertyRow | null = null) {
+function renderPage(initialRow: PropertyRow | null = null, bedRows: BedRow[] = []) {
   const fake = createFakePropertiesDbClient(initialRow)
-  const beds = createFakeBedsDbClient([])
+  const beds = createFakeBedsDbClient(bedRows)
   const plants = createFakePlantsDbClient([])
   const plantings = createFakePlantingsDbClient([])
   render(
@@ -237,27 +237,169 @@ describe('PropertyPage — existing Property', () => {
     expect(screen.queryByText(/Matched to/)).not.toBeInTheDocument()
   })
 
-  it('renders the base map imagery behind the Bed editor for an available property (no separate thumbnail)', async () => {
-    renderPage(availableRow)
-    expect(await screen.findByText('10 Main St, Cambridge, MA')).toBeInTheDocument()
+  const bedRow: BedRow = {
+    id: 'bed-1',
+    property_id: 'property-1',
+    name: 'Front border',
+    tool: 'rectangle',
+    points: [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+    ],
+    smoothing_enabled: false,
+    created_at: '2026-01-01T00:00:00.000Z',
+  }
 
-    // Nothing renders imagery until the drawing surface is actually opened:
-    // the standalone thumbnail above it was removed in #6, and with no Beds
-    // drawn yet PlantingMap's hidden surface skips its own copy of the base
-    // map (#25). This assertion is why the click below matters — without it
-    // the tiles found afterward could be PlantingMap's, not the editor's.
-    expect(document.querySelectorAll('img')).toHaveLength(0)
+  const PREVIEW_CAPTION = 'Check this is the right place before drawing Beds.'
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Draw a Bed' }))
-
-    // BaseMapBackground's tiles are decorative (alt=""), so they're excluded
-    // from the accessible "img" role — query the DOM directly instead.
-    const tiles = document.querySelectorAll('img')
-    expect(tiles.length).toBeGreaterThan(0)
-    expect(tiles[0]).toHaveAttribute(
-      'src',
-      expect.stringContaining('server.arcgisonline.com/ArcGIS/rest/services/World_Imagery'),
+  /** BaseMapBackground's aerial tiles are decorative (alt=""), so they're excluded from the accessible "img" role — query the DOM directly instead. */
+  function aerialTiles() {
+    return [...document.querySelectorAll('img')].filter((img) =>
+      img.getAttribute('src')?.includes('server.arcgisonline.com/ArcGIS/rest/services/World_Imagery'),
     )
+  }
+
+  it('shows the base map straight away on a Property with no Beds, so a geocoded address can be checked against the imagery', async () => {
+    renderPage(availableRow)
+    await screen.findByText('10 Main St, Cambridge, MA')
+
+    // The regression this guards: #6 removed PropertyPage's own thumbnail as
+    // a duplicate of BedEditor's copy, which only holds while the editor is
+    // open; #25 then hid PlantingMap's until a Bed exists. Between them a
+    // freshly created Property rendered no imagery at all — nothing to tell
+    // a right roof from a wrong one.
+    expect(await screen.findByText(PREVIEW_CAPTION)).toBeInTheDocument()
+    expect(aerialTiles().length).toBeGreaterThan(0)
+  })
+
+  it('drops the preview once the Bed editor opens, so the same imagery never renders twice', async () => {
+    renderPage(availableRow)
+    // The caption, not the address: the address comes from the Property
+    // fetch, while the preview waits on the separate Beds fetch settling.
+    await screen.findByText(PREVIEW_CAPTION)
+    const previewTileCount = aerialTiles().length
+    expect(previewTileCount).toBeGreaterThan(0)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Draw a Bed' }))
+
+    // Stacking the two was exactly what #6 removed the original thumbnail
+    // for, so the count must not grow when the editor's own copy appears.
+    expect(screen.queryByText(PREVIEW_CAPTION)).not.toBeInTheDocument()
+    expect(aerialTiles()).toHaveLength(previewTileCount)
+  })
+
+  it('brings the preview back when the Bed editor closes with no Bed saved', async () => {
+    renderPage(availableRow)
+    await screen.findByText('10 Main St, Cambridge, MA')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Draw a Bed' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+
+    expect(await screen.findByText(PREVIEW_CAPTION)).toBeInTheDocument()
+  })
+
+  it('drops the preview once a Bed exists, since PlantingMap already shows the imagery', async () => {
+    renderPage(availableRow, [bedRow])
+    await screen.findByText('10 Main St, Cambridge, MA')
+    await waitFor(() => expect(aerialTiles().length).toBeGreaterThan(0))
+
+    expect(screen.queryByText(PREVIEW_CAPTION)).not.toBeInTheDocument()
+  })
+
+  it('hides the Plantings map while the Bed editor is open, so only one base map is ever on screen', async () => {
+    renderPage(availableRow, [bedRow])
+    const plantingSurface = await screen.findByTestId('planting-map-surface')
+    await waitFor(() => expect(plantingSurface).toBeVisible())
+
+    // Two 768px maps stacked, each drawing the same imagery, with nothing
+    // saying which one accepts a drawing — the duplicate #6 removed the
+    // standalone thumbnail over, in the one arrangement that removal left
+    // untouched.
+    const plantingsHeading = screen.getByRole('heading', { name: 'Plantings' })
+    expect(plantingsHeading).toBeVisible()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Draw a Bed' }))
+    expect(plantingsHeading).not.toBeVisible()
+    expect(screen.getByTestId('bed-drawing-surface')).toBeVisible()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(plantingsHeading).toBeVisible()
+  })
+
+  it('keeps the Plantings surface mounted while hidden, so its Konva refs survive the round trip', async () => {
+    renderPage(availableRow, [bedRow])
+    const plantingSurface = await screen.findByTestId('planting-map-surface')
+    await waitFor(() => expect(plantingSurface).toBeVisible())
+
+    // Hiding, never unmounting — #8's original null-ref bug came back the
+    // moment this container left the DOM. Same reasoning as the beds-length
+    // gate this sits alongside (see PlantingMap's own comment).
+    await userEvent.click(screen.getByRole('button', { name: 'Draw a Bed' }))
+    expect(plantingSurface).toBeInTheDocument()
+    expect(plantingSurface).not.toBeVisible()
+  })
+
+  it('keeps the 768px Plantings canvas from widening the page on a phone', async () => {
+    renderPage(availableRow, [bedRow])
+    const surface = await screen.findByTestId('planting-map-surface')
+    await waitFor(() => expect(surface).toBeVisible())
+
+    // The canvas is a fixed STAGE_SIZE_PX and can't shrink — the Konva
+    // stage is built at that size and Pin coordinates run through it. So
+    // the scrolling is contained to its own box instead, rather than the
+    // whole page sliding sideways on a narrow screen.
+    const viewport = screen.getByTestId('planting-map-viewport')
+    expect(viewport).toHaveStyle({ overflowX: 'auto', maxWidth: '100%' })
+    expect(viewport).toContainElement(surface)
+  })
+
+  it('previews a photographed base map too, not just aerial imagery', async () => {
+    renderPage({
+      ...availableRow,
+      base_map_source: 'photo',
+      base_map_photo_path: 'user-1/plan.jpg',
+      latitude: null,
+      longitude: null,
+      imagery_zoom: null,
+      imagery_available: false,
+      scale_reference: {
+        pointA: { x: 0, y: 0 },
+        pointB: { x: 300, y: 0 },
+        realDistanceFeet: 25,
+        mode: 'known-measurement',
+      },
+    })
+
+    expect(await screen.findByText(PREVIEW_CAPTION)).toBeInTheDocument()
+    expect(await screen.findByAltText('Photographed plot plan or survey')).toBeInTheDocument()
+  })
+
+  it('previews an in-app-drawn base map too', async () => {
+    renderPage({
+      ...availableRow,
+      base_map_source: 'drawn',
+      base_map_drawing: [
+        [
+          { x: 10, y: 10 },
+          { x: 200, y: 10 },
+        ],
+      ],
+      latitude: null,
+      longitude: null,
+      imagery_zoom: null,
+      imagery_available: false,
+      scale_reference: {
+        pointA: { x: 0, y: 0 },
+        pointB: { x: 300, y: 0 },
+        realDistanceFeet: 25,
+        mode: 'known-measurement',
+      },
+    })
+
+    expect(await screen.findByText(PREVIEW_CAPTION)).toBeInTheDocument()
+    expect(await screen.findByLabelText('Drawn base plan')).toBeInTheDocument()
   })
 
   it('shows a degraded-mode message instead of a silent grey gap when no imagery is available', async () => {
@@ -293,20 +435,6 @@ describe('PropertyPage — existing Property', () => {
   })
 
   it('opens the Planting named by a ?plantingId= query param (the Registry\'s "View on the map" link, #10)', async () => {
-    const bedRow: BedRow = {
-      id: 'bed-1',
-      property_id: 'property-1',
-      name: 'Front border',
-      tool: 'rectangle',
-      points: [
-        { x: 0, y: 0 },
-        { x: 10, y: 0 },
-        { x: 10, y: 10 },
-        { x: 0, y: 10 },
-      ],
-      smoothing_enabled: false,
-      created_at: '2026-01-01T00:00:00.000Z',
-    }
     const plantRow: PlantRow = {
       id: 'plant-1',
       common_name: 'Coneflower',

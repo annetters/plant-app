@@ -1,9 +1,10 @@
 import type { Bed, Property } from '@plant-app/domain'
-import { pixelsPerFootForProperty } from '@plant-app/domain'
+import { STAGE_SIZE_PX, pixelsPerFootForProperty } from '@plant-app/domain'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { PlantingMap } from '../plantings/PlantingMap'
 import { AddressAutocomplete } from '../property/AddressAutocomplete'
+import { BaseMapBackground } from '../property/BaseMapBackground'
 import { BaseMapSetup } from '../property/BaseMapSetup'
 import { BedEditor } from '../property/BedEditor'
 import { usePropertiesRepository } from '../property/PropertiesRepositoryContext'
@@ -31,8 +32,13 @@ export function PropertyPage() {
   const [confirmedName, setConfirmedName] = useState<string | null>(null)
   // Shared with PlantingMap below, via BedEditor's onBedsChange — so a Bed
   // drawn and saved in the editor is immediately visible for Pin placement,
-  // not just after a reload.
-  const [beds, setBeds] = useState<Bed[]>([])
+  // not just after a reload. `null` until that first call arrives: "no Beds
+  // yet" and "not known yet" look identical as an empty array, and the
+  // base-map preview below has to tell them apart.
+  const [beds, setBeds] = useState<Bed[] | null>(null)
+  // Only so the base-map preview below can step aside while BedEditor is
+  // rendering the same imagery behind its own canvas.
+  const [bedEditorOpen, setBedEditorOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -164,8 +170,55 @@ export function PropertyPage() {
           )}
           {pixelsPerFootForProperty(property) !== null ? (
             <>
-              <BedEditor property={property} onBedsChange={setBeds} />
-              <PlantingMap property={property} beds={beds} selectPlantingId={selectPlantingId} />
+              {/*
+                A Property with no Beds yet has nothing else drawing its base
+                map: BedEditor renders imagery only while its drawing panel
+                is open, and PlantingMap's canvas stays hidden until a Bed
+                exists (#25). Between them a freshly created Property showed
+                no imagery at all — leaving no way to tell a correctly
+                geocoded address from a wrong one, which is the whole job of
+                this screen at that moment.
+
+                This restores the standalone base map #6 removed (ffbc807).
+                It was removed as a duplicate of BedEditor's copy, and that
+                was true then only because PlantingMap's canvas still
+                rendered unconditionally underneath. Gating on both
+                conditions keeps the duplicate from coming back: whenever
+                either of the two real drawing surfaces is showing the base
+                map, this preview is not.
+              */}
+              {beds?.length === 0 && !bedEditorOpen && (
+                <figure className="property-base-map-preview">
+                  {/* Capped rather than fixed at STAGE_SIZE_PX: this is a
+                      picture to look at, not a surface with a coordinate
+                      space to honour, and it's the only wide thing on this
+                      path — the two real canvases are desktop-only and
+                      hidden respectively, so a fixed 768px would put a
+                      phone into horizontal scroll for the first time. */}
+                  <div
+                    style={{
+                      position: 'relative',
+                      width: '100%',
+                      maxWidth: STAGE_SIZE_PX,
+                      aspectRatio: '1',
+                    }}
+                  >
+                    <BaseMapBackground property={property} />
+                  </div>
+                  <figcaption>Check this is the right place before drawing Beds.</figcaption>
+                </figure>
+              )}
+              <BedEditor
+                property={property}
+                onBedsChange={setBeds}
+                onOpenChange={setBedEditorOpen}
+              />
+              <PlantingMap
+                property={property}
+                beds={beds ?? []}
+                selectPlantingId={selectPlantingId}
+                hiddenWhileDrawing={bedEditorOpen}
+              />
             </>
           ) : (
             <>

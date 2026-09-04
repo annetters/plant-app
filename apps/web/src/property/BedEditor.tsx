@@ -67,21 +67,29 @@ function freshDrawState(): DrawState {
 export function BedEditor({
   property,
   onBedsChange,
+  onOpenChange,
 }: {
   property: Property
   /** Notified with the current Bed list on every load/create/remove — lets a sibling like `PlantingMap` (which needs to resolve Pins against these same Beds) stay in sync instead of holding its own stale copy until a reload. */
   onBedsChange?: (beds: Bed[]) => void
+  /** Notified whenever the drawing panel opens or closes. `PropertyPage` uses it to drop its own base-map preview while this editor is showing the same imagery behind its canvas — see the preview's comment there. */
+  onOpenChange?: (open: boolean) => void
 }) {
   const isDesktop = useIsDesktopViewport()
   const repository = useBedsRepository()
 
   const [open, setOpen] = useState(false)
+  const [bedsLoaded, setBedsLoaded] = useState(false)
   const [beds, setBeds] = useState<Bed[]>([])
   const [tool, setTool] = useState<BedTool>('freehand')
   const [smoothingEnabled, setSmoothingEnabled] = useState(false)
   const [name, setName] = useState('')
   const [draft, setDraft] = useState<Draft | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Kept apart from `error` above, which reports load and remove failures
+  // and has to stay visible with the drawing panel closed. A save failure
+  // belongs next to the Save button instead — #32.
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -108,18 +116,42 @@ export function BedEditor({
       .catch(() => {
         if (!cancelled) setError("Could not load this Property's Beds.")
       })
+      .finally(() => {
+        // Settled either way: a failed load leaves `beds` empty, which is
+        // the same thing an empty Property reports, and the error message
+        // above is what distinguishes them for the gardener.
+        if (!cancelled) setBedsLoaded(true)
+      })
     return () => {
       cancelled = true
     }
   }, [property.id, repository])
 
   useEffect(() => {
+    // Held back until the fetch settles, so a caller can tell "no Beds yet"
+    // from "not known yet" — PropertyPage's base-map preview would otherwise
+    // mount and fetch a full base map on every Property with Beds, then tear
+    // it down a moment later.
+    if (!bedsLoaded) return
     onBedsChange?.(beds)
     // onBedsChange intentionally excluded: it's fired whenever `beds`
     // itself changes, not whenever the caller happens to pass a new
     // (possibly unstable) callback identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [beds])
+  }, [beds, bedsLoaded])
+
+  // What the caller actually needs to know is "is this editor showing the
+  // base map right now", not "is `open` set" — on a non-desktop viewport the
+  // editor renders a message instead of the canvas however `open` is left.
+  // Deriving it from the same condition the JSX branches on means narrowing
+  // the window can't strand PropertyPage believing the canvas is still up
+  // (which would hide its preview too, leaving no base map anywhere).
+  const showingBaseMap = isDesktop && open
+  useEffect(() => {
+    onOpenChange?.(showingBaseMap)
+    // onOpenChange intentionally excluded, same reasoning as onBedsChange above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showingBaseMap])
 
   // Mounts a real Konva stage for hands-on drawing — only while the editor
   // is open, and only once there's a scale to draw against.
@@ -423,7 +455,7 @@ export function BedEditor({
 
   async function handleSave() {
     if (!draft) return
-    setError(null)
+    setSaveError(null)
     const input: BedInput = {
       propertyId: property.id,
       name,
@@ -433,7 +465,7 @@ export function BedEditor({
     }
     const validation = validateBedInput(input)
     if (!validation.ok) {
-      setError(Object.values(validation.errors)[0] ?? 'Could not save this Bed.')
+      setSaveError(Object.values(validation.errors)[0] ?? 'Could not save this Bed.')
       return
     }
     setSaving(true)
@@ -443,7 +475,7 @@ export function BedEditor({
       handleClearDraft()
       setName('')
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save this Bed.')
+      setSaveError(err instanceof Error ? err.message : 'Could not save this Bed.')
     } finally {
       setSaving(false)
     }
@@ -506,11 +538,11 @@ export function BedEditor({
             <p>Click to place points; click near the first point to close the shape.</p>
           )}
 
-          {/* The base map renders again here, at native/full resolution and
-              pixel-for-pixel behind the Konva stage, so the two share one
-              coordinate space — the always-visible thumbnail above (in
-              PropertyPage) is CSS-capped to 512px and isn't usable as a
-              drawing reference. */}
+          {/* The base map renders again here, pixel-for-pixel behind the
+              Konva stage, so the two share one coordinate space.
+              PropertyPage's own preview is hidden for as long as this panel
+              is open (it listens via `onOpenChange`), so the imagery is
+              never drawn twice. */}
           <div style={{ position: 'relative', width: STAGE_SIZE_PX, height: STAGE_SIZE_PX }}>
             <BaseMapBackground property={property} />
             <div
@@ -525,13 +557,30 @@ export function BedEditor({
             <input id="bed-name" value={name} onChange={(event) => setName(event.target.value)} />
           </div>
 
-          <button type="button" onClick={handleSave} disabled={!draft || saving}>
+          {/* Named requirements next to the button that needs them, the
+              same way PlantingMap's Save block names its own (#14's device
+              QA found the identical problem there). Before this, a blank
+              name produced a real "Name is required." alert — 800px up the
+              page, above the canvas, where nobody was looking (#32). */}
+          {!name.trim() && <p>Enter a Bed name to save.</p>}
+          {saveError && <p role="alert">{saveError}</p>}
+
+          <button type="button" onClick={handleSave} disabled={!draft || !name.trim() || saving}>
             {saving ? 'Saving…' : 'Save Bed'}
           </button>
           <button type="button" onClick={handleClearDraft} disabled={!draft}>
             Clear
           </button>
-          <button type="button" onClick={() => setOpen(false)}>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false)
+              // Otherwise a failed save's alert is still sitting there the
+              // next time the panel is opened, describing an attempt the
+              // gardener has since walked away from.
+              setSaveError(null)
+            }}
+          >
             Close
           </button>
         </>

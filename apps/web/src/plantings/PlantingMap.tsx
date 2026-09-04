@@ -48,12 +48,15 @@ export function PlantingMap({
   property,
   beds: bedsProp,
   selectPlantingId,
+  hiddenWhileDrawing = false,
 }: {
   property: Property
   /** When provided (e.g. by `PropertyPage`, which also renders `BedEditor` against the same Property), this list is used as-is instead of self-fetching — so a Bed drawn and saved in the sibling editor shows up here immediately, not just after a reload. Omit to self-fetch (used by this component's own tests in isolation). */
   beds?: Bed[]
   /** A Planting to jump straight to once loaded — the Registry's "View on the map" link (#10) lands here via `?plantingId=`, so a gardener reaches that Planting's details without hunting for its Pin. */
   selectPlantingId?: string
+  /** Set while a sibling `BedEditor` has its drawing panel open. Both components draw the same base map at the same size, and two stacked 768px maps — one drawable, one not — read as one confusing screen with no way to tell which is which. Reported during #25's QA; pre-existing since #7/#8. */
+  hiddenWhileDrawing?: boolean
 }) {
   const bedsRepository = useBedsRepository()
   const plantsRepository = usePlantsRepository()
@@ -433,7 +436,12 @@ export function PlantingMap({
   }
 
   return (
-    <section className="planting-map">
+    // Hidden, not unmounted — same reasoning as the map surface's own gate
+    // below, one level up: the Konva stage's container has to stay in the
+    // DOM. Hiding the whole section rather than just the canvas also keeps
+    // an in-progress "Add Planting" intact across a trip into the Bed
+    // editor and back, instead of stranding a half-filled form.
+    <section className="planting-map" style={{ display: hiddenWhileDrawing ? 'none' : undefined }}>
       <h2>Plantings</h2>
       {loadError && <p role="alert">{loadError}</p>}
 
@@ -458,20 +466,37 @@ export function PlantingMap({
         // ArcGIS tiles (a display:none ancestor doesn't stop an <img>
         // loading) or round-trip Supabase for a photo's signed URL.
       }
+      {/* The canvas below is a fixed STAGE_SIZE_PX in both directions —
+          the Konva stage is constructed at that size and every Pin
+          coordinate is resolved through it, so it can't simply be given a
+          percentage width. On a phone that's wider than the viewport, and
+          an overflowing child drags the whole page sideways: the map hangs
+          out past a `main` that's still only one screen wide. Scrolling it
+          within its own box contains that. Making the stage itself
+          responsive is the real fix, and belongs with the `/map`
+          single-canvas rework. */}
       <div
+        data-testid="planting-map-viewport"
         style={{
           display: beds.length === 0 ? 'none' : undefined,
-          position: 'relative',
-          width: STAGE_SIZE_PX,
-          height: STAGE_SIZE_PX,
+          overflowX: 'auto',
+          maxWidth: '100%',
         }}
       >
-        {beds.length > 0 && <BaseMapBackground property={property} />}
         <div
-          ref={containerRef}
-          data-testid="planting-map-surface"
-          style={{ position: 'absolute', inset: 0 }}
-        />
+          style={{
+            position: 'relative',
+            width: STAGE_SIZE_PX,
+            height: STAGE_SIZE_PX,
+          }}
+        >
+          {beds.length > 0 && <BaseMapBackground property={property} />}
+          <div
+            ref={containerRef}
+            data-testid="planting-map-surface"
+            style={{ position: 'absolute', inset: 0 }}
+          />
+        </div>
       </div>
 
       {beds.length === 0 && <p>Draw a Bed first before adding Plantings.</p>}

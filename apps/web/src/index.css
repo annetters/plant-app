@@ -343,6 +343,20 @@ main.property-page {
 }
 
 /*
+ * The base-map preview shown before any Bed exists (#25). A UA's default
+ * `figure` margin indents it 40px, out of line with the Bed editor and
+ * Planting map that replace it — those sit flush, and the preview standing
+ * in for them should too.
+ */
+.property-base-map-preview {
+  margin: 16px 0;
+}
+
+.property-base-map-preview figcaption {
+  margin-top: 8px;
+}
+
+/*
  * The address form itself stays at the generic `form` rule's 420px —
  * readability still applies to it even though the page around it doesn't
  * cap width anymore (see the comment above `main.property-page`).
