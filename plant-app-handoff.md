@@ -1,19 +1,26 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-03 (updated: **#15 is built and committed — the last unbuilt ticket under the spec**; see "#15: native Scale Reference calibration" immediately below. It needs device QA that has not been run, and it is NOT closed. Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
+**Date:** 2026-09-03 (updated: **#15 is built, device-QA'd by the user, and its two findings are fixed and committed — the last unbuilt ticket under the spec now has code and a passing pass**; see "#15: native Scale Reference calibration" immediately below. It is NOT closed. Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
-## #15: native Scale Reference calibration — built and committed, NOT QA'd, NOT closed
+## #15: native Scale Reference calibration — built, QA'd on a device, NOT closed
 
-**Commit `5d103f4`.** A gardener can photograph a plot plan or survey and
-calibrate its scale entirely from the phone. This was the **last unbuilt
-ticket under the spec (#1)** — every #2–#20 ticket now has code.
+**Commits `5d103f4` (build) and `ceb07b9` (QA findings).** A gardener can
+photograph a plot plan or survey and calibrate its scale entirely from the
+phone. This was the **last unbuilt ticket under the spec (#1)** — every
+#2–#20 ticket now has code.
 
-**Not QA'd on a device, and not closed on GitHub.** Same posture as every
-prior ticket here: real, tested code held open pending the user's own pass.
-Per `CLAUDE.md`, closing is the user's call and hasn't been asked for.
+**Device QA run to completion by the user on a real iPhone, and it passes.**
+No rebuild was needed (nothing native changed), so this was a plain Metro
+session. Two findings came out of it, both fixed and committed — see "What
+device QA found" below. Items 1–7 of the checklist passed; item 8 (the
+aerial-with-no-imagery fallback) was opportunistic and is not confirmed
+either way, since it needs an address with no Esri coverage.
+
+**NOT closed on GitHub.** Per `CLAUDE.md`, closing is the user's call and
+hasn't been asked for — a passing QA is explicitly not authorization.
 
 ### What's there
 
@@ -80,11 +87,41 @@ glossary's *Property*. It's verbatim web's existing copy
 (`PropertyPage.tsx:141`), so changing it on the phone alone would make the
 two surfaces disagree. Worth fixing on both together, or not at all.
 
-### What to QA (nothing below has been run)
+### What device QA found — both fixed in `ceb07b9`
+
+1. **The Scale Reference step asked its question before there was anything
+   to ask about.** "How do you know this distance?", the distance field and
+   Save all sat below an untouched plan, so the screen posed the question
+   before the two points it refers to existed. The block now appears only
+   once both points are placed, with a prompt naming the next tap in
+   between, and withdraws again when a third tap restarts the pair.
+   **Web was deliberately left alone**: its wider layout doesn't read as one
+   vertical sequence, and this changes disclosure, not behaviour or data, so
+   ADR-0003's parity is untouched. Worth deciding separately whether web
+   wants the same treatment.
+2. **A Property created on the phone could only be deleted on the desktop.**
+   The user hit this trying to re-run the create path: an account holds one
+   Property, and there was no way to free the slot from the phone. Added
+   `PropertiesRepository.remove` (ported from web) and a confirmed **Delete
+   Property** control on the Map screen, using the same `Alert` shape
+   removing a Planting already uses. It renders for **any** loaded Property,
+   not just a calibrated one — an aerial Property with no imagery has nothing
+   else to do on that screen, so it needs the exit more, not less.
+
+   **This is beyond #15's acceptance criteria**, added at the user's explicit
+   direction during the pass rather than because the ticket asked for it.
+   ADR-0003 puts everything except drawing at full parity, so the gap was
+   real; #15 is simply what made it bite, by making the phone able to create
+   a Property in the first place. Same shape as #6, where live QA grew the
+   ticket substantially. Web only has its own delete control because #5's QA
+   hit the identical dead end.
+
+### The checklist that was run
 
 Needs a real device — camera, a real photo library, and touch accuracy
-against a real plan. **No rebuild needed first.** Reach it from the
-Dashboard's Map tile.
+against a real plan. **No rebuild needed.** Reached from the Dashboard's Map
+tile. Re-running it is now much easier: Delete Property resets the account in
+place, instead of needing a fresh throwaway signup per round.
 
 1. **The whole create path**: no Property → "Photograph a plot plan" → name →
    camera *and* library → the review step → calibrate → save. Does the Map
@@ -106,8 +143,7 @@ Dashboard's Map tile.
 7. **The aerial-fallback path**, if you can reach an address with no imagery
    coverage.
 8. **Storage RLS from the phone** — uploading to `property-base-map-photos`
-   has never been exercised from a device before, only reading has. A
-   permissions failure would show as "Could not upload this photo."
+   had never been exercised from a device before, only reading had. It works.
 
 ### Known gaps, deliberate — not QA findings
 
@@ -118,11 +154,12 @@ Dashboard's Map tile.
 - **A screen reader can't place the two points** — same gap as Pin dragging
   on both surfaces, and for the same reason.
 
-**Full monorepo green**: 235 domain + 218 mobile + 199 web, typecheck clean
+**Full monorepo green**: 235 domain + 223 mobile + 199 web, typecheck clean
 across all three workspaces.
 
-**Git state**: `5d103f4` on `main`, **not pushed** — push wasn't requested.
-Verify with `git log origin/main..HEAD` rather than trusting this line.
+**Git state**: `5d103f4` and `ceb07b9` on `main`, **not pushed** — push wasn't
+requested. Verify with `git log origin/main..HEAD` rather than trusting this
+line; this doc's push claims have drifted before.
 
 ---
 
