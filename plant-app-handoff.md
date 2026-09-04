@@ -15,9 +15,14 @@ phone. This was the **last unbuilt ticket under the spec (#1)** — every
 **Device QA run to completion by the user on a real iPhone, and it passes.**
 No rebuild was needed (nothing native changed), so this was a plain Metro
 session. Two findings came out of it, both fixed and committed — see "What
-device QA found" below. Items 1–7 of the checklist passed; item 8 (the
-aerial-with-no-imagery fallback) was opportunistic and is not confirmed
-either way, since it needs an address with no Esri coverage.
+device QA found" below.
+
+**Every item passed except one, which was skipped deliberately**: the
+aerial-with-no-imagery fallback (item 7) needs an address with no Esri
+coverage, which is hard to arrange on purpose and wasn't worth chasing.
+That path is built and unit-tested but has **never run on a device** — the
+same standing caveat #14's item 10 and 15b carry. Everything else, including
+the first real upload to `property-base-map-photos` from a phone, passed.
 
 **NOT closed on GitHub.** Per `CLAUDE.md`, closing is the user's call and
 hasn't been asked for — a passing QA is explicitly not authorization.
@@ -141,9 +146,14 @@ place, instead of needing a fresh throwaway signup per round.
    in the same real-world places on both surfaces. A wrong scale shows up
    here and nowhere else.
 7. **The aerial-fallback path**, if you can reach an address with no imagery
-   coverage.
+   coverage. **SKIPPED — still unverified on a device.** Reaching it means
+   finding a real address Esri has no coverage for at zoom 18–21. If it ever
+   needs proving, #5's QA created a Property at open-ocean coordinates
+   (30°S, 140°W) through the `create-property` Edge Function directly, which
+   would set up exactly this state.
 8. **Storage RLS from the phone** — uploading to `property-base-map-photos`
-   had never been exercised from a device before, only reading had. It works.
+   had never been exercised from a device before, only reading had. **It
+   works**; every photo in the passing create runs went through it.
 
 ### Known gaps, deliberate — not QA findings
 
