@@ -1,7 +1,95 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-03 (updated: the task system was removed from the MVP commitment — see "Scope change" immediately below, which also corrects the "working tree is clean" claim in "Current state". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
+**Date:** 2026-09-03 (updated: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
 **Repo:** `annetters/plant-app` · branch `main`
+
+---
+
+## #25's last gap closed — QA run by the user, everything fixed
+
+**This entry supersedes the "What to do next" section further down and the
+whole of "Not yet resolved — blocks closing #25".** That gap is gone.
+
+**The freshly-created-Property gap is fixed and verified.** The user ran the
+pass in a browser (their choice, not Playwright) on a **throwaway account** —
+which matters: MVP allows one Property per account (`properties_one_per_user`),
+and `properties -> beds -> plantings -> planting_photos` all cascade on delete,
+so testing a *freshly created* Property on the real account would have destroyed
+every Bed, Pin and dated photo in the real garden. Use a throwaway account for
+anything that needs a new Property; it also makes the delete/recreate loop
+repeatable.
+
+**Root cause was a two-commit interaction, not #25 alone.** #5 gave
+`PropertyPage` a standalone aerial thumbnail. #6's QA removed it as a
+"duplicate" of `BedEditor`'s copy (`ffbc807`) — true only because
+`PlantingMap`'s canvas still rendered unconditionally underneath at the time.
+#25 then hid that canvas until a Bed exists, and the two together left a new
+Property with no imagery at all. The user confirmed the gap on **all three**
+base-map sources.
+
+### What was built
+
+- **`PropertyPage.tsx`** renders the base map itself when a Property has no
+  Beds and the Bed editor is closed — the two conditions under which nothing
+  else draws it. Uses the existing `BaseMapBackground`, so all three sources
+  work. Capped with `maxWidth`/`aspectRatio` rather than fixed at
+  `STAGE_SIZE_PX`.
+- **`BedEditor.tsx`** gained `onOpenChange`, reporting `isDesktop && open`
+  rather than raw `open`; `onBedsChange` is held until the Beds fetch settles
+  so a caller can tell "no Beds yet" from "not known yet".
+- A stale comment in `BedEditor` describing "the always-visible thumbnail
+  above (in PropertyPage), CSS-capped to 512px" was fixed — that thumbnail had
+  been deleted a session later.
+
+### `/code-review` caught three real problems in the first cut
+
+All fixed, each with a regression test confirmed failing without its fix: a
+768px preview forcing horizontal scroll on a phone; a viewport flip stranding
+`PropertyPage` believing the canvas was still up, **reproducing the exact bug
+being fixed**; and a preview flash (nine ArcGIS tiles, then teardown) on every
+Property that already had Beds.
+
+### Three more findings from the user's pass, all fixed
+
+1. **Two stacked maps while drawing.** With a Bed saved, `BedEditor`'s canvas
+   and `PlantingMap`'s both rendered — one drawable, one not.
+   **Pre-existing since #7/#8**, not a regression. `PlantingMap` now takes
+   `hiddenWhileDrawing` and hides the whole section while the editor is open
+   (hidden, never unmounted — #8's null-ref bug; hiding the section rather
+   than just the canvas also preserves an in-progress "Add Planting").
+2. **#32 fixed** (blank Bed name gave no visible error). Rather than only
+   relocating the alert, this matches what `PlantingMap` already does for its
+   own Save button (added during #14's device QA): a hint next to Save naming
+   the requirement, Save disabled until a name exists, and save failures given
+   their own `saveError` state rendered by the button. The top-of-section
+   alert stays for load/remove failures, which must be visible with the panel
+   closed — the reason it was up there originally.
+3. **Phone-width page overflow.** `PlantingMap`'s canvas is a fixed 768px and
+   dragged the whole page sideways. Contained with `overflow-x: auto` on a
+   wrapper. **This is containment, not a responsive fix** — the stage is still
+   768px. Tracked in #35.
+
+### Filed: #35
+
+**#35** (`needs-triage`) — **`/map` should be one canvas with a mode control**,
+replacing the two stacked surfaces. Three separate visibility rules now decide
+which of three components draws the base map; #35 collapses them and makes the
+base map unconditional, which would delete the preview added above entirely.
+Matches native's single-surface `MapScreen`. Also carries the responsive-stage
+work from finding 3. **Splitting Beds and Plantings onto separate pages was
+considered and rejected** — they share one base map and one coordinate space,
+and it would diverge web from native.
+
+### Status
+
+- **#25 and #32 both stay OPEN.** QA is complete and nothing is outstanding
+  against either; closing is the user's call, per `CLAUDE.md`.
+- **Test counts: domain 235, mobile 194, web 199.** Typecheck clean, no new
+  lint warnings. Every new test was confirmed to fail without its fix.
+- **One unexplained flake**: a single web-suite run failed one test that could
+  not be reproduced across eight subsequent runs and could not be identified
+  from the output. Recorded rather than dismissed — if a flaky test surfaces
+  later, this is the first sighting.
 
 ---
 
@@ -55,6 +143,9 @@ alongside it, since it genuinely hasn't been triaged.
 > corrects this entry's git state, the standing instruction about #18, and
 > every "not pushed yet" line in this doc.
 
+> **Superseded — see "#25's last gap closed" at the top of this doc.** The
+> unresolved thread named below is fixed and QA'd.
+
 **#25's browser QA checklist is complete, but #25 is NOT ready to close** —
 one unresolved thread is a real behavior change caused by #25 itself, not a
 side-finding, and it wasn't covered by this session's checklist. See
@@ -71,6 +162,10 @@ close an issue without the user explicitly asking**, even once the item below
 is resolved and the checklist is fully clean.
 
 ### Not yet resolved — blocks closing #25
+
+> **RESOLVED — see "#25's last gap closed" at the top of this doc.** Everything
+> in this section is history: the fix was implemented, reviewed and verified by
+> the user. Nothing below blocks #25 any more.
 
 **A freshly created Property shows no imagery at all until "Draw a Bed" is
 clicked** — found during the peer session's #14 pass (see "#25 already has a
