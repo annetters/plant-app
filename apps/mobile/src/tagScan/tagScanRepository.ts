@@ -1,4 +1,4 @@
-import type { Plant, PlantInput, PlantRow, SpeciesNameSummary, UsdaCharacteristic } from '@plant-app/domain'
+import type { Plant, PlantInput, PlantRow } from '@plant-app/domain'
 import { plantFromRow, plantInputToRow } from '@plant-app/domain'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import * as Crypto from 'expo-crypto'
@@ -30,12 +30,6 @@ export interface TagScanDbClient {
       ): Promise<{ data: { path: string } | null; error: { message: string } | null }>
     }
   }
-  functions: {
-    invoke(
-      name: string,
-      options: { body: unknown },
-    ): Promise<{ data: unknown; error: { message: string } | null }>
-  }
   auth: {
     getUser(): Promise<{
       data: { user: { id: string } | null }
@@ -52,7 +46,6 @@ export function asTagScanDbClient(client: SupabaseClient): TagScanDbClient {
 const PLANTS_TABLE = 'plants'
 const TAG_PHOTOS_TABLE = 'tag_photos'
 const TAG_PHOTOS_BUCKET = 'tag-photos'
-const USDA_FUNCTION = 'usda-plant-traits'
 
 function unwrap<T>({ data, error }: DbResult<unknown>): T {
   if (error) throw new Error(error.message)
@@ -131,33 +124,5 @@ export class TagScanRepository {
 
   async linkTagPhotoToPlant(tagPhotoId: string, plantId: string): Promise<void> {
     unwrap(await this.client.from(TAG_PHOTOS_TABLE).update({ plant_id: plantId }).eq('id', tagPhotoId))
-  }
-
-  /** A common name can span multiple species — see `resolveCommonName` in `@plant-app/domain`, which this feeds. */
-  async lookupUsdaByCommonName(commonName: string): Promise<SpeciesNameSummary[]> {
-    const { data, error } = await this.client.functions.invoke(USDA_FUNCTION, {
-      body: { commonName },
-    })
-    if (error) throw new Error(error.message)
-    const result = data as { error?: string; species?: SpeciesNameSummary[] }
-    if (result?.error) throw new Error(result.error)
-    return result.species ?? []
-  }
-
-  /** An empty `characteristics` array (no USDA match) is a routine, common outcome — see ADR-0004 — not an error. */
-  async lookupUsdaByScientificName(
-    scientificName: string,
-  ): Promise<{ species: SpeciesNameSummary[]; characteristics: UsdaCharacteristic[] }> {
-    const { data, error } = await this.client.functions.invoke(USDA_FUNCTION, {
-      body: { scientificName },
-    })
-    if (error) throw new Error(error.message)
-    const result = data as {
-      error?: string
-      species?: SpeciesNameSummary[]
-      characteristics?: UsdaCharacteristic[]
-    }
-    if (result?.error) throw new Error(result.error)
-    return { species: result.species ?? [], characteristics: result.characteristics ?? [] }
   }
 }

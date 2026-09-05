@@ -45,7 +45,7 @@ async function renderRegistry({
                 <Stack.Screen name="PlantDetail">
                   {({ navigation, route }: any) => (
                     <>
-                      <Text>plant detail: {route.params.plantId}</Text>
+                      <Text>plant detail: {route.params?.plantId ?? 'new'}</Text>
                       {/* Simulates PlantDetailScreen's real save-then-goBack flow,
                           mutating the underlying row directly rather than going
                           through the repository, so the test can assert Registry
@@ -54,7 +54,7 @@ async function renderRegistry({
                       <Pressable
                         accessibilityRole="button"
                         onPress={() => {
-                          const row = plantsFake.rows().find((r) => r.id === route.params.plantId)
+                          const row = plantsFake.rows().find((r) => r.id === route.params?.plantId)
                           if (row) row.common_name = 'Purple Coneflower'
                           navigation.goBack()
                         }}
@@ -82,6 +82,15 @@ describe('RegistryScreen', () => {
     await renderRegistry({ plantRows: [] })
 
     expect(await screen.findByText('No plants yet — add your first one.')).toBeTruthy()
+  })
+
+  it('offers a way to add a Plant without a tag to scan, even with an empty registry (#31)', async () => {
+    await renderRegistry({ plantRows: [] })
+    await screen.findByText('No plants yet — add your first one.')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Add Plant' }))
+
+    expect(await screen.findByText('plant detail: new')).toBeTruthy()
   })
 
   it('lists every Plant with its matching attributes shown', async () => {

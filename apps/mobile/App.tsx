@@ -13,6 +13,8 @@ import { asBedsDbClient } from './src/property/bedsRepository';
 import { BedsRepositoryProvider } from './src/property/BedsRepositoryContext';
 import { asPropertiesDbClient } from './src/property/propertiesRepository';
 import { PropertiesRepositoryProvider } from './src/property/PropertiesRepositoryContext';
+import { asSpeciesLookupDbClient } from './src/species/speciesLookupRepository';
+import { SpeciesLookupRepositoryProvider } from './src/species/SpeciesLookupRepositoryContext';
 import { asTagScanDbClient } from './src/tagScan/tagScanRepository';
 import { TagScanRepositoryProvider } from './src/tagScan/TagScanRepositoryContext';
 import { asOneOffTodosDbClient } from './src/tasks/oneOffTodosRepository';
@@ -35,21 +37,23 @@ export default function App() {
   return (
     <SafeAreaProvider>
       <AuthProvider client={supabase}>
-        <TagScanRepositoryProvider client={asTagScanDbClient(supabase)}>
-          <PropertiesRepositoryProvider client={asPropertiesDbClient(supabase)}>
-            <BedsRepositoryProvider client={asBedsDbClient(supabase)}>
-              <PlantingsRepositoryProvider client={asPlantingsDbClient(supabase)}>
-                <PlantsRepositoryProvider client={asPlantsDbClient(supabase)}>
-                  <OneOffTodosRepositoryProvider client={asOneOffTodosDbClient(supabase)}>
-                    <TaskCompletionsRepositoryProvider client={asTaskCompletionsDbClient(supabase)}>
-                      <AppShell />
-                    </TaskCompletionsRepositoryProvider>
-                  </OneOffTodosRepositoryProvider>
-                </PlantsRepositoryProvider>
-              </PlantingsRepositoryProvider>
-            </BedsRepositoryProvider>
-          </PropertiesRepositoryProvider>
-        </TagScanRepositoryProvider>
+        <SpeciesLookupRepositoryProvider client={asSpeciesLookupDbClient(supabase)}>
+          <TagScanRepositoryProvider client={asTagScanDbClient(supabase)}>
+            <PropertiesRepositoryProvider client={asPropertiesDbClient(supabase)}>
+              <BedsRepositoryProvider client={asBedsDbClient(supabase)}>
+                <PlantingsRepositoryProvider client={asPlantingsDbClient(supabase)}>
+                  <PlantsRepositoryProvider client={asPlantsDbClient(supabase)}>
+                    <OneOffTodosRepositoryProvider client={asOneOffTodosDbClient(supabase)}>
+                      <TaskCompletionsRepositoryProvider client={asTaskCompletionsDbClient(supabase)}>
+                        <AppShell />
+                      </TaskCompletionsRepositoryProvider>
+                    </OneOffTodosRepositoryProvider>
+                  </PlantsRepositoryProvider>
+                </PlantingsRepositoryProvider>
+              </BedsRepositoryProvider>
+            </PropertiesRepositoryProvider>
+          </TagScanRepositoryProvider>
+        </SpeciesLookupRepositoryProvider>
       </AuthProvider>
     </SafeAreaProvider>
   );

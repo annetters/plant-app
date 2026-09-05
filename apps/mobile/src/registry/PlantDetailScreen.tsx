@@ -11,6 +11,8 @@ import {
   type PlantFormFields,
   type PlantInput,
   type PlantValidationErrors,
+  type SpeciesNameSummary,
+  type UsdaSpeciesSuggestedTraits,
 } from '@plant-app/domain'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
@@ -22,37 +24,67 @@ import { ChipRow } from '../components/ChipRow'
 import { pickPhoto, type PhotoSource } from '../lib/pickPhoto'
 import type { MainStackParamList } from '../navigation/types'
 import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
+import { useSpeciesLookupRepository } from '../species/SpeciesLookupRepositoryContext'
+import { SuggestedTraitsConfirmation } from '../species/SuggestedTraitsConfirmation'
+import {
+  applySuggestedTraits,
+  hasApplicableTraits,
+  lookupSpeciesByCommonName,
+  suggestSpeciesTraits,
+  traitsNotAlreadySetBy,
+} from '../species/speciesLookup'
 
 const HARDINESS_ZONE_OPTIONS = HARDINESS_ZONE_NUMBERS.map(String)
 
 /**
- * Phone parity for viewing/editing a Plant record and its reference photos
- * (ticket #18) — the native counterpart of web's `PlantFormPage`, trimmed to
- * the editing surface #18 actually asks for: no Care task template
- * management here (that stays web-only; see #12/#18's own scoping), and no
- * "create" flow (Tag Scan is mobile's Plant-creation path — see #19/#20).
+ * Phone parity for creating, viewing and editing a Plant record and its
+ * reference photos — the native counterpart of web's `PlantFormPage`, trimmed
+ * to the editing surface #18 asked for: no Care task template management here
+ * (that stays web-only; see #12/#18's own scoping).
+ *
+ * One screen serves both create and edit, exactly as web mounts one
+ * `PlantFormPage` at `/registry/new` and `/registry/:plantId`. Arriving
+ * without a `plantId` (#31) starts from an empty form and creates on save;
+ * from that first save on, this is an ordinary Plant detail screen, on the
+ * same route. Keeping it one component is the point: a second copy of this
+ * form is exactly the kind of thing that drifts (see the `plantLabel`
+ * divergence #18's QA turned up between web and mobile).
+ *
+ * Tag Scan (#19/#20) remains the other creation path, for a plant that does
+ * have a nursery tag to photograph.
  */
 export function PlantDetailScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>()
   const route = useRoute<RouteProp<MainStackParamList, 'PlantDetail'>>()
-  const { plantId } = route.params
+  const routePlantId = route.params?.plantId ?? null
   const repository = usePlantsRepository()
+  const speciesLookup = useSpeciesLookupRepository()
 
+  // Not derived from the route: a successful create swaps this screen from
+  // create mode to edit mode in place, without a second navigation.
+  const [plantId, setPlantId] = useState<string | null>(routePlantId)
   const [fields, setFields] = useState<PlantFormFields>(EMPTY_PLANT_FORM_FIELDS)
   const [referencePhotoPaths, setReferencePhotoPaths] = useState<string[]>([])
   const [photoPreviews, setPhotoPreviews] = useState<Record<string, string>>({})
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(routePlantId !== null)
   const [errors, setErrors] = useState<PlantValidationErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [photoBusy, setPhotoBusy] = useState<'camera' | 'library' | 'remove' | null>(null)
+  const [lookingUpSpecies, setLookingUpSpecies] = useState(false)
+  const [speciesCandidates, setSpeciesCandidates] = useState<SpeciesNameSummary[] | null>(null)
+  const [pendingCreation, setPendingCreation] = useState<{
+    input: PlantInput
+    traits: UsdaSpeciesSuggestedTraits
+  } | null>(null)
   const scrollViewRef = useRef<ScrollView>(null)
 
   useEffect(() => {
+    if (!routePlantId) return
     let cancelled = false
     repository
-      .get(plantId)
+      .get(routePlantId)
       .then((plant) => {
         if (cancelled) return
         if (!plant) {
@@ -73,7 +105,7 @@ export function PlantDetailScreen() {
     return () => {
       cancelled = true
     }
-  }, [plantId, repository])
+  }, [routePlantId, repository])
 
   useEffect(() => {
     let cancelled = false
@@ -122,6 +154,10 @@ export function PlantDetailScreen() {
     }
     setFormError(null)
     setStatusMessage(null)
+    if (!plantId) {
+      await offerTraitsThenCreate(input)
+      return
+    }
     setSubmitting(true)
     try {
       await repository.update(plantId, input)
@@ -133,7 +169,93 @@ export function PlantDetailScreen() {
     }
   }
 
+  /**
+   * Same shape as Tag Scan's review screen: ask USDA what it knows about the
+   * scientific name and, if it knows anything, show it for confirmation
+   * before writing. Nothing is ever auto-applied (CONTEXT.md's Tag Scan
+   * rule), and a lookup failure forfeits only the suggestion, never the save.
+   */
+  async function offerTraitsThenCreate(input: PlantInput) {
+    setSubmitting(true)
+    let traits: UsdaSpeciesSuggestedTraits = {}
+    try {
+      // Only what the user hasn't answered themselves: this form, unlike Tag
+      // Scan's review screen, has its own Sun/shade and Mature height inputs,
+      // and a suggestion must never overwrite a value they typed.
+      traits = traitsNotAlreadySetBy(
+        await suggestSpeciesTraits(speciesLookup, input.scientificName),
+        input,
+      )
+    } catch {
+      // No suggestion available — fall through and create the Plant as typed.
+    } finally {
+      setSubmitting(false)
+    }
+    // Unlike Tag Scan, don't interrupt the save for a panel that could only
+    // report the reference-only hardiness zone and change nothing.
+    if (hasApplicableTraits(traits)) {
+      setPendingCreation({ input, traits })
+      return
+    }
+    await handleCreate(input)
+  }
+
+  async function handleCreate(input: PlantInput, traits?: UsdaSpeciesSuggestedTraits) {
+    setPendingCreation(null)
+    setSubmitting(true)
+    try {
+      const created = await repository.create(applySuggestedTraits(input, traits))
+      // Re-deriving the form from the created row is what turns this into an
+      // ordinary detail screen: any trait just applied becomes visible, and
+      // Delete/photo actions unlock because `plantId` is now set.
+      setPlantId(created.id)
+      setFields(plantFormFieldsFromPlant(created))
+      setReferencePhotoPaths(created.referencePhotoPaths)
+      setSpeciesCandidates(null)
+      setStatusMessage('Saved.')
+    } catch {
+      setFormError('Could not save this Plant. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  /** The same species lookup Tag Scan's review screen offers — see `speciesLookup.ts`; the two share one mechanism rather than two copies. */
+  async function handleLookupSpecies() {
+    if (!fields.commonName.trim()) return
+    setFormError(null)
+    setSpeciesCandidates(null)
+    setLookingUpSpecies(true)
+    try {
+      const resolution = await lookupSpeciesByCommonName(speciesLookup, fields.commonName)
+      if (resolution.status === 'ambiguous') {
+        // A common name can span several species (CONTEXT.md's Liatris
+        // example) — never guess. Tag Scan pushes its own screen for this;
+        // here the candidates list inline, since there's no scan to return to.
+        setSpeciesCandidates(resolution.candidates)
+      } else if (resolution.status === 'resolved') {
+        updateField('scientificName', resolution.species.scientificName)
+        setStatusMessage(`Scientific name set from USDA PLANTS: ${resolution.species.scientificName}`)
+      } else {
+        setFormError(
+          'No USDA match for that common name — enter the scientific name yourself.',
+        )
+      }
+    } catch {
+      setFormError('Could not look up that name. Enter the scientific name yourself.')
+    } finally {
+      setLookingUpSpecies(false)
+    }
+  }
+
+  function handleSelectSpecies(species: SpeciesNameSummary) {
+    updateField('scientificName', species.scientificName)
+    setSpeciesCandidates(null)
+    setStatusMessage(`Scientific name set from USDA PLANTS: ${species.scientificName}`)
+  }
+
   async function handleAddPhoto(source: PhotoSource) {
+    if (!plantId) return
     setFormError(null)
     setStatusMessage(null)
     try {
@@ -166,6 +288,7 @@ export function PlantDetailScreen() {
   }
 
   async function handleRemovePhoto(path: string) {
+    if (!plantId) return
     const nextPaths = referencePhotoPaths.filter((existing) => existing !== path)
     const input = validatedInputFor(nextPaths)
     if (!input) {
@@ -188,6 +311,7 @@ export function PlantDetailScreen() {
   }
 
   function handleDelete() {
+    if (!plantId) return
     Alert.alert('Delete this Plant?', 'This cannot be undone.', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -215,11 +339,41 @@ export function PlantDetailScreen() {
     )
   }
 
+  if (pendingCreation) {
+    const { input, traits } = pendingCreation
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <KeyboardAwareScrollView contentContainerStyle={styles.container}>
+          {formError && <Text style={styles.error}>{formError}</Text>}
+          <SuggestedTraitsConfirmation
+            traits={traits}
+            busy={submitting}
+            onAccept={() => handleCreate(input, traits)}
+            onSkip={() => handleCreate(input)}
+            footer={
+              <Pressable
+                accessibilityRole="button"
+                disabled={submitting}
+                onPress={() => setPendingCreation(null)}
+              >
+                <Text style={styles.backLink}>Back to the form</Text>
+              </Pressable>
+            }
+          />
+        </KeyboardAwareScrollView>
+      </SafeAreaView>
+    )
+  }
+
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
       <KeyboardAwareScrollView ref={scrollViewRef} contentContainerStyle={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.title}>{fields.commonName || 'Plant'}</Text>
+          {/* Titled as a header so it's distinguishable from the identically
+              labelled submit button — to a screen reader as well as a test. */}
+          <Text accessibilityRole="header" style={styles.title}>
+            {plantId ? fields.commonName || 'Plant' : 'Add Plant'}
+          </Text>
           <Pressable accessibilityRole="button" onPress={() => navigation.goBack()}>
             <Text style={styles.backLink}>Back to Registry</Text>
           </Pressable>
@@ -235,6 +389,43 @@ export function PlantDetailScreen() {
           />
           {errors.commonName && <Text style={styles.error}>{errors.commonName}</Text>}
         </View>
+
+        {/* Create only: on an existing Plant the scientific name is already
+            settled, and #31 leaves the editing surface exactly as it was. */}
+        {!plantId && (
+          <View style={styles.field}>
+            <Pressable
+              accessibilityRole="button"
+              style={[
+                styles.buttonSecondary,
+                (lookingUpSpecies || !fields.commonName.trim()) && styles.buttonSecondaryDisabled,
+              ]}
+              disabled={lookingUpSpecies || !fields.commonName.trim()}
+              onPress={handleLookupSpecies}
+            >
+              <Text>{lookingUpSpecies ? 'Looking up…' : 'Look up species'}</Text>
+            </Pressable>
+            {speciesCandidates && (
+              <View accessibilityLabel="Species candidates" style={styles.candidateList}>
+                <Text>
+                  "{fields.commonName}" matches more than one species. Pick the one you mean — if
+                  none are right, type the scientific name yourself.
+                </Text>
+                {speciesCandidates.map((species) => (
+                  <Pressable
+                    key={species.scientificName}
+                    accessibilityRole="button"
+                    style={styles.candidate}
+                    onPress={() => handleSelectSpecies(species)}
+                  >
+                    <Text style={styles.candidateScientificName}>{species.scientificName}</Text>
+                    <Text>{species.commonName}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
 
         <View style={styles.field}>
           <Text style={styles.label}>Scientific name *</Text>
@@ -382,44 +573,49 @@ export function PlantDetailScreen() {
           formatChip={formatOption}
         />
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Reference photos</Text>
-          {referencePhotoPaths.length === 0 && <Text>No reference photos yet.</Text>}
-          <View style={styles.photoList}>
-            {referencePhotoPaths.map((path) => (
-              <View key={path} style={styles.photoItem}>
-                {photoPreviews[path] && (
-                  <Image source={{ uri: photoPreviews[path] }} style={styles.photoThumbnail} />
-                )}
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={photoBusy !== null}
-                  onPress={() => handleRemovePhoto(path)}
-                >
-                  <Text style={styles.removeLink}>{photoBusy === 'remove' ? 'Removing…' : 'Remove'}</Text>
-                </Pressable>
-              </View>
-            ))}
+        {/* Both of these need a Plant row to act on — a photo needs somewhere
+            to be uploaded against, and there is nothing yet to delete. They
+            appear the moment the first save creates one. */}
+        {plantId && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Reference photos</Text>
+            {referencePhotoPaths.length === 0 && <Text>No reference photos yet.</Text>}
+            <View style={styles.photoList}>
+              {referencePhotoPaths.map((path) => (
+                <View key={path} style={styles.photoItem}>
+                  {photoPreviews[path] && (
+                    <Image source={{ uri: photoPreviews[path] }} style={styles.photoThumbnail} />
+                  )}
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={photoBusy !== null}
+                    onPress={() => handleRemovePhoto(path)}
+                  >
+                    <Text style={styles.removeLink}>{photoBusy === 'remove' ? 'Removing…' : 'Remove'}</Text>
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+            <View style={styles.photoActions}>
+              <Pressable
+                accessibilityRole="button"
+                style={styles.buttonSecondary}
+                disabled={photoBusy !== null}
+                onPress={() => handleAddPhoto('camera')}
+              >
+                <Text>{photoBusy === 'camera' ? 'Uploading…' : 'Take photo'}</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                style={styles.buttonSecondary}
+                disabled={photoBusy !== null}
+                onPress={() => handleAddPhoto('library')}
+              >
+                <Text>{photoBusy === 'library' ? 'Uploading…' : 'Choose from library'}</Text>
+              </Pressable>
+            </View>
           </View>
-          <View style={styles.photoActions}>
-            <Pressable
-              accessibilityRole="button"
-              style={styles.buttonSecondary}
-              disabled={photoBusy !== null}
-              onPress={() => handleAddPhoto('camera')}
-            >
-              <Text>{photoBusy === 'camera' ? 'Uploading…' : 'Take photo'}</Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              style={styles.buttonSecondary}
-              disabled={photoBusy !== null}
-              onPress={() => handleAddPhoto('library')}
-            >
-              <Text>{photoBusy === 'library' ? 'Uploading…' : 'Choose from library'}</Text>
-            </Pressable>
-          </View>
-        </View>
+        )}
 
         {formError && <Text style={styles.error}>{formError}</Text>}
         {statusMessage && <Text style={styles.status}>{statusMessage}</Text>}
@@ -430,17 +626,21 @@ export function PlantDetailScreen() {
           disabled={submitting}
           onPress={handleSave}
         >
-          <Text style={styles.saveButtonText}>{submitting ? 'Saving…' : 'Save changes'}</Text>
+          <Text style={styles.saveButtonText}>
+            {submitting ? 'Saving…' : plantId ? 'Save changes' : 'Add Plant'}
+          </Text>
         </Pressable>
 
-        <Pressable
-          accessibilityRole="button"
-          style={styles.deleteButton}
-          disabled={submitting}
-          onPress={handleDelete}
-        >
-          <Text style={styles.deleteButtonText}>Delete Plant</Text>
-        </Pressable>
+        {plantId && (
+          <Pressable
+            accessibilityRole="button"
+            style={styles.deleteButton}
+            disabled={submitting}
+            onPress={handleDelete}
+          >
+            <Text style={styles.deleteButtonText}>Delete Plant</Text>
+          </Pressable>
+        )}
       </KeyboardAwareScrollView>
     </SafeAreaView>
   )
@@ -543,6 +743,23 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: 'center',
     flex: 1,
+  },
+  buttonSecondaryDisabled: {
+    opacity: 0.5,
+  },
+  candidateList: {
+    gap: 8,
+    marginTop: 8,
+  },
+  candidate: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 4,
+    padding: 12,
+  },
+  candidateScientificName: {
+    fontStyle: 'italic',
+    fontWeight: '600',
   },
   deleteButton: {
     borderWidth: 1,

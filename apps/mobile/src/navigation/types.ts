@@ -13,7 +13,8 @@ export type MainStackParamList = {
   Map: undefined
   BaseMapSetup: undefined
   Registry: undefined
-  PlantDetail: { plantId: string }
+  /** No `plantId` means create: the same screen starts from an empty form and creates on save (#31). */
+  PlantDetail: { plantId: string } | undefined
   PlantingDetail: { plantingId: string }
   BloomTimeline: undefined
   Tasks: undefined

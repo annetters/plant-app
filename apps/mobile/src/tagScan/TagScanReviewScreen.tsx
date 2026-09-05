@@ -1,7 +1,5 @@
 import {
   checkForDuplicatePlant,
-  projectUsdaSpeciesTraits,
-  resolveCommonName,
   validatePlantInput,
   type Plant,
   type PlantInput,
@@ -15,6 +13,13 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { KeyboardAwareScrollView } from '../components/KeyboardAwareScrollView'
 import type { MainStackParamList, TagScanPhotoIds } from '../navigation/types'
+import { useSpeciesLookupRepository } from '../species/SpeciesLookupRepositoryContext'
+import { SuggestedTraitsConfirmation } from '../species/SuggestedTraitsConfirmation'
+import {
+  applySuggestedTraits,
+  lookupSpeciesByCommonName,
+  suggestSpeciesTraits,
+} from '../species/speciesLookup'
 import { useTagScanRepository } from './TagScanRepositoryContext'
 
 function tagPhotoIdList(photoIds: TagScanPhotoIds): string[] {
@@ -32,6 +37,7 @@ export function TagScanReviewScreen() {
   const route = useRoute<RouteProp<MainStackParamList, 'TagScanReview'>>()
   const { scanId, photoIds, candidate } = route.params
   const repository = useTagScanRepository()
+  const speciesLookup = useSpeciesLookupRepository()
 
   const [commonName, setCommonName] = useState(candidate?.commonName ?? '')
   const [scientificName, setScientificName] = useState(candidate?.scientificName ?? '')
@@ -83,8 +89,7 @@ export function TagScanReviewScreen() {
     setFormError(null)
     setBusy(true)
     try {
-      const species = await repository.lookupUsdaByCommonName(commonName)
-      const resolution = resolveCommonName(commonName, species)
+      const resolution = await lookupSpeciesByCommonName(speciesLookup, commonName)
       if (resolution.status === 'ambiguous') {
         navigation.navigate('TagScanAmbiguousSpecies', {
           scanId,
@@ -120,14 +125,9 @@ export function TagScanReviewScreen() {
   async function createPlant(input: PlantInput, traits?: UsdaSpeciesSuggestedTraits) {
     setBusy(true)
     setFormError(null)
-    const finalInput: PlantInput = {
-      ...input,
-      ...(traits?.sunRequirement && { sunRequirement: traits.sunRequirement }),
-      ...(traits?.matureHeightInches && { matureHeightInches: traits.matureHeightInches }),
-    }
     let plant: Plant
     try {
-      plant = await repository.createPlant(finalInput)
+      plant = await repository.createPlant(applySuggestedTraits(input, traits))
     } catch {
       setFormError('Could not save this Plant. Please try again.')
       setBusy(false)
@@ -169,8 +169,7 @@ export function TagScanReviewScreen() {
 
     setBusy(true)
     try {
-      const { characteristics } = await repository.lookupUsdaByScientificName(input.scientificName)
-      const traits = projectUsdaSpeciesTraits(characteristics)
+      const traits = await suggestSpeciesTraits(speciesLookup, input.scientificName)
       if (Object.keys(traits).length === 0) {
         await createPlant(input)
         return
@@ -196,39 +195,13 @@ export function TagScanReviewScreen() {
           <Pressable accessibilityRole="button" disabled={busy} onPress={cancelScan}>
             <Text style={styles.cancelText}>Cancel</Text>
           </Pressable>
-          <Text style={styles.title}>Suggested traits</Text>
-          <Text>
-            USDA PLANTS suggests the following species-level traits. Bloom window is never
-            suggested — that's always your own observation.
-          </Text>
-          {traits.sunRequirement && <Text>Sun/shade: {traits.sunRequirement}</Text>}
-          {traits.matureHeightInches !== undefined && <Text>Mature height: {traits.matureHeightInches}"</Text>}
-          {traits.minimumHardinessZone !== undefined && (
-            <Text style={styles.note}>
-              For reference only, not saved automatically: USDA reports this species survives to
-              about zone {traits.minimumHardinessZone} (no upper-zone data available) — add a full
-              hardiness range yourself later if you'd like it recorded.
-            </Text>
-          )}
-
           {formError && <Text style={styles.error}>{formError}</Text>}
-
-          <Pressable
-            accessibilityRole="button"
-            disabled={busy}
-            style={styles.button}
-            onPress={() => createPlant(input, traits)}
-          >
-            <Text style={styles.buttonText}>Use these suggested traits</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            disabled={busy}
-            style={styles.buttonSecondary}
-            onPress={() => createPlant(input)}
-          >
-            <Text>Skip suggested traits</Text>
-          </Pressable>
+          <SuggestedTraitsConfirmation
+            traits={traits}
+            busy={busy}
+            onAccept={() => createPlant(input, traits)}
+            onSkip={() => createPlant(input)}
+          />
         </KeyboardAwareScrollView>
       </SafeAreaView>
     )
@@ -343,8 +316,5 @@ const styles = StyleSheet.create({
   buttonSecondaryDisabled: {
     borderColor: '#ccc',
     opacity: 0.5,
-  },
-  note: {
-    fontStyle: 'italic',
   },
 })

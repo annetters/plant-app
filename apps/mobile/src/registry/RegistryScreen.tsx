@@ -181,6 +181,18 @@ export function RegistryScreen() {
           </Pressable>
         </View>
 
+        {/* Outside the "has plants" branch on purpose: the empty state is
+            exactly when you most need this (#31 — before it, Tag Scan was
+            the only way to a new Plant on the phone, so a plant with no tag
+            couldn't be added at all). */}
+        <Pressable
+          accessibilityRole="button"
+          style={styles.addButton}
+          onPress={() => navigation.navigate('PlantDetail')}
+        >
+          <Text style={styles.addButtonText}>Add Plant</Text>
+        </Pressable>
+
         {error && <Text style={styles.error}>{error}</Text>}
         {plants === null && !error && <Text>Loading…</Text>}
         {plants && plants.length === 0 && <Text>No plants yet — add your first one.</Text>}
@@ -315,6 +327,15 @@ const styles = StyleSheet.create({
   },
   backLink: {
     color: '#2e7d32',
+  },
+  addButton: {
+    backgroundColor: '#2e7d32',
+    borderRadius: 4,
+    padding: 12,
+    alignItems: 'center',
+  },
+  addButtonText: {
+    color: '#fff',
   },
   error: {
     color: '#b00020',

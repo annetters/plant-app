@@ -106,6 +106,19 @@ export class PlantsRepository {
     return row ? plantFromRow(row) : null
   }
 
+  /** Mirrors apps/web's `PlantsRepository.create` — the manual (non-Tag-Scan) path to a new Plant, added for #31. */
+  async create(input: PlantInput): Promise<Plant> {
+    const userId = await requireUserId(this.client)
+    const row = unwrap<PlantRow>(
+      await this.client
+        .from(TABLE)
+        .insert({ ...plantInputToRow(input), user_id: userId })
+        .select()
+        .single(),
+    )
+    return plantFromRow(row)
+  }
+
   async update(id: string, input: PlantInput): Promise<Plant> {
     const row = unwrap<PlantRow>(
       await this.client.from(TABLE).update(plantInputToRow(input)).eq('id', id).select().single(),

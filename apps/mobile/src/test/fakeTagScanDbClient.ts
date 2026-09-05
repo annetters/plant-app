@@ -121,8 +121,6 @@ export function createFakeTagScanDbClient(
       .mockResolvedValue({ data: { path: 'fake/path.jpg' }, error: null }),
   }
 
-  const functionsInvoke = jest.fn().mockResolvedValue({ data: { species: [] }, error: null })
-
   const client: TagScanDbClient = {
     from(table: Table) {
       return {
@@ -134,9 +132,6 @@ export function createFakeTagScanDbClient(
     storage: {
       from: () => storage,
     },
-    functions: {
-      invoke: functionsInvoke,
-    },
     auth: {
       getUser: jest.fn().mockResolvedValue({ data: { user: { id: userId } }, error: null }),
     },
@@ -145,7 +140,6 @@ export function createFakeTagScanDbClient(
   return {
     client,
     storage,
-    functionsInvoke,
     userId,
     plantRows: () => tables.plants as unknown as (PlantRow & Record<string, unknown>)[],
     tagPhotoRows: () => tables.tag_photos,

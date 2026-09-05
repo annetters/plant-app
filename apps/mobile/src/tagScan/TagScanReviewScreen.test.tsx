@@ -1,7 +1,11 @@
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
+import type { PlantRow } from '@plant-app/domain'
+import type { ReactNode } from 'react'
 import { Text } from 'react-native'
+import { SpeciesLookupRepositoryProvider } from '../species/SpeciesLookupRepositoryContext'
+import { createFakeSpeciesLookupDbClient } from '../test/fakeSpeciesLookupDbClient'
 import { createFakeTagScanDbClient } from '../test/fakeTagScanDbClient'
 import { plantRow } from '../test/plantRowFixture'
 import { TagScanAmbiguousSpeciesScreen } from './TagScanAmbiguousSpeciesScreen'
@@ -12,12 +16,35 @@ const Stack = createNativeStackNavigator()
 
 const defaultPhotoIds = { frontTagPhotoId: 'tag-photo-1' }
 
+/**
+ * This screen reads its Plants through TagScanRepository and its USDA
+ * species lookup through SpeciesLookupRepository (#31 moved the lookup out
+ * so the manual Plant form could share it), so it needs both fakes.
+ * `functionsInvoke` drives the lookup.
+ */
+function createFakes(
+  initialPlantRows: PlantRow[] = [],
+  initialTagPhotoRows: Record<string, unknown>[] = [],
+) {
+  const tagScan = createFakeTagScanDbClient(initialPlantRows, initialTagPhotoRows)
+  const species = createFakeSpeciesLookupDbClient()
+  return { ...tagScan, speciesClient: species.client, functionsInvoke: species.functionsInvoke }
+}
+
+function Providers({ fake, children }: { fake: ReturnType<typeof createFakes>; children: ReactNode }) {
+  return (
+    <SpeciesLookupRepositoryProvider client={fake.speciesClient}>
+      <TagScanRepositoryProvider client={fake.client}>{children}</TagScanRepositoryProvider>
+    </SpeciesLookupRepositoryProvider>
+  )
+}
+
 async function renderReviewFlow(
-  fake = createFakeTagScanDbClient(),
+  fake = createFakes(),
   initialParams: Record<string, unknown> = { scanId: 'scan-1', photoIds: defaultPhotoIds },
 ) {
   await render(
-    <TagScanRepositoryProvider client={fake.client}>
+    <Providers fake={fake}>
       <NavigationContainer>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="TagScanReview" component={TagScanReviewScreen} initialParams={initialParams} />
@@ -30,7 +57,7 @@ async function renderReviewFlow(
           <Stack.Screen name="Dashboard">{() => <Text>dashboard screen</Text>}</Stack.Screen>
         </Stack.Navigator>
       </NavigationContainer>
-    </TagScanRepositoryProvider>,
+    </Providers>,
   )
   return fake
 }
@@ -54,7 +81,7 @@ describe('TagScanReviewScreen', () => {
   })
 
   it('pre-fills fields from an OCR candidate, still fully editable', async () => {
-    await renderReviewFlow(createFakeTagScanDbClient(), {
+    await renderReviewFlow(createFakes(), {
       scanId: 'scan-1',
       photoIds: defaultPhotoIds,
       candidate: { commonName: 'Bee balm', scientificName: 'Monarda didyma', cultivar: 'Gateway' },
@@ -97,7 +124,7 @@ describe('TagScanReviewScreen', () => {
     // fields must re-sync from updated route.params rather than only from the
     // initial mount value. Uses the real TagScanAmbiguousSpeciesScreen (not a
     // stub) so the round trip is exercised for real.
-    const fake = createFakeTagScanDbClient()
+    const fake = createFakes()
     fake.functionsInvoke.mockResolvedValueOnce({
       data: {
         species: [
@@ -108,7 +135,7 @@ describe('TagScanReviewScreen', () => {
       error: null,
     })
     await render(
-      <TagScanRepositoryProvider client={fake.client}>
+      <Providers fake={fake}>
         <NavigationContainer>
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen
@@ -119,7 +146,7 @@ describe('TagScanReviewScreen', () => {
             <Stack.Screen name="TagScanAmbiguousSpecies" component={TagScanAmbiguousSpeciesScreen} />
           </Stack.Navigator>
         </NavigationContainer>
-      </TagScanRepositoryProvider>,
+      </Providers>,
     )
     await waitFor(() => expect(screen.getByLabelText('Common name')).toBeTruthy())
     await fireEvent.changeText(screen.getByLabelText('Common name'), 'bee balm')
@@ -135,7 +162,7 @@ describe('TagScanReviewScreen', () => {
 
   it('offers a new Planting against an existing matching Plant instead of creating a duplicate', async () => {
     const fake = await renderReviewFlow(
-      createFakeTagScanDbClient([
+      createFakes([
         plantRow({ id: 'plant-1', common_name: 'Bee balm', scientific_name: 'Monarda didyma' }),
       ]),
     )
@@ -154,7 +181,7 @@ describe('TagScanReviewScreen', () => {
   })
 
   it('disables Continue until the existing-Plants check has finished loading, closing the duplicate-detection race', async () => {
-    const fake = createFakeTagScanDbClient([
+    const fake = createFakes([
       plantRow({ id: 'plant-1', common_name: 'Bee balm', scientific_name: 'Monarda didyma' }),
     ])
     let resolveListPlants!: (value: { data: unknown; error: null }) => void
@@ -178,7 +205,7 @@ describe('TagScanReviewScreen', () => {
   })
 
   it('blocks a garbled/bad OCR candidate from being applied without confirmation', async () => {
-    await renderReviewFlow(createFakeTagScanDbClient(), {
+    await renderReviewFlow(createFakes(), {
       scanId: 'scan-1',
       photoIds: defaultPhotoIds,
       candidate: { commonName: '###garbled###', scientificName: '' },
@@ -194,7 +221,7 @@ describe('TagScanReviewScreen', () => {
 
   it('creates the Plant and links both tag photos when there is no duplicate and no USDA match', async () => {
     const fake = await renderReviewFlow(
-      createFakeTagScanDbClient([], [tagPhotoRow('tag-photo-1'), tagPhotoRow('tag-photo-2')]),
+      createFakes([], [tagPhotoRow('tag-photo-1'), tagPhotoRow('tag-photo-2')]),
       { scanId: 'scan-1', photoIds: { frontTagPhotoId: 'tag-photo-1', backTagPhotoId: 'tag-photo-2' } },
     )
     fake.functionsInvoke.mockResolvedValueOnce({ data: { species: [] }, error: null })
@@ -218,7 +245,7 @@ describe('TagScanReviewScreen', () => {
 
   it('still lands on Dashboard with the Plant saved even if linking the tag photo fails afterward', async () => {
     const fake = await renderReviewFlow(
-      createFakeTagScanDbClient([], [tagPhotoRow('tag-photo-1')]),
+      createFakes([], [tagPhotoRow('tag-photo-1')]),
       { scanId: 'scan-1', photoIds: defaultPhotoIds },
     )
     fake.functionsInvoke.mockResolvedValueOnce({ data: { species: [] }, error: null })
@@ -246,7 +273,7 @@ describe('TagScanReviewScreen', () => {
 
   it('shows suggested USDA traits before creating; hardiness zone is shown as reference-only and never silently applied', async () => {
     const fake = await renderReviewFlow(
-      createFakeTagScanDbClient([], [tagPhotoRow('tag-photo-1')]),
+      createFakes([], [tagPhotoRow('tag-photo-1')]),
       { scanId: 'scan-1', photoIds: defaultPhotoIds },
     )
     fake.functionsInvoke.mockResolvedValueOnce({
@@ -268,7 +295,9 @@ describe('TagScanReviewScreen', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))
 
     expect(await screen.findByText('Suggested traits')).toBeTruthy()
-    expect(screen.getByText('Sun/shade: full-shade')).toBeTruthy()
+    // Displayed via formatOption, the same treatment the Registry gives this
+    // enum — the stored value is still the raw 'full-shade' (asserted below).
+    expect(screen.getByText('Sun/shade: full shade')).toBeTruthy()
     expect(screen.getByText(/For reference only, not saved automatically/)).toBeTruthy()
 
     await fireEvent.press(screen.getByRole('button', { name: 'Use these suggested traits' }))

@@ -2,9 +2,11 @@ import { NavigationContainer, useNavigation } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
 import * as ImagePicker from 'expo-image-picker'
-import { Alert, Pressable, Text } from 'react-native'
+import { Alert, Pressable, Text, View } from 'react-native'
 import { PlantsRepositoryProvider } from '../plants/PlantsRepositoryContext'
+import { SpeciesLookupRepositoryProvider } from '../species/SpeciesLookupRepositoryContext'
 import { createFakePlantsDbClient } from '../test/fakePlantsDbClient'
+import { createFakeSpeciesLookupDbClient } from '../test/fakeSpeciesLookupDbClient'
 import { plantRow } from '../test/plantRowFixture'
 import { PlantDetailScreen } from './PlantDetailScreen'
 
@@ -44,34 +46,56 @@ const Stack = createNativeStackNavigator()
 function RegistryStub() {
   const navigation = useNavigation<any>()
   return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={() => navigation.navigate('PlantDetail', { plantId: 'plant-1' })}
-    >
-      <Text>registry screen</Text>
-    </Pressable>
+    <View>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => navigation.navigate('PlantDetail', { plantId: 'plant-1' })}
+      >
+        <Text>registry screen</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" onPress={() => navigation.navigate('PlantDetail')}>
+        <Text>add plant</Text>
+      </Pressable>
+    </View>
   )
 }
 
-async function renderScreen(fake = createFakePlantsDbClient([plantRow({ id: 'plant-1' })])) {
+function createFakes(plantRows = [plantRow({ id: 'plant-1' })]) {
+  const plants = createFakePlantsDbClient(plantRows)
+  const species = createFakeSpeciesLookupDbClient()
+  return { ...plants, speciesClient: species.client, functionsInvoke: species.functionsInvoke }
+}
+
+async function renderFlow(fake: ReturnType<typeof createFakes>, entryPoint: string) {
   await render(
-    <PlantsRepositoryProvider client={fake.client}>
-      <NavigationContainer>
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="Registry" component={RegistryStub} />
-          <Stack.Screen name="PlantDetail" component={PlantDetailScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </PlantsRepositoryProvider>,
+    <SpeciesLookupRepositoryProvider client={fake.speciesClient}>
+      <PlantsRepositoryProvider client={fake.client}>
+        <NavigationContainer>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="Registry" component={RegistryStub} />
+            <Stack.Screen name="PlantDetail" component={PlantDetailScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </PlantsRepositoryProvider>
+    </SpeciesLookupRepositoryProvider>,
   )
-  await fireEvent.press(screen.getByText('registry screen'))
+  await fireEvent.press(screen.getByText(entryPoint))
   return fake
+}
+
+async function renderScreen(fake = createFakes()) {
+  return renderFlow(fake, 'registry screen')
+}
+
+/** Arrives at the same screen with no `plantId` — the manual creation path (#31). */
+async function renderCreateScreen(fake = createFakes([])) {
+  return renderFlow(fake, 'add plant')
 }
 
 describe('PlantDetailScreen', () => {
   it("loads and shows the Plant's fields", async () => {
     await renderScreen(
-      createFakePlantsDbClient([
+      createFakes([
         plantRow({ id: 'plant-1', common_name: 'Coneflower', scientific_name: 'Echinacea purpurea' }),
       ]),
     )
@@ -81,7 +105,7 @@ describe('PlantDetailScreen', () => {
   })
 
   it('shows an error when the Plant does not exist', async () => {
-    await renderScreen(createFakePlantsDbClient([]))
+    await renderScreen(createFakes([]))
 
     expect(await screen.findByText('Plant not found.')).toBeTruthy()
   })
@@ -158,7 +182,7 @@ describe('PlantDetailScreen', () => {
 
   it('removes a reference photo', async () => {
     const fake = await renderScreen(
-      createFakePlantsDbClient([
+      createFakes([
         plantRow({ id: 'plant-1', reference_photo_paths: ['user-1/plant-1/a.jpg'] }),
       ]),
     )
@@ -182,5 +206,177 @@ describe('PlantDetailScreen', () => {
 
     await waitFor(() => expect(screen.getByText('registry screen')).toBeTruthy())
     expect(fake.rows()).toHaveLength(0)
+  })
+})
+
+describe('PlantDetailScreen in create mode (#31)', () => {
+  it('starts from an empty form, with no Delete or photo actions to reach yet', async () => {
+    await renderCreateScreen()
+
+    expect(await screen.findByRole('header', { name: 'Add Plant' })).toBeTruthy()
+    expect(screen.getByLabelText('Common name').props.value).toBe('')
+    expect(screen.queryByText('Delete Plant')).toBeNull()
+    expect(screen.queryByText('Reference photos')).toBeNull()
+    expect(screen.queryByText('Take photo')).toBeNull()
+  })
+
+  it('creates the Plant on save and stays on it, now with Delete and photo actions', async () => {
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'Bee balm')
+    await fireEvent.changeText(screen.getByLabelText('Scientific name'), 'Monarda didyma')
+    await fireEvent.press(screen.getByRole('button', { name: 'Add Plant' }))
+
+    await waitFor(() => expect(screen.getByText('Saved.')).toBeTruthy())
+    expect(fake.rows()).toEqual([
+      expect.objectContaining({ common_name: 'Bee balm', scientific_name: 'Monarda didyma' }),
+    ])
+    // Same route, same screen — it is simply an existing Plant now.
+    expect(screen.getByText('Delete Plant')).toBeTruthy()
+    expect(screen.getByText('Reference photos')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Save changes' })).toBeTruthy()
+  })
+
+  it('rejects invalid input through the same inline validation editing uses', async () => {
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'Bee balm')
+    await fireEvent.press(screen.getByRole('button', { name: 'Add Plant' }))
+
+    expect(await screen.findByText('Fix the highlighted fields above.')).toBeTruthy()
+    expect(fake.rows()).toHaveLength(0)
+  })
+
+  it('fills the scientific name from the same USDA lookup Tag Scan offers', async () => {
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+    fake.functionsInvoke.mockResolvedValueOnce({
+      data: { species: [{ scientificName: 'Monarda didyma', commonName: 'bee balm' }] },
+      error: null,
+    })
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'bee balm')
+    await fireEvent.press(screen.getByRole('button', { name: 'Look up species' }))
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Scientific name').props.value).toBe('Monarda didyma'),
+    )
+  })
+
+  it('never guesses an ambiguous common name — it lists the candidates to pick from', async () => {
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+    fake.functionsInvoke.mockResolvedValueOnce({
+      data: {
+        species: [
+          { scientificName: 'Liatris spicata', commonName: 'liatris' },
+          { scientificName: 'Liatris aspera', commonName: 'liatris' },
+        ],
+      },
+      error: null,
+    })
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'liatris')
+    await fireEvent.press(screen.getByRole('button', { name: 'Look up species' }))
+
+    await screen.findByLabelText('Species candidates')
+    expect(screen.getByLabelText('Scientific name').props.value).toBe('')
+
+    await fireEvent.press(screen.getByText('Liatris aspera'))
+
+    expect(screen.getByLabelText('Scientific name').props.value).toBe('Liatris aspera')
+    expect(screen.queryByLabelText('Species candidates')).toBeNull()
+  })
+
+  it('offers USDA trait suggestions before creating, and applies them only when accepted', async () => {
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+    fake.functionsInvoke.mockResolvedValueOnce({
+      data: {
+        species: [],
+        characteristics: [
+          { name: 'Shade Tolerance', value: 'None' },
+          { name: 'Height, Mature (feet)', value: '4.0' },
+        ],
+      },
+      error: null,
+    })
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'Bee balm')
+    await fireEvent.changeText(screen.getByLabelText('Scientific name'), 'Monarda didyma')
+    await fireEvent.press(screen.getByRole('button', { name: 'Add Plant' }))
+
+    await screen.findByText('Suggested traits')
+    expect(fake.rows()).toHaveLength(0) // nothing written until the user decides
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Use these suggested traits' }))
+
+    await waitFor(() => expect(fake.rows()).toHaveLength(1))
+    expect(fake.rows()[0]).toEqual(
+      expect.objectContaining({ sun_requirement: 'full-sun', mature_height_inches: 48 }),
+    )
+  })
+
+  it('never offers to overwrite a trait the user filled in themselves', async () => {
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+    fake.functionsInvoke.mockResolvedValueOnce({
+      data: {
+        species: [],
+        characteristics: [
+          { name: 'Shade Tolerance', value: 'None' }, // → full-sun
+          { name: 'Height, Mature (feet)', value: '4.0' }, // → 48"
+        ],
+      },
+      error: null,
+    })
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'Bee balm')
+    await fireEvent.changeText(screen.getByLabelText('Scientific name'), 'Monarda didyma')
+    await fireEvent.press(screen.getByRole('button', { name: 'full shade' }))
+    await fireEvent.changeText(screen.getByLabelText('Mature height'), '36')
+    await fireEvent.press(screen.getByRole('button', { name: 'Add Plant' }))
+
+    // Both suggestions are already answered, so there is nothing to confirm —
+    // it saves straight through, keeping what the user chose.
+    await waitFor(() => expect(fake.rows()).toHaveLength(1))
+    expect(screen.queryByText('Suggested traits')).toBeNull()
+    expect(fake.rows()[0]).toEqual(
+      expect.objectContaining({ sun_requirement: 'full-shade', mature_height_inches: 36 }),
+    )
+  })
+
+  it('creates the Plant as typed when the trait suggestion is skipped', async () => {
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+    fake.functionsInvoke.mockResolvedValueOnce({
+      data: { species: [], characteristics: [{ name: 'Shade Tolerance', value: 'None' }] },
+      error: null,
+    })
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'Bee balm')
+    await fireEvent.changeText(screen.getByLabelText('Scientific name'), 'Monarda didyma')
+    await fireEvent.press(screen.getByRole('button', { name: 'Add Plant' }))
+    await screen.findByText('Suggested traits')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Skip suggested traits' }))
+
+    await waitFor(() => expect(fake.rows()).toHaveLength(1))
+    expect(fake.rows()[0].sun_requirement).toBeNull()
+  })
+
+  it('still creates the Plant when the USDA lookup fails — a lookup forfeits the suggestion, not the save', async () => {
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+    fake.functionsInvoke.mockRejectedValueOnce(new Error('network down'))
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'Bee balm')
+    await fireEvent.changeText(screen.getByLabelText('Scientific name'), 'Monarda didyma')
+    await fireEvent.press(screen.getByRole('button', { name: 'Add Plant' }))
+
+    await waitFor(() => expect(screen.getByText('Saved.')).toBeTruthy())
+    expect(fake.rows()).toHaveLength(1)
   })
 })

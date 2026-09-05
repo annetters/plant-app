@@ -35,6 +35,23 @@ describe('PlantsRepository', () => {
     expect(await repository.list()).toEqual([])
   })
 
+  it('creates a Plant against the signed-in user', async () => {
+    const { client, rows, userId } = createFakePlantsDbClient([])
+    const repository = new PlantsRepository(client)
+
+    const created = await repository.create({
+      commonName: 'Bee balm',
+      scientificName: 'Monarda didyma',
+      referencePhotoPaths: [],
+    })
+
+    expect(created.id).toBeTruthy()
+    expect(created.commonName).toBe('Bee balm')
+    expect(rows()).toEqual([
+      expect.objectContaining({ common_name: 'Bee balm', scientific_name: 'Monarda didyma', user_id: userId }),
+    ])
+  })
+
   it('gets a single Plant by id, mapped from the row', async () => {
     const { client } = createFakePlantsDbClient([plantRow({ id: 'p1', common_name: 'Coneflower' })])
     const repository = new PlantsRepository(client)
