@@ -1,7 +1,121 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-04 (updated: **#15 is built, device-QA'd, closed by the user, and pushed — every ticket #2–#20 under the spec now has code, and no build work remains on the frontier**; see "#15: native Scale Reference calibration" immediately below. Previously 2026-09-03: Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
+**Date:** 2026-09-04 (updated: **#31 is built and its QA is part-run — three findings, all fixed; #31 remains OPEN and its QA pass is not finished**; see "#31: manual Plant creation on native mobile" immediately below. Also filed **#36** against the USDA data source. Previously the same day: **#15 is built, device-QA'd, closed by the user, and pushed — every ticket #2–#20 under the spec now has code, and no build work remains on the frontier**; see "#15: native Scale Reference calibration" below. Previously 2026-09-03: Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
 **Repo:** `annetters/plant-app` · branch `main`
+
+---
+
+## #31: manual Plant creation on native mobile — built, QA part-run, STILL OPEN
+
+**Build commit `9b74fb3`; QA fixes in `7487048`.** A Plant can now
+be created on the phone without a tag to scan. Before this, Tag Scan was the
+only path to a new Plant on mobile and it demands a front tag photo before
+the flow will start — so a division from a friend, a seed-grown plant, an
+inherited shrub or anything whose tag is long gone **could not be added from
+the phone at all**. ADR-0003 names freehand drawing as its one exception to
+native parity; creating a Plant record is not drawing.
+
+**#31 is still open, and its QA pass is NOT complete** — see "What QA covered,
+and what it didn't" below. Nothing here is a request to close it.
+
+### What's there
+
+`PlantDetailScreen` now serves create as well as view/edit, the same way web
+mounts one `PlantFormPage` at both `/registry/new` and `/registry/:plantId`.
+Arriving with no `plantId` (`MainStackParamList.PlantDetail` is now
+`{ plantId: string } | undefined`) starts from an empty form and creates on
+save; that first save flips the screen to an ordinary detail view **in place,
+on the same route**, at which point Delete and Reference photos appear — both
+need a Plant row to act on. One rendering of the form, not a second copy: the
+`plantLabel` web/mobile divergence #18's QA turned up is exactly the drift
+this avoids.
+
+Also new: `PlantsRepository.create` on mobile (mirrors web's), and an
+"Add Plant" button on the Registry placed **outside** the has-plants branch,
+so the empty state — the case that most needs it — can reach it.
+
+### The species lookup moved out of Tag Scan
+
+`lookupUsdaByCommonName`/`lookupUsdaByScientificName` were on
+`TagScanRepository`. They are now `SpeciesLookupRepository`
+(`apps/mobile/src/species/`), with `speciesLookup.ts` pairing each call to the
+domain function that reads its result, and `SuggestedTraitsConfirmation`
+holding the "USDA suggests these traits" step both creation paths show. The
+value of a lookup is in the traits it returns, not in having photographed a
+tag, so both paths share one mechanism rather than two copies.
+
+**This changed Tag Scan's review screen**, which was nominally out of #31's
+scope. Two deliberate changes, both flagged to the user at the time:
+
+- Its suggested-traits panel now renders the sun/shade enum through
+  `formatOption` ("full shade", not "full-shade") — the Registry's treatment.
+  Cosmetic; the stored value is unchanged.
+- It picked up the same 3-character minimum on the lookup (below).
+
+### What `/code-review` caught, fixed before the build commit
+
+- **Accepting suggested traits silently overwrote what the user had typed.**
+  The merge was copied from Tag Scan, where it is safe because that review
+  screen collects names only — but the full Plant form has its own Sun/shade
+  and Mature height inputs. `traitsNotAlreadySetBy` now strips any suggestion
+  the user has already answered, and if nothing applicable is left the save
+  runs straight through instead of showing a panel that would change nothing.
+- **The suggested-traits panel was a verbatim second copy** across the two
+  screens. Extracted, along with `applySuggestedTraits`.
+
+### What QA covered, and what it didn't
+
+Run by the user on a device. **Three findings, all fixed and verified; each
+regression test was confirmed to fail with its fix reverted.**
+
+1. **Stale species candidates survived an edit to the name they answered.**
+   Looking up "rose", then typing "asdf" without saving, left the old
+   candidates on screen — and the prompt interpolated the *live* field, so it
+   read `"asdf" matches more than one species`. Results for one name were
+   presented as matches for another. Candidates now clear when the common name
+   changes, and carry the term they were looked up for so the copy cannot
+   misattribute them.
+2. **No minimum length on the lookup.** "g" returned "candidates", because
+   `resolveCommonName` matches by substring — deliberately, since USDA's own
+   common names are compounds ("common sunflower") — so one letter hits a large
+   slice of the dataset and the result reads as ambiguity when it is noise.
+   Minimum is now 3 trimmed characters (`canLookUpCommonName`), applied to
+   **both** screens so they cannot disagree about what counts as a lookup.
+3. **A no-match looked like nothing happened.** "dahlia" flickered the button
+   and reverted. The message *was* being set — it rendered ~200 lines further
+   down beside Save, off-screen on a phone. The lookup now reports beside its
+   own button, and a failed lookup is worded distinctly from a genuine
+   no-match (previously near-identical, which was actively misleading).
+
+**Not yet run, and not to be assumed passing:** the Registry entry point from
+an empty registry, the create form's blank state and validation, the
+suggested-traits accept/skip panel, the overwrite-protection case, the
+post-save transition to edit mode, photos on a newly created Plant, and the
+regression check that editing an existing Plant is unchanged. Also unrun: the
+Tag Scan `formatOption` change, which needs the custom dev client to reach.
+
+### Filed during the pass
+
+- **#36** — the USDA lookup misses most garden plants. "dahlia" returns
+  nothing, and so does *Dahlia pinnata*, a plain species binomial. The cause
+  is not cultivar coverage: `usda-plant-traits` queries USDA's
+  `characteristicSearchResults` endpoint, which is the **characteristics**
+  subset — pulled live on 2026-09-04 it holds **2,186 entries and no Dahlia
+  record at all**. ADR-0004 already flagged this under a heading that says
+  species-level coverage has real gaps too, not just cultivar-level (2 of 7
+  species from real nursery tags resolved). CONTEXT.md's revisit condition has
+  therefore fired, but in a different shape than it was written in. Labelled
+  `needs-triage`, not `ready-for-agent` — it is a data-source decision.
+
+### Deliberately not built
+
+**No duplicate-Plant check.** Tag Scan runs `checkForDuplicatePlant` before
+creating, per CONTEXT.md's "one source of truth per plant type/cultivar" rule.
+Manual creation does not: #31's acceptance criteria don't ask for it, and
+`TagScanDuplicateOffer` requires a `scanId`/`photoIds` a manual create has no
+way to supply. **Manual creation can therefore produce a duplicate Plant that
+a scan would have caught.** Both review axes raised this independently; it
+needs its own ticket if it matters.
 
 ---
 
