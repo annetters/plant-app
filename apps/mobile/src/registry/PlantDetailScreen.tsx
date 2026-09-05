@@ -27,7 +27,9 @@ import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
 import { useSpeciesLookupRepository } from '../species/SpeciesLookupRepositoryContext'
 import { SuggestedTraitsConfirmation } from '../species/SuggestedTraitsConfirmation'
 import {
+  MINIMUM_COMMON_NAME_LOOKUP_LENGTH,
   applySuggestedTraits,
+  canLookUpCommonName,
   hasApplicableTraits,
   lookupSpeciesByCommonName,
   suggestSpeciesTraits,
@@ -73,7 +75,19 @@ export function PlantDetailScreen() {
   const [submitting, setSubmitting] = useState(false)
   const [photoBusy, setPhotoBusy] = useState<'camera' | 'library' | 'remove' | null>(null)
   const [lookingUpSpecies, setLookingUpSpecies] = useState(false)
-  const [speciesCandidates, setSpeciesCandidates] = useState<SpeciesNameSummary[] | null>(null)
+  // Carries the name they were looked up for, not just the list: the copy
+  // names that term, and it must never be the live field's current text.
+  const [speciesCandidates, setSpeciesCandidates] = useState<{
+    commonName: string
+    candidates: SpeciesNameSummary[]
+  } | null>(null)
+  // The lookup reports next to its own button. The page-level formError sits
+  // ~200 lines further down beside Save, off-screen on a phone — feedback for
+  // a control up here has to render up here.
+  const [speciesLookupMessage, setSpeciesLookupMessage] = useState<{
+    tone: 'info' | 'error'
+    text: string
+  } | null>(null)
   const [pendingCreation, setPendingCreation] = useState<{
     input: PlantInput
     traits: UsdaSpeciesSuggestedTraits
@@ -128,6 +142,13 @@ export function PlantDetailScreen() {
   function updateField<K extends keyof PlantFormFields>(key: K, value: PlantFormFields[K]) {
     setFields((current) => ({ ...current, [key]: value }))
     setStatusMessage(null)
+    // Candidates answer one specific common name. Editing that name strands
+    // them — leaving them on screen would present results for the old term as
+    // though they were matches for the new one.
+    if (key === 'commonName') {
+      setSpeciesCandidates(null)
+      setSpeciesLookupMessage(null)
+    }
   }
 
   function validatedInputFor(nextPaths: string[]): PlantInput | null {
@@ -222,27 +243,44 @@ export function PlantDetailScreen() {
 
   /** The same species lookup Tag Scan's review screen offers — see `speciesLookup.ts`; the two share one mechanism rather than two copies. */
   async function handleLookupSpecies() {
-    if (!fields.commonName.trim()) return
+    const searched = fields.commonName.trim()
+    if (!canLookUpCommonName(searched)) return
     setFormError(null)
     setSpeciesCandidates(null)
+    setSpeciesLookupMessage(null)
     setLookingUpSpecies(true)
     try {
-      const resolution = await lookupSpeciesByCommonName(speciesLookup, fields.commonName)
+      const resolution = await lookupSpeciesByCommonName(speciesLookup, searched)
       if (resolution.status === 'ambiguous') {
         // A common name can span several species (CONTEXT.md's Liatris
         // example) — never guess. Tag Scan pushes its own screen for this;
         // here the candidates list inline, since there's no scan to return to.
-        setSpeciesCandidates(resolution.candidates)
+        setSpeciesCandidates({ commonName: searched, candidates: resolution.candidates })
       } else if (resolution.status === 'resolved') {
         updateField('scientificName', resolution.species.scientificName)
-        setStatusMessage(`Scientific name set from USDA PLANTS: ${resolution.species.scientificName}`)
+        setSpeciesLookupMessage({
+          tone: 'info',
+          text: `Scientific name set from USDA PLANTS: ${resolution.species.scientificName}`,
+        })
       } else {
-        setFormError(
-          'No USDA match for that common name — enter the scientific name yourself.',
-        )
+        // Not a user error, and worth saying so plainly. What this searches is
+        // USDA's *characteristics* dataset — ~2,200 species with trait records,
+        // an NRCS conservation-plant population, not the full PLANTS flora and
+        // not a horticultural database. ADR-0004 measured the gap at 5 of 7
+        // species from real nursery tags missing, and is explicit that it is
+        // species-level, not merely cultivar-level: a plant with a perfectly
+        // ordinary binomial (Dahlia pinnata) is simply not in it. Say that,
+        // rather than anything implying the typed name was wrong.
+        setSpeciesLookupMessage({
+          tone: 'info',
+          text: `No USDA match for "${searched}". This lookup searches USDA's conservation-plant trait dataset, not the full flora — many garden plants aren't in it, including ones with ordinary species names. Type the scientific name yourself.`,
+        })
       }
     } catch {
-      setFormError('Could not look up that name. Enter the scientific name yourself.')
+      setSpeciesLookupMessage({
+        tone: 'error',
+        text: 'Could not reach the species lookup. Type the scientific name yourself, or try again.',
+      })
     } finally {
       setLookingUpSpecies(false)
     }
@@ -251,7 +289,10 @@ export function PlantDetailScreen() {
   function handleSelectSpecies(species: SpeciesNameSummary) {
     updateField('scientificName', species.scientificName)
     setSpeciesCandidates(null)
-    setStatusMessage(`Scientific name set from USDA PLANTS: ${species.scientificName}`)
+    setSpeciesLookupMessage({
+      tone: 'info',
+      text: `Scientific name set from USDA PLANTS: ${species.scientificName}`,
+    })
   }
 
   async function handleAddPhoto(source: PhotoSource) {
@@ -398,20 +439,35 @@ export function PlantDetailScreen() {
               accessibilityRole="button"
               style={[
                 styles.buttonSecondary,
-                (lookingUpSpecies || !fields.commonName.trim()) && styles.buttonSecondaryDisabled,
+                (lookingUpSpecies || !canLookUpCommonName(fields.commonName)) &&
+                  styles.buttonSecondaryDisabled,
               ]}
-              disabled={lookingUpSpecies || !fields.commonName.trim()}
+              disabled={lookingUpSpecies || !canLookUpCommonName(fields.commonName)}
               onPress={handleLookupSpecies}
             >
               <Text>{lookingUpSpecies ? 'Looking up…' : 'Look up species'}</Text>
             </Pressable>
+            {/* Only once they've started typing — an untouched form shouldn't nag. */}
+            {fields.commonName.trim().length > 0 && !canLookUpCommonName(fields.commonName) && (
+              <Text style={styles.hint}>
+                Type at least {MINIMUM_COMMON_NAME_LOOKUP_LENGTH} characters to look up a species.
+              </Text>
+            )}
+            {speciesLookupMessage && (
+              <Text
+                accessibilityLabel="Species lookup result"
+                style={speciesLookupMessage.tone === 'error' ? styles.error : styles.hint}
+              >
+                {speciesLookupMessage.text}
+              </Text>
+            )}
             {speciesCandidates && (
               <View accessibilityLabel="Species candidates" style={styles.candidateList}>
                 <Text>
-                  "{fields.commonName}" matches more than one species. Pick the one you mean — if
-                  none are right, type the scientific name yourself.
+                  "{speciesCandidates.commonName}" matches more than one species. Pick the one you
+                  mean — if none are right, type the scientific name yourself.
                 </Text>
-                {speciesCandidates.map((species) => (
+                {speciesCandidates.candidates.map((species) => (
                   <Pressable
                     key={species.scientificName}
                     accessibilityRole="button"
@@ -746,6 +802,9 @@ const styles = StyleSheet.create({
   },
   buttonSecondaryDisabled: {
     opacity: 0.5,
+  },
+  hint: {
+    color: '#555',
   },
   candidateList: {
     gap: 8,

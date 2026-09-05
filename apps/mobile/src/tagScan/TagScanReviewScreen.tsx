@@ -16,7 +16,9 @@ import type { MainStackParamList, TagScanPhotoIds } from '../navigation/types'
 import { useSpeciesLookupRepository } from '../species/SpeciesLookupRepositoryContext'
 import { SuggestedTraitsConfirmation } from '../species/SuggestedTraitsConfirmation'
 import {
+  MINIMUM_COMMON_NAME_LOOKUP_LENGTH,
   applySuggestedTraits,
+  canLookUpCommonName,
   lookupSpeciesByCommonName,
   suggestSpeciesTraits,
 } from '../species/speciesLookup'
@@ -85,7 +87,7 @@ export function TagScanReviewScreen() {
   }, [repository])
 
   async function handleLookupSpecies() {
-    if (!commonName.trim()) return
+    if (!canLookUpCommonName(commonName)) return
     setFormError(null)
     setBusy(true)
     try {
@@ -227,12 +229,20 @@ export function TagScanReviewScreen() {
 
         <Pressable
           accessibilityRole="button"
-          disabled={busy || !commonName.trim()}
-          style={[styles.buttonSecondary, (busy || !commonName.trim()) && styles.buttonSecondaryDisabled]}
+          disabled={busy || !canLookUpCommonName(commonName)}
+          style={[
+            styles.buttonSecondary,
+            (busy || !canLookUpCommonName(commonName)) && styles.buttonSecondaryDisabled,
+          ]}
           onPress={handleLookupSpecies}
         >
           <Text>Look up species</Text>
         </Pressable>
+        {commonName.trim().length > 0 && !canLookUpCommonName(commonName) && (
+          <Text style={styles.hint}>
+            Type at least {MINIMUM_COMMON_NAME_LOOKUP_LENGTH} characters to look up a species.
+          </Text>
+        )}
 
         <Text>Scientific name</Text>
         <TextInput
@@ -312,6 +322,9 @@ const styles = StyleSheet.create({
   cancelText: {
     color: '#2e7d32',
     marginBottom: 8,
+  },
+  hint: {
+    color: '#555',
   },
   buttonSecondaryDisabled: {
     borderColor: '#ccc',

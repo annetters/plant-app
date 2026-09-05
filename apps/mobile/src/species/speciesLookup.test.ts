@@ -1,7 +1,9 @@
 import type { PlantInput } from '@plant-app/domain'
 import type { SpeciesLookupSource } from './speciesLookup'
 import {
+  MINIMUM_COMMON_NAME_LOOKUP_LENGTH,
   applySuggestedTraits,
+  canLookUpCommonName,
   hasApplicableTraits,
   lookupSpeciesByCommonName,
   suggestSpeciesTraits,
@@ -139,5 +141,23 @@ describe('applySuggestedTraits', () => {
 
   it('leaves the input untouched when there is nothing to apply', () => {
     expect(applySuggestedTraits(plantInput())).toEqual(plantInput())
+  })
+})
+
+describe('canLookUpCommonName', () => {
+  it('rejects a fragment too short to mean anything under substring matching', () => {
+    expect(canLookUpCommonName('g')).toBe(false)
+    expect(canLookUpCommonName('ro')).toBe(false)
+    expect(canLookUpCommonName('')).toBe(false)
+  })
+
+  it('ignores surrounding whitespace rather than counting it toward the minimum', () => {
+    expect(canLookUpCommonName('  g  ')).toBe(false)
+    expect(canLookUpCommonName('  rose  ')).toBe(true)
+  })
+
+  it('accepts a name at the minimum length', () => {
+    expect(canLookUpCommonName('a'.repeat(MINIMUM_COMMON_NAME_LOOKUP_LENGTH))).toBe(true)
+    expect(canLookUpCommonName('rose')).toBe(true)
   })
 })

@@ -27,6 +27,21 @@ export interface SpeciesLookupSource {
  * that pairing — and so a change to it lands in both at once.
  */
 
+/**
+ * `resolveCommonName` matches by substring on purpose — USDA's own common
+ * names are adjective-qualified compounds ("common sunflower"), so an exact
+ * match would discard nearly every real hit. The cost is that one or two
+ * characters match a large slice of the database, and what comes back reads
+ * as an ambiguity between species when it's really just noise. Below this
+ * length, don't ask at all.
+ */
+export const MINIMUM_COMMON_NAME_LOOKUP_LENGTH = 3
+
+/** Whether a common name is worth sending to the lookup — see `MINIMUM_COMMON_NAME_LOOKUP_LENGTH`. */
+export function canLookUpCommonName(commonName: string): boolean {
+  return commonName.trim().length >= MINIMUM_COMMON_NAME_LOOKUP_LENGTH
+}
+
 /** Never guesses: a common name spanning several species comes back `ambiguous` with every candidate, per CONTEXT.md's Tag Scan rule. */
 export async function lookupSpeciesByCommonName(
   source: SpeciesLookupSource,

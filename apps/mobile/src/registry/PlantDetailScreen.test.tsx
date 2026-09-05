@@ -290,6 +290,138 @@ describe('PlantDetailScreen in create mode (#31)', () => {
     expect(screen.queryByLabelText('Species candidates')).toBeNull()
   })
 
+  it('reports a no-match beside the lookup button, explaining USDA coverage rather than blaming the input', async () => {
+    // Found in QA: "dahlia" looked like nothing happened — the button flickered
+    // and reverted. The "no match" message was being set, but it rendered ~200
+    // lines down beside Save, off-screen. Feedback for this button has to
+    // appear beside this button.
+    //
+    // Dahlia pinnata is a straightforward species binomial, not a cultivar; it
+    // is absent because this searches USDA's ~2,200-species characteristics
+    // dataset (verified: no Dahlia entry at all). Per ADR-0004 the gap is
+    // species-level, so the copy must not pin it on cultivars.
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+    fake.functionsInvoke.mockResolvedValueOnce({ data: { species: [] }, error: null })
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'dahlia')
+    await fireEvent.press(screen.getByRole('button', { name: 'Look up species' }))
+
+    const message = await screen.findByLabelText('Species lookup result')
+    expect(message).toHaveTextContent(/No USDA match for "dahlia"/)
+    expect(message).toHaveTextContent(/conservation-plant trait dataset, not the full flora/)
+    expect(message).toHaveTextContent(/ordinary species names/)
+  })
+
+  it('reports a failed lookup as a lookup failure, not as a plant that does not exist', async () => {
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+    fake.functionsInvoke.mockRejectedValueOnce(new Error('network down'))
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'dahlia')
+    await fireEvent.press(screen.getByRole('button', { name: 'Look up species' }))
+
+    expect(await screen.findByLabelText('Species lookup result')).toHaveTextContent(
+      /Could not reach the species lookup/,
+    )
+  })
+
+  it('confirms a resolved lookup beside the button too, not only by filling the field', async () => {
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+    fake.functionsInvoke.mockResolvedValueOnce({
+      data: { species: [{ scientificName: 'Monarda didyma', commonName: 'bee balm' }] },
+      error: null,
+    })
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'bee balm')
+    await fireEvent.press(screen.getByRole('button', { name: 'Look up species' }))
+
+    expect(await screen.findByLabelText('Species lookup result')).toHaveTextContent(
+      /Scientific name set from USDA PLANTS: Monarda didyma/,
+    )
+  })
+
+  it('clears a lookup result once the name it described is edited', async () => {
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+    fake.functionsInvoke.mockResolvedValueOnce({ data: { species: [] }, error: null })
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'dahlia')
+    await fireEvent.press(screen.getByRole('button', { name: 'Look up species' }))
+    await screen.findByLabelText('Species lookup result')
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'rose')
+
+    expect(screen.queryByLabelText('Species lookup result')).toBeNull()
+  })
+
+  it('will not look up a name too short to mean anything, and says why', async () => {
+    // Found in QA: "g" returned "candidates", because resolveCommonName matches
+    // by substring — a single letter hits a large slice of USDA's data, which
+    // reads as ambiguity between species when it is really just noise.
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'g')
+
+    expect(screen.getByText(/Type at least 3 characters/)).toBeTruthy()
+    await fireEvent.press(screen.getByRole('button', { name: 'Look up species' }))
+    expect(fake.functionsInvoke).not.toHaveBeenCalled()
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'rose')
+
+    expect(screen.queryByText(/Type at least 3 characters/)).toBeNull()
+    await fireEvent.press(screen.getByRole('button', { name: 'Look up species' }))
+    await waitFor(() => expect(fake.functionsInvoke).toHaveBeenCalled())
+  })
+
+  it('drops stale species candidates when the common name they answered is edited', async () => {
+    // Found in QA: looking up an ambiguous name and then retyping the common
+    // name left the old candidates on screen, with the prompt naming the *new*
+    // text — presenting results for one name as matches for another.
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+    fake.functionsInvoke.mockResolvedValueOnce({
+      data: {
+        species: [
+          { scientificName: 'Rosa carolina', commonName: 'rose' },
+          { scientificName: 'Rosa palustris', commonName: 'rose' },
+        ],
+      },
+      error: null,
+    })
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'rose')
+    await fireEvent.press(screen.getByRole('button', { name: 'Look up species' }))
+    await screen.findByLabelText('Species candidates')
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'asdf')
+
+    expect(screen.queryByLabelText('Species candidates')).toBeNull()
+    expect(screen.queryByText(/asdf.*matches more than one species/)).toBeNull()
+  })
+
+  it('names the term that was looked up, not whatever the field says now', async () => {
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+    fake.functionsInvoke.mockResolvedValueOnce({
+      data: {
+        species: [
+          { scientificName: 'Liatris spicata', commonName: 'liatris' },
+          { scientificName: 'Liatris aspera', commonName: 'liatris' },
+        ],
+      },
+      error: null,
+    })
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'liatris')
+    await fireEvent.press(screen.getByRole('button', { name: 'Look up species' }))
+
+    await screen.findByLabelText('Species candidates')
+    expect(screen.getByText(/"liatris" matches more than one species/)).toBeTruthy()
+  })
+
   it('offers USDA trait suggestions before creating, and applies them only when accepted', async () => {
     const fake = await renderCreateScreen()
     await screen.findByRole('header', { name: 'Add Plant' })
