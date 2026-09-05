@@ -1,11 +1,11 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-04 (updated: **#31 is built and its QA is part-run — three findings, all fixed; #31 remains OPEN and its QA pass is not finished**; see "#31: manual Plant creation on native mobile" immediately below. Also filed **#36** against the USDA data source. Previously the same day: **#15 is built, device-QA'd, closed by the user, and pushed — every ticket #2–#20 under the spec now has code, and no build work remains on the frontier**; see "#15: native Scale Reference calibration" below. Previously 2026-09-03: Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
+**Date:** 2026-09-04 (updated: **#31 is built, device-QA'd, closed by the user, and pushed — three QA findings, all fixed**; see "#31: manual Plant creation on native mobile" immediately below. Also filed **#36** against the USDA data source. Previously the same day: **#15 is built, device-QA'd, closed by the user, and pushed — every ticket #2–#20 under the spec now has code, and no build work remains on the frontier**; see "#15: native Scale Reference calibration" below. Previously 2026-09-03: Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
 
-## #31: manual Plant creation on native mobile — built, QA part-run, STILL OPEN
+## #31: manual Plant creation on native mobile — built, device-QA'd, CLOSED
 
 **Build commit `9b74fb3`; QA fixes in `7487048`.** A Plant can now
 be created on the phone without a tag to scan. Before this, Tag Scan was the
@@ -15,8 +15,13 @@ inherited shrub or anything whose tag is long gone **could not be added from
 the phone at all**. ADR-0003 names freehand drawing as its one exception to
 native parity; creating a Plant record is not drawing.
 
-**#31 is still open, and its QA pass is NOT complete** — see "What QA covered,
-and what it didn't" below. Nothing here is a request to close it.
+**Device QA run to completion by the user and it passes** — three findings,
+all fixed and regression-tested; see below. **Closed on GitHub by the user on
+2026-09-04.** Note the sequence, as with #15: the user closed it themselves
+before asking for it to be closed, so the `gh issue close` was a no-op — and
+it silently dropped the summary comment attached to the same command, which
+had to be posted separately. Worth knowing: `gh issue close --comment` posts
+nothing on an already-closed issue.
 
 ### What's there
 
@@ -63,7 +68,7 @@ scope. Two deliberate changes, both flagged to the user at the time:
 - **The suggested-traits panel was a verbatim second copy** across the two
   screens. Extracted, along with `applySuggestedTraits`.
 
-### What QA covered, and what it didn't
+### What device QA found — run to completion, and it passes
 
 Run by the user on a device. **Three findings, all fixed and verified; each
 regression test was confirmed to fail with its fix reverted.**
@@ -87,12 +92,18 @@ regression test was confirmed to fail with its fix reverted.**
    own button, and a failed lookup is worded distinctly from a genuine
    no-match (previously near-identical, which was actively misleading).
 
-**Not yet run, and not to be assumed passing:** the Registry entry point from
-an empty registry, the create form's blank state and validation, the
-suggested-traits accept/skip panel, the overwrite-protection case, the
-post-save transition to edit mode, photos on a newly created Plant, and the
-regression check that editing an existing Plant is unchanged. Also unrun: the
-Tag Scan `formatOption` change, which needs the custom dev client to reach.
+**Every other checklist item passed**, confirmed by the user on 2026-09-05:
+the Registry entry point from an empty registry, the create form's blank state
+and validation, the suggested-traits accept/skip panel, the
+overwrite-protection case (a user-entered Sun/shade and Mature height are not
+offered for overwrite), the post-save transition to edit mode, photos on a
+newly created Plant, and the regression check that editing an existing Plant
+is unchanged.
+
+**One item remains unrun**, and it is the one that needs a rebuild: the Tag
+Scan `formatOption` display change ("full shade", not "full-shade"), reachable
+only through a real tag scan and therefore only from the custom dev client. It
+is cosmetic and the stored value is unchanged.
 
 ### Filed during the pass
 
