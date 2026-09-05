@@ -1,7 +1,62 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-04 (updated: **#31 is built, device-QA'd, closed by the user, and pushed — three QA findings, all fixed**; see "#31: manual Plant creation on native mobile" immediately below. Also filed **#36** against the USDA data source. Previously the same day: **#15 is built, device-QA'd, closed by the user, and pushed — every ticket #2–#20 under the spec now has code, and no build work remains on the frontier**; see "#15: native Scale Reference calibration" below. Previously 2026-09-03: Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
+**Date:** 2026-09-04 (updated: **the backlog is triaged — `needs-triage` is empty, and only four issues stand between here and the MVP**; see "Backlog triage: the board now has a verdict on every issue" immediately below. Previously the same day: **#31 is built, device-QA'd, closed by the user, and pushed — three QA findings, all fixed**; see "#31: manual Plant creation on native mobile" immediately below. Also filed **#36** against the USDA data source. Previously the same day: **#15 is built, device-QA'd, closed by the user, and pushed — every ticket #2–#20 under the spec now has code, and no build work remains on the frontier**; see "#15: native Scale Reference calibration" below. Previously 2026-09-03: Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
 **Repo:** `annetters/plant-app` · branch `main`
+
+---
+
+## Backlog triage: the board now has a verdict on every issue
+
+**2026-09-04, docs only — no code touched, nothing closed.** The user asked
+whether every open ticket has to be addressed before the app can ship. It
+doesn't. `needs-triage` had built up to **11 of 17 open issues**, so the
+backlog looked like 17 obligations when it was really four.
+
+**`needs-triage` is now empty.** The MVP board is:
+
+| # | Labels | |
+|---|---|---|
+| 14 | `ready-for-agent` | Native: Map view — the last unbuilt MVP feature |
+| 34 | `ready-for-human` | Outstanding manual QA from #3, #7, #8, #17 |
+| 37 | `bug` `ready-for-agent` | Duplicate-Plant check on every creation path |
+| 29 | `bug` `ready-for-agent` | Wrong "no aerial imagery" message |
+
+Plus **#1**, the spec epic, which closes when its children do.
+
+**Deferred `post-mvp` (9):** #23, #24, #26, #27, #28, #30, #35, #38, #39 —
+the Tag Scan OCR polish, the one-canvas map redesign, and five
+nice-to-haves. The Tag Scan cluster went here on the strength of **story 15
+in #1**: *"OCR failing, being unavailable, or misreading something never
+blocks me from adding a plant — OCR is a convenience layer, never a
+requirement."* Manual entry is the contract; OCR quality is allowed to be
+imperfect at ship.
+
+**`wontfix` (1):** **#36** (revisit the USDA data source), on the strength of
+`CONTEXT.md`'s own line — *"Revisit when cultivar-level coverage is a real
+gap in practice, not speculatively."* #36 is that speculative revisit. If
+cultivar coverage later becomes a real, felt gap, reopen it; the label
+records a decision already made, not a permanent ban.
+
+**Two judgement calls worth knowing:**
+
+- **#33 got `needs-info`, not `ready-for-agent`.** It is MVP work, but its
+  body ends *"Options to consider, not prescribing one"* — freehand drag vs.
+  a clearer affordance for click-to-place is a UX decision only the user can
+  make. It flips to `ready-for-agent` the moment they pick one.
+- **#21 lost its stale `needs-triage`**, which it had been carrying
+  alongside `post-mvp`.
+
+**Knock-on:** #29 notes it is *"worth doing alongside #28, which touches the
+same branch"* — and #28 is now `post-mvp`. Whoever takes #29 may find #28
+nearly free; pulling it forward is the user's call.
+
+`docs/agents/triage-labels.md` gained a **Scope labels** section documenting
+`post-mvp` and when to reach for it over `wontfix`. It is held apart from the
+five-role mapping table on purpose — see the note under "Scope change".
+
+**Nothing was closed.** Per `CLAUDE.md`, a ticket looking finished is not
+authorization to close it, and re-labelling is not closure by proxy: #36 is
+`wontfix` and still open, awaiting the user.
 
 ---
 
@@ -457,12 +512,15 @@ What changed instead:
   only piece of task work never built), which stays open with the reasoning
   commented on it.
 
-Two things a later session may want to revisit: the **`[POST-MVP]` tag
-convention is new**, invented for this and used only in #1 so far; and
-**`post-mvp` is a scope label, not a triage role**, so it was deliberately
-*not* added to `docs/agents/triage-labels.md`, whose table maps the five
-`/triage` roles to this repo's strings. #21 still carries `needs-triage`
-alongside it, since it genuinely hasn't been triaged.
+One thing a later session may want to revisit: the **`[POST-MVP]` tag
+convention is new**, invented for this and used only in #1 so far.
+
+> **Updated 2026-09-04.** `post-mvp` is still a scope label rather than a
+> triage role, but it is no longer undocumented: the backlog triage pass (see
+> "Backlog triage: the board now has a verdict on every issue") put it in
+> `docs/agents/triage-labels.md` under its own **Scope labels** heading, held
+> deliberately apart from the five-role mapping table. #21 no longer carries
+> `needs-triage`.
 
 ---
 
@@ -2573,9 +2631,12 @@ Triage labels: `needs-triage`, `needs-info`, `ready-for-agent`,
 `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
 
 Also `post-mvp` (added 2026-09-03) — **a scope label, not a triage role**:
-built or filed, but outside the MVP commitment, may be revisited. It is
-intentionally absent from `docs/agents/triage-labels.md`, which maps the five
-`/triage` roles only. An issue can carry both (`#21` currently does).
+built or filed, but outside the MVP commitment, may be revisited. Since
+2026-09-04 it is documented in `docs/agents/triage-labels.md` under **Scope
+labels**, a section kept separate from the five-role mapping table so
+`/triage` never applies it as a triage outcome. A triage role and a scope
+label are orthogonal, so an issue can carry one of each (`#23` currently
+does: `ready-for-agent` + `post-mvp`).
 
 **#1** is the spec, labeled `ready-for-agent`. **#2–#20** are the 19
 tracer-bullet tickets `/to-tickets` split it into, each also `ready-for-agent`
