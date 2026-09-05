@@ -191,7 +191,12 @@ every open issue passes it. What remains:
   to scan. The user rated this the most significant parity gap, and it is
   cheap: `PlantDetailScreen`'s form plus the shared `plantFormFields`.
 - **#14** — QA'd and complete, held open by the user's own choice.
-- Twelve `needs-triage` issues (#21, #23, #24, #26–#33, #35), none blocking.
+- Ten `needs-triage` issues (#21, #23, #24, #26–#30, #33, #35), none blocking.
+  **Updated 2026-09-04:** #32 is now **CLOSED** — its fix had already landed
+  in `28a093c` during #25's QA, and the user asked for it to be closed once
+  that was verified. #31 has been relabelled `enhancement` + `ready-for-agent`,
+  so it is out of the triage pile too (the bullet above still calls it
+  `needs-triage`).
 
 Two small carried-over items: `apps/mobile/AGENTS.md` points at the Expo
 **v57** docs while the app is pinned to **54.0.37** (the SDK 54 docs are the
@@ -278,8 +283,11 @@ and it would diverge web from native.
 
 ### Status
 
-- **#25 and #32 both stay OPEN.** QA is complete and nothing is outstanding
-  against either; closing is the user's call, per `CLAUDE.md`.
+- **#25 stays OPEN. #32 is CLOSED as of 2026-09-04** — the user asked for it
+  once its fix was verified in `28a093c`; a summary comment naming the commit,
+  the approach and its two regression tests is on the issue. Nothing is
+  outstanding against #25 either, but closing it remains the user's call, per
+  `CLAUDE.md`.
 - **Test counts: domain 235, mobile 194, web 199.** Typecheck clean, no new
   lint warnings. Every new test was confirmed to fail without its fix.
 - **One unexplained flake**: a single web-suite run failed one test that could
