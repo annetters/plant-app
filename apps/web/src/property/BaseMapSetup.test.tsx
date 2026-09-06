@@ -226,3 +226,43 @@ describe('BaseMapSetup — drawn source', () => {
     expect(screen.getByRole('button', { name: 'Finish this line' })).not.toBeDisabled()
   })
 })
+
+describe('BaseMapSetup — placed-point feedback while drawing', () => {
+  it('marks the first placed point, before any line exists to render', async () => {
+    renderSetup()
+    await userEvent.click(screen.getByRole('button', { name: 'Draw a base plan' }))
+
+    clickAt('base-map-drawing-surface', 40, 60)
+
+    const placed = screen.getAllByTestId('base-map-placed-point')
+    expect(placed).toHaveLength(1)
+    expect(placed[0]).toHaveAttribute('cx', '40')
+    expect(placed[0]).toHaveAttribute('cy', '60')
+    // The bug was an element that existed and painted nothing, so presence in
+    // the DOM is not the assertion that matters — a drawable radius is.
+    expect(placed[0]).toBeVisible()
+    expect(Number(placed[0].getAttribute('r'))).toBeGreaterThan(0)
+  })
+
+  it('marks every point of the line in progress', async () => {
+    renderSetup()
+    await userEvent.click(screen.getByRole('button', { name: 'Draw a base plan' }))
+
+    clickAt('base-map-drawing-surface', 0, 0)
+    clickAt('base-map-drawing-surface', 100, 0)
+    clickAt('base-map-drawing-surface', 100, 100)
+
+    expect(screen.getAllByTestId('base-map-placed-point')).toHaveLength(3)
+  })
+
+  it('drops the in-progress markers once the line is finished', async () => {
+    renderSetup()
+    await userEvent.click(screen.getByRole('button', { name: 'Draw a base plan' }))
+
+    clickAt('base-map-drawing-surface', 0, 0)
+    clickAt('base-map-drawing-surface', 100, 0)
+    await userEvent.click(screen.getByRole('button', { name: 'Finish this line' }))
+
+    expect(screen.queryAllByTestId('base-map-placed-point')).toHaveLength(0)
+  })
+})

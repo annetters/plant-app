@@ -240,6 +240,29 @@ export function BaseMapSetup(props: BaseMapSetupProps) {
                   strokeDasharray="4 3"
                 />
               )}
+              {/*
+                One dot per placed point of the line in progress. Without these
+                the first point is invisible — a polyline of a single point has
+                zero length and paints nothing — so a correct first click looked
+                like the surface had ignored it (#33). Smaller than the
+                calibrate step's r=6 circles because here the line is the
+                content and these are its vertices, where there the two points
+                *are* the content. Only the in-progress stroke needs them:
+                "Finish this line" is disabled below two points, so a committed
+                stroke always has a length to paint.
+              */}
+              {currentStroke.map((point, i) => (
+                <circle
+                  key={i}
+                  data-testid="base-map-placed-point"
+                  cx={point.x}
+                  cy={point.y}
+                  r={4}
+                  fill="#1b4332"
+                  stroke="white"
+                  strokeWidth={1.5}
+                />
+              ))}
             </svg>
           </div>
           <button type="button" onClick={handleFinishLine} disabled={currentStroke.length < 2}>
