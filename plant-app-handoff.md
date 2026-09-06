@@ -1,6 +1,6 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-04 (updated: **the backlog is triaged — `needs-triage` is empty, and only four issues stand between here and the MVP**; see "Backlog triage: the board now has a verdict on every issue" immediately below. Previously the same day: **#31 is built, device-QA'd, closed by the user, and pushed — three QA findings, all fixed**; see "#31: manual Plant creation on native mobile" immediately below. Also filed **#36** against the USDA data source. Previously the same day: **#15 is built, device-QA'd, closed by the user, and pushed — every ticket #2–#20 under the spec now has code, and no build work remains on the frontier**; see "#15: native Scale Reference calibration" below. Previously 2026-09-03: Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
+**Date:** 2026-09-05 (updated: **#33 re-triaged to `ready-for-agent` — the reported symptom is a missing point marker, not the drag-vs-click question the ticket posed**; see "#33 re-triaged" below. Previously 2026-09-04: **the backlog is triaged — `needs-triage` is empty, and only four issues stand between here and the MVP**; see "Backlog triage: the board now has a verdict on every issue" immediately below. Previously the same day: **#31 is built, device-QA'd, closed by the user, and pushed — three QA findings, all fixed**; see "#31: manual Plant creation on native mobile" immediately below. Also filed **#36** against the USDA data source. Previously the same day: **#15 is built, device-QA'd, closed by the user, and pushed — every ticket #2–#20 under the spec now has code, and no build work remains on the frontier**; see "#15: native Scale Reference calibration" below. Previously 2026-09-03: Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
@@ -20,6 +20,7 @@ backlog looked like 17 obligations when it was really four.
 | 34 | `ready-for-human` | Outstanding manual QA from #3, #7, #8, #17 |
 | 37 | `bug` `ready-for-agent` | Duplicate-Plant check on every creation path |
 | 29 | `bug` `ready-for-agent` | Wrong "no aerial imagery" message |
+| 33 | `bug` `ready-for-agent` | Placed base-map point renders no visible mark |
 
 Plus **#1**, the spec epic, which closes when its children do.
 
@@ -37,12 +38,12 @@ gap in practice, not speculatively."* #36 is that speculative revisit. If
 cultivar coverage later becomes a real, felt gap, reopen it; the label
 records a decision already made, not a permanent ban.
 
-**Two judgement calls worth knowing:**
+**Judgement calls worth knowing:**
 
-- **#33 got `needs-info`, not `ready-for-agent`.** It is MVP work, but its
-  body ends *"Options to consider, not prescribing one"* — freehand drag vs.
-  a clearer affordance for click-to-place is a UX decision only the user can
-  make. It flips to `ready-for-agent` the moment they pick one.
+- **#33 was first labeled `needs-info`, then corrected to `ready-for-agent`
+  on 2026-09-05** — see "#33 re-triaged" immediately below. Trusting the
+  ticket's own "options to consider, not prescribing one" framing over the
+  reported symptom was the mistake.
 - **#21 lost its stale `needs-triage`**, which it had been carrying
   alongside `post-mvp`.
 
@@ -57,6 +58,46 @@ five-role mapping table on purpose — see the note under "Scope change".
 **Nothing was closed.** Per `CLAUDE.md`, a ticket looking finished is not
 authorization to close it, and re-labelling is not closure by proxy: #36 is
 `wontfix` and still open, awaiting the user.
+
+---
+
+### #33 re-triaged (2026-09-05): a missing mark, not a model choice
+
+The user, recalling the session where they hit this: **the problem was that
+when they started drawing, no dot or mark appeared to show it had worked.**
+The code agrees, and it dissolves the decision the ticket was blocked on.
+
+`apps/web/src/property/BaseMapSetup.tsx:234` renders the in-progress stroke as
+an SVG `<polyline>` once `currentStroke.length > 0` — but **a polyline with a
+single point has zero length and paints nothing.** The first placed point is
+invisible whether the user clicked cleanly or dragged. The only feedback that
+a click registered is "Finish this line" losing `disabled` at two points.
+
+So the body's framing — freehand drag vs. click-to-place, "not prescribing
+one" — was a red herring: a correct single click fails identically. There is
+no interaction-model call for the user to make, which is why `needs-info` was
+wrong.
+
+**The fix, and the proof it's right:** the `calibrate` step *on the same
+screen* already renders a `<circle r={6}>` per placed point
+(`BaseMapSetup.tsx:291`), so a single point is visible there. The two steps
+simply disagree about whether a placed point is visible. Reuse the circle.
+
+**Nearly free alongside, but not required:** moving placement from `onClick`
+to `onMouseDown` makes the mark appear on press rather than release, and lands
+the point where the user pressed. Note `handleCanvasClick` is **shared with
+the calibrate step**, so this changes Scale Reference placement too — it needs
+its own tests.
+
+**Freehand dragging is recommended against.** These are structural lines
+(boundary, driveway, house outline) and this drawing is the base map the Scale
+Reference calibrates against, so hand-wobble would propagate into every
+distance measured in the garden.
+
+**Why it survived:** `BaseMapSetup.test.tsx` always places two or more points
+(`clickAt` twice, e.g. lines 150-151). The one-point state is never
+exercised. A regression test should assert a marker is visible after a
+*single* click.
 
 ---
 
