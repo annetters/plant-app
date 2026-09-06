@@ -402,13 +402,59 @@ describe('PropertyPage — existing Property', () => {
     expect(await screen.findByLabelText('Drawn base plan')).toBeInTheDocument()
   })
 
-  it('shows a degraded-mode message instead of a silent grey gap when no imagery is available', async () => {
+  it('shows a degraded-mode message instead of a silent grey gap when an aerial Property has no imagery', async () => {
     renderPage({ ...availableRow, imagery_zoom: null, imagery_available: false })
     expect(
       await screen.findByText(/No aerial imagery is available for this property/),
     ).toBeInTheDocument()
+    // The two no-scale branches must not blur together: an aerial Property
+    // whose imagery came back unavailable is a different problem from a
+    // photo/drawn Property that just hasn't been calibrated yet, and the
+    // fix each points at is different.
+    expect(screen.queryByText(/Scale Reference/)).not.toBeInTheDocument()
     expect(screen.queryByRole('img')).not.toBeInTheDocument()
   })
+
+  // #29: this branch fired the "no aerial imagery" message regardless of
+  // baseMapSource, so a photo/drawn Property that just hadn't been calibrated
+  // yet was pointed at the wrong fix (re-check the address, choose a different
+  // base map) rather than the real one (set its scale). The wording predates
+  // #6's rework, when photo/drawn only existed as an aerial fallback — that's
+  // no longer true. Photo and drawn share this branch, so it.each pins that
+  // they behave the same rather than leaving it implicit in copy-paste.
+  const uncalibratedRow = {
+    ...availableRow,
+    address: null,
+    name: 'Backyard plot',
+    resolved_address: null,
+    latitude: null,
+    longitude: null,
+    imagery_zoom: null,
+    imagery_available: false,
+    scale_reference: null,
+  }
+  it.each<[string, Partial<PropertyRow>]>([
+    ['photo', { base_map_source: 'photo', base_map_photo_path: 'user-1/plan.jpg' }],
+    [
+      'drawn',
+      {
+        base_map_source: 'drawn',
+        base_map_drawing: [
+          [
+            { x: 10, y: 10 },
+            { x: 200, y: 10 },
+          ],
+        ],
+      },
+    ],
+  ])(
+    'tells a %s Property with no Scale Reference to calibrate one, not that aerial imagery is missing',
+    async (_source, extras) => {
+      renderPage({ ...uncalibratedRow, ...extras })
+      expect(await screen.findByText(/Scale Reference/)).toBeInTheDocument()
+      expect(screen.queryByText(/No aerial imagery is available/)).not.toBeInTheDocument()
+    },
+  )
 
   it('deletes the Property after confirmation, freeing the account up to create another', async () => {
     const user = userEvent.setup()

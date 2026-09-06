@@ -222,10 +222,26 @@ export function PropertyPage() {
             </>
           ) : (
             <>
-              <p>
-                No aerial imagery is available for this property's location. Add a base map
-                another way below.
-              </p>
+              {/*
+                Two different failures land in this branch and want different
+                wording. An aerial Property is here because its address had no
+                imagery — the fix is to switch base-map source, so we say so.
+                A photo/drawn Property is here because it just hasn't been
+                calibrated yet; #29 was the wording telling that gardener to
+                re-check their address, which predates #6's rework when
+                photo/drawn only existed as an aerial fallback.
+              */}
+              {property.baseMapSource === 'aerial' ? (
+                <p>
+                  No aerial imagery is available for this property's location. Add a base map
+                  another way below.
+                </p>
+              ) : (
+                <p>
+                  This Property has no Scale Reference calibrated yet, so its Beds and Pins
+                  can't be drawn to scale. Finish setting up its base map below.
+                </p>
+              )}
               <BaseMapSetup mode="update" property={property} onUpdated={setProperty} />
             </>
           )}
