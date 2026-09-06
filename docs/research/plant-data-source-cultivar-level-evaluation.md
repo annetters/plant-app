@@ -25,8 +25,12 @@ stays user-observed only, never database-suggested.
 ## USDA PLANTS Database — adopted as the starting foundation
 
 - **Access**: a real bulk download exists — the "Complete PLANTS Checklist,"
-  a plain comma-delimited text file (historically named `plantlst.bin`,
-  despite the extension — not actually binary). Separately, a
+  a plain comma-delimited text file. **Corrected 2026-09-05:** the file is
+  `plantlst.txt`, not `plantlst.bin` as originally written here — the `.bin`
+  name appears in neither the 2010 nor 2019 Wayback snapshots nor today. Live
+  at
+  `https://plants.sc.egov.usda.gov/DocumentLibrary/Txt/plantlst.txt`
+  (6.7 MB, 93,157 rows, `Last-Modified: 2025-05-29`). Separately, a
   [Characteristics Search](https://plants.usda.gov/characteristics-search)
   tool covers 80+ NRCS Conservation Plant Characteristics, filterable by
   growth habit, duration, environmental tolerances, and native status, with
@@ -59,6 +63,19 @@ stays user-observed only, never database-suggested.
   conservation-plant dataset, not a general horticultural database — see
   ADR-0004 for the full finding. Doesn't reverse the decision below, but
   sharpens it: expect USDA to come up empty often, not occasionally.
+- **Names vs. traits — corrected 2026-09-05**
+  (`docs/research/usda-plants-name-resolution.md`): the gap above is a gap in
+  the **characteristics table**, which is one small NRCS conservation-traits
+  subset — *not* in USDA PLANTS. The full checklist holds **48,994 accepted
+  names** and does contain ordinary garden ornamentals: *Dahlia pinnata*
+  (`DAPI3`), Hosta, *Paeonia lactiflora*, *Hydrangea macrophylla*,
+  *Echinacea purpurea*, *Rudbeckia hirta*. On a 60-taxon ornamental panel the
+  full checklist resolved **57/60**, against the characteristics table's
+  **10/60**; all 7 real-tag species above resolve. **"Adopted as the
+  species-level foundation" was right; "expect USDA to come up empty often"
+  is true of traits and false of names.** This document conflated the two —
+  they are separate claims. Cultivar coverage is unaffected: USDA still has no
+  cultivar field anywhere.
 
 ## IPNI (International Plant Names Index) — ruled out
 

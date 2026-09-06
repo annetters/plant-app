@@ -16,6 +16,45 @@ on their own to clear the bar Tag Scan needs — see "Decision" below for why
 that makes the missing comparison non-blocking rather than a gap papered
 over.
 
+## Amendment — 2026-09-05: the USDA coverage finding was about traits, not names
+
+**The decisions in this ADR stand. One of its supporting findings does not,
+and it is the one most likely to be acted on.**
+
+Research for #36 (`docs/research/usda-plants-name-resolution.md`) established
+that `characteristicSearchResults` is **not USDA PLANTS** — it is one small
+NRCS conservation-traits table inside it. The name index behind the rest of
+the site holds **48,994 accepted names** (93,157 rows including synonyms) and
+does contain ordinary garden ornamentals.
+
+Three specific corrections, each marked inline below where the original claim
+appears:
+
+1. **"no published API docs"** (Context, below) — superseded. An OpenAPI 3.0.4
+   spec listing all 42 operations is served at
+   `https://plantsservices.sc.egov.usda.gov/swagger/v1/swagger.json`. It is
+   unlinked and un-versioned, so these endpoints remain *unsupported* — the
+   config.json recovery route this ADR documents is still the honest
+   description of their status — but they are no longer *undiscoverable*.
+
+2. **"only 2 of 7 real-tag species matched"** (Flag section, below) — true of
+   the characteristics table, and **all 7 resolve by name** in the full
+   checklist. *Phlox paniculata*, *Monarda didyma*, *Scabiosa columbaria*,
+   *Heuchera* and *Agastache* are all present.
+
+3. **"USDA will return nothing for a large share of real nursery tags"**
+   (Consequences, below) — must be split in two:
+   - No USDA ***trait*** match is routine. Unchanged.
+   - No USDA ***name*** match is now the **exception**, not the rule.
+
+   This matters for design: Tag Scan's "USDA has nothing at all for this
+   genus/species" outcome is far rarer than this ADR concluded, *if* name
+   resolution moves off the characteristics table.
+
+**Not changed:** USDA has no cultivar field at any endpoint or in the bulk
+file. The prior evaluation's cultivar-level rejection, and this ADR's reliance
+on it, are untouched.
+
 ## Context
 
 `CONTEXT.md`'s Tag Scan section and ADR-0003 both left OCR execution
@@ -113,8 +152,10 @@ sample later shows on-device Vision struggling in ways these 8 didn't.
 
 Confirmed by direct HTTP calls, not documentation-reading — the search UI at
 `plants.usda.gov/characteristics-search` is a client-rendered Angular SPA
-with no published API docs, so the actual endpoints were recovered from its
-runtime config at `https://plants.sc.egov.usda.gov/assets/config.json`
+with no published API docs *(superseded — see Amendment 2026-09-05: an
+OpenAPI spec exists at `/swagger/v1/swagger.json`; the endpoints are still
+unsupported, but no longer undiscoverable)*, so the actual endpoints were
+recovered from its runtime config at `https://plants.sc.egov.usda.gov/assets/config.json`
 (`serviceUrls.plantsServicesUrl`):
 
 - `GET https://plantsservices.sc.egov.usda.gov/api/characteristicSearchResults`
@@ -133,6 +174,11 @@ temperature). This resolves the "unverified" note in
 alongside this ADR.
 
 ### Flag for the prior USDA research doc: species-level coverage has real gaps too, not just cultivar-level
+
+> **Amended 2026-09-05.** Everything below is correct *about the
+> characteristics table*. It is not true of USDA PLANTS as a whole: all 7 of
+> these species resolve by name in the full checklist. See the Amendment at
+> the top of this ADR.
 
 The existing research doc already ruled out cultivar-level matching from
 USDA (no cultivar field exists at all) and adopted USDA anyway as the
@@ -212,6 +258,9 @@ whoever builds the confirmation UI, since none of this is hypothetical.
   species tested here) — Tag Scan's "show candidates, let the user confirm"
   design already handles this, but it needs to handle "no USDA match at all"
   as a routine outcome, not a rare one.
+  **Amended 2026-09-05:** true of *traits* only. No USDA **name** match is the
+  exception, not the rule — 7 of 7 of these species resolve in the full
+  checklist. See the Amendment at the top of this ADR.
 
 ## Relationship to prior ADRs
 
