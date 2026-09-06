@@ -1,6 +1,6 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-05 (updated: **#33 re-triaged to `ready-for-agent` — the reported symptom is a missing point marker, not the drag-vs-click question the ticket posed**; see "#33 re-triaged" below. Previously 2026-09-04: **the backlog is triaged — `needs-triage` is empty, and only four issues stand between here and the MVP**; see "Backlog triage: the board now has a verdict on every issue" immediately below. Previously the same day: **#31 is built, device-QA'd, closed by the user, and pushed — three QA findings, all fixed**; see "#31: manual Plant creation on native mobile" immediately below. Also filed **#36** against the USDA data source. Previously the same day: **#15 is built, device-QA'd, closed by the user, and pushed — every ticket #2–#20 under the spec now has code, and no build work remains on the frontier**; see "#15: native Scale Reference calibration" below. Previously 2026-09-03: Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
+**Date:** 2026-09-06 (updated: **#29 fixed on `main` and closed by the user — `PropertyPage`'s no-scale message now branches on `baseMapSource`, so a photo/drawn Property is told its Scale Reference isn't calibrated yet rather than that aerial imagery is missing**; see "#29 fixed" below. Also **#33 fixed on `main` and closed by the user earlier the same day** — a dot per placed point in the drawing surface, reusing the treatment `calibrate` already applies to its ScalePoints; see "#33 fixed" below. Previously 2026-09-05: **#33 re-triaged to `ready-for-agent` — the reported symptom is a missing point marker, not the drag-vs-click question the ticket posed**; see "#33 re-triaged" below. Previously 2026-09-04: **the backlog is triaged — `needs-triage` is empty, and only four issues stand between here and the MVP**; see "Backlog triage: the board now has a verdict on every issue" immediately below. Previously the same day: **#31 is built, device-QA'd, closed by the user, and pushed — three QA findings, all fixed**; see "#31: manual Plant creation on native mobile" immediately below. Also filed **#36** against the USDA data source. Previously the same day: **#15 is built, device-QA'd, closed by the user, and pushed — every ticket #2–#20 under the spec now has code, and no build work remains on the frontier**; see "#15: native Scale Reference calibration" below. Previously 2026-09-03: Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
@@ -19,8 +19,6 @@ backlog looked like 17 obligations when it was really four.
 | 14 | `ready-for-agent` | Native: Map view — the last unbuilt MVP feature |
 | 34 | `ready-for-human` | Outstanding manual QA from #3, #7, #8, #17 |
 | 37 | `bug` `ready-for-agent` | Duplicate-Plant check on every creation path |
-| 29 | `bug` `ready-for-agent` | Wrong "no aerial imagery" message |
-| 33 | `bug` `ready-for-agent` | Placed base-map point renders no visible mark |
 
 Plus **#1**, the spec epic, which closes when its children do.
 
@@ -47,9 +45,11 @@ records a decision already made, not a permanent ban.
 - **#21 lost its stale `needs-triage`**, which it had been carrying
   alongside `post-mvp`.
 
-**Knock-on:** #29 notes it is *"worth doing alongside #28, which touches the
-same branch"* — and #28 is now `post-mvp`. Whoever takes #29 may find #28
-nearly free; pulling it forward is the user's call.
+**Knock-on:** #29 is now fixed (see "#29 fixed" below) without pulling #28
+forward. #28 (no indicator that a Property's base map has a calibrated scale)
+is still `post-mvp` and still touches the same branch — the precedent from
+#29 is that this branch now recognises the source, so #28's indicator work
+has a clean seam to sit against when it lands.
 
 `docs/agents/triage-labels.md` gained a **Scope labels** section documenting
 `post-mvp` and when to reach for it over `wontfix`. It is held apart from the
@@ -58,6 +58,90 @@ five-role mapping table on purpose — see the note under "Scope change".
 **Nothing was closed.** Per `CLAUDE.md`, a ticket looking finished is not
 authorization to close it, and re-labelling is not closure by proxy: #36 is
 `wontfix` and still open, awaiting the user.
+
+---
+
+### #29 fixed (2026-09-06): wording branches on `baseMapSource`
+
+**Commit `65f408c` on `main`; closed on GitHub by the user.** `PropertyPage`
+rendered one no-scale message — "No aerial imagery is available … add a base
+map another way" — whenever `pixelsPerFootForProperty` came back `null`. That
+branch fires for two different failures: an aerial Property whose address had
+no imagery, and a photo/drawn Property that just hasn't been calibrated yet.
+Only the aerial case matched the wording. A photo/drawn gardener was pointed
+at re-checking their address or switching base-map source, when the real fix
+is to set the Scale Reference.
+
+The wording predates #6, when photo/drawn only existed as an aerial fallback
+and "no aerial imagery" was fair for everyone reaching that branch. #6 made
+base-map source an up-front choice, and mobile's `MapScreen.tsx:499` already
+worded this correctly.
+
+**The shape of the fix:** branch on `property.baseMapSource`. Aerial keeps
+the original copy. Photo/drawn now reads *"This Property has no Scale
+Reference calibrated yet, so its Beds and Pins can't be drawn to scale.
+Finish setting up its base map below."* Uses CONTEXT.md's proper term. Two
+tests via `it.each` so photo and drawn stay symmetric, plus a negative
+assertion tightened on the aerial test so the two branches can't blur again.
+
+**Not done, and why:** the ticket's proposed direction was to *"point at the
+calibration step rather than at choosing a base map."* Left as-is. The below
+UI is `BaseMapSetup mode="update"`, which starts at the 'choose' step and
+walks the user through re-upload/redraw before calibrating; there is no
+calibration-only entry point today. Rewriting the copy to point at "just
+calibration" would mislead about the flow it invokes. A calibration-only
+entry point would be its own change, out of scope. The ticket body itself
+labeled its wording proposal "for triage, not yet agreed."
+
+**Not run:** browser QA. The change is invisible outside the photo/drawn +
+no-scale state, which is not on any golden path — a photo/drawn Property is
+normally created with its Scale Reference in the same session by
+`BaseMapSetup mode="create"`. The state is reachable in principle (row-level
+schema doesn't require `scale_reference`) but exercised only by tests.
+
+**Two-axis review ran clean.** Standards flagged the two new tests as
+copy-paste; the fix collapses them into `it.each`. Spec's partial finding on
+"point at calibration" is what "Not done, and why" above records.
+
+---
+
+### #33 fixed (2026-09-06): a dot per placed point in the drawing surface
+
+**Commit `a9ee262` on `main`; closed on GitHub by the user.** The re-triage
+below correctly identified the defect: an SVG `<polyline>` with a single
+point has zero length and paints nothing, so the first click on
+`BaseMapSetup`'s drawing surface produced no visible feedback — the surface
+read as broken to a user who had used it correctly. The only signal that
+anything registered was "Finish this line" losing `disabled`, two points in.
+
+**The shape of the fix:** render a `<circle>` per point of `currentStroke`,
+reusing the treatment `calibrate` already applies to its `ScalePoint`s on
+the same screen. Smaller (`r=4` vs `r=6`) and in the in-progress stroke's
+own green — the line is the content here, and these are its vertices; there
+the two points *are* the content. Committed strokes get no dots on purpose:
+"Finish this line" is disabled below two points, so a committed stroke
+always has a length to paint.
+
+**Tests:** three new tests, TDD'd red-first. The one-point state is now
+exercised directly — the re-triage's "why this survived" note called out
+that every existing drawing test placed at least two points. The regression
+test asserts a *drawable radius*, not just presence in the DOM, because
+presence was never the problem; the fix was verified to bite by temporarily
+setting `r={0}`. Two-axis code review's three findings applied in the same
+diff — the test id avoids "marker" (CONTEXT.md reserves that for Pin), the
+drawable-radius assertion above, and an inline note on why committed
+strokes are excluded.
+
+**Not done, and why:** moving placement from `onClick` to `onMouseDown`
+stays out of scope — `handleCanvasClick` is shared with the calibrate step,
+so that would change Scale Reference placement too and wants its own tests.
+Freehand dragging stays rejected: these are structural lines the Scale
+Reference calibrates against, so hand-wobble would propagate into every
+distance measured in the garden.
+
+**Not covered by automated tests:** whether the dot reads clearly against a
+real photographed plot plan at the sizes a person actually draws at. Worth
+an eye during the next browser sitting.
 
 ---
 
