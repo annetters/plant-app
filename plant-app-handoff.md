@@ -1,7 +1,90 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-06 (updated: **#29 fixed on `main` and closed by the user — `PropertyPage`'s no-scale message now branches on `baseMapSource`, so a photo/drawn Property is told its Scale Reference isn't calibrated yet rather than that aerial imagery is missing**; see "#29 fixed" below. Also **#33 fixed on `main` and closed by the user earlier the same day** — a dot per placed point in the drawing surface, reusing the treatment `calibrate` already applies to its ScalePoints; see "#33 fixed" below. Previously 2026-09-05: **#33 re-triaged to `ready-for-agent` — the reported symptom is a missing point marker, not the drag-vs-click question the ticket posed**; see "#33 re-triaged" below. Previously 2026-09-04: **the backlog is triaged — `needs-triage` is empty, and only four issues stand between here and the MVP**; see "Backlog triage: the board now has a verdict on every issue" immediately below. Previously the same day: **#31 is built, device-QA'd, closed by the user, and pushed — three QA findings, all fixed**; see "#31: manual Plant creation on native mobile" immediately below. Also filed **#36** against the USDA data source. Previously the same day: **#15 is built, device-QA'd, closed by the user, and pushed — every ticket #2–#20 under the spec now has code, and no build work remains on the frontier**; see "#15: native Scale Reference calibration" below. Previously 2026-09-03: Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
+**Date:** 2026-09-06 (updated: **#37 built, reviewed, and closed on the user's instruction — the duplicate-Plant check now runs on all three creation paths, and its "add a Planting instead" offer is real for the first time**; see "#37: the duplicate check on every creation path" immediately below. Also **#29 fixed on `main` and closed by the user — `PropertyPage`'s no-scale message now branches on `baseMapSource`, so a photo/drawn Property is told its Scale Reference isn't calibrated yet rather than that aerial imagery is missing**; see "#29 fixed" below. Also **#33 fixed on `main` and closed by the user earlier the same day** — a dot per placed point in the drawing surface, reusing the treatment `calibrate` already applies to its ScalePoints; see "#33 fixed" below. Previously 2026-09-05: **#33 re-triaged to `ready-for-agent` — the reported symptom is a missing point marker, not the drag-vs-click question the ticket posed**; see "#33 re-triaged" below. Previously 2026-09-04: **the backlog is triaged — `needs-triage` is empty, and only four issues stand between here and the MVP**; see "Backlog triage: the board now has a verdict on every issue" immediately below. Previously the same day: **#31 is built, device-QA'd, closed by the user, and pushed — three QA findings, all fixed**; see "#31: manual Plant creation on native mobile" immediately below. Also filed **#36** against the USDA data source. Previously the same day: **#15 is built, device-QA'd, closed by the user, and pushed — every ticket #2–#20 under the spec now has code, and no build work remains on the frontier**; see "#15: native Scale Reference calibration" below. Previously 2026-09-03: Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
 **Repo:** `annetters/plant-app` · branch `main`
+
+---
+
+## #37: the duplicate check on every creation path — built, reviewed, CLOSED
+
+**Commit `cc80ec0` on `main`; closed on GitHub at the user's explicit
+instruction** (per `CLAUDE.md`, that instruction is the only thing that ever
+closes an issue here — a finished ticket isn't authorization). `CONTEXT.md`
+promised one Plant record per plant type/cultivar. `checkForDuplicatePlant`
+had **exactly one caller** — Tag Scan's review screen — so the two paths a
+gardener actually *types* a plant into (web `/registry/new`, the phone's Add
+Plant form) could each write a second record for a plant already in the
+Registry. The path that did check is the one needing it least: a scan starts
+from a physical label the gardener is holding.
+
+**The shape of the fix.** All three paths run the same check at the same
+seam — validated input, before the write — load the existing Plants the same
+way, and degrade to "no known duplicates" on a load failure rather than
+blocking the form, which is what Tag Scan already did. Both forms now gate
+their submit button until that list arrives, as Tag Scan gated Continue.
+`checkForDuplicatePlant` itself was not touched; the ticket was explicit
+that it needed no changes, and it didn't.
+
+**Decisions the ticket left open, and how they went:**
+
+- **Inline on all three**, the shape #31 used for ambiguous species. Neither
+  surface needed a new route.
+- **`TagScanDuplicateOfferScreen` retired**, with its route (−306 lines).
+  Its "create anyway" was a second copy of the review screen's own create;
+  inlining the offer collapses that back to one, tag-photo linking included.
+- **The wording lives in `@plant-app/domain`** (`DUPLICATE_PLANT_OFFER`), so
+  the three surfaces present the same decisions in the same order. This is
+  the anti-drift device the ticket asked for by name: `plantLabel` diverged
+  between web and native in #18, and the suggested-traits panel existed as
+  two copies until #31. Native additionally shares one `DuplicatePlantOffer`
+  component across its two paths; **web has its own markup** — different
+  framework, nothing to share below the wording.
+- **Creating anyway survives on every path**, per CONTEXT.md's
+  offer-an-alternative model.
+
+**The ⚠️ check in the ticket paid off, but not as written.** It warned that
+`TagScanDuplicateOfferScreen`'s "Planting CRUD is #8's work" docstring might
+be stale. It was worse than stale: **there was no "add a Planting" action at
+all**, only prose explaining its absence. With #8 shipped it is now real —
+the offer opens the map's add-Planting form with the matched Plant already
+chosen (`?addPlantingForPlantId=` on web, a `Map` route param on native).
+Both surfaces treat that parameter as a **one-shot instruction and clear it
+once honoured**; left in place, a reload or a refocus reopened a form the
+gardener had cancelled. That was a real bug in the first cut, caught by the
+Spec axis of `/code-review`.
+
+**CONTEXT.md changed.** The one-source-of-truth rule moved out from under
+Tag Scan into **Plant**, reworded to hold however a record is created and to
+say plainly that it offers an alternative rather than prohibiting a second
+record. The rule was always indifferent to how the record got made; only its
+placement suggested otherwise.
+
+**Deliberately not done:** linking a scan's tag photos onto the matched
+Plant when "add a Planting instead" is taken. It was in the first cut and
+came back out — it writes to a record the gardener came here specifically
+*not* to duplicate, irreversibly from the UI, before they have committed to
+the Planting at all (including when they back out of it). The retired screen
+never did it either, and #37 didn't ask for it.
+
+**Also not done, and flagged rather than fixed:** if the Property has no
+Beds, the offer's primary action lands on a map that can only say "Draw a
+Bed first." The map's own empty state explains the situation, but nothing
+connects it back to what the gardener asked for. Small follow-up if it
+irritates in practice.
+
+**Duplication accepted, with reasons.** Both review axes flagged the
+near-identical preselect effect and registry-loader effect across
+`PlantingMap`/`MapScreen` and `PlantFormPage`/`PlantDetailScreen`. Left as
+is: there is no shared React package in this repo — `packages/domain` is
+deliberately dependency-free — and creating one for three small effects is a
+larger architectural move than this ticket should make. What had to be
+shared to stop drift is shared.
+
+**Not run: any manual QA.** Automated only — 717 tests across the three
+workspaces (domain 237, mobile 265, web 215), typecheck clean, lint back to
+its pre-existing 11 warnings. Nothing here has been exercised by hand on a
+device or in a browser; the duplicate offer's appearance, the map handoff,
+and the native navigation reset out of a scan are all worth a look.
 
 ---
 
@@ -18,7 +101,7 @@ backlog looked like 17 obligations when it was really four.
 |---|---|---|
 | 14 | `ready-for-agent` | Native: Map view — the last unbuilt MVP feature |
 | 34 | `ready-for-human` | Outstanding manual QA from #3, #7, #8, #17 |
-| 37 | `bug` `ready-for-agent` | Duplicate-Plant check on every creation path |
+| ~~37~~ | *closed 2026-09-06* | Duplicate-Plant check on every creation path — see the #37 section above |
 
 Plus **#1**, the spec epic, which closes when its children do.
 
