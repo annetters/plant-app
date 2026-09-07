@@ -10,7 +10,8 @@ export type TagScanPhotoIds = { frontTagPhotoId: string; backTagPhotoId?: string
 
 export type MainStackParamList = {
   Dashboard: undefined
-  Map: undefined
+  /** `addPlantingForPlantId` opens the Add Planting form against that Plant — the duplicate-Plant offer's "add a Planting against the record you already have" (#37), web's `?addPlantingForPlantId=` in native form. */
+  Map: { addPlantingForPlantId?: string } | undefined
   BaseMapSetup: undefined
   Registry: undefined
   /** No `plantId` means create: the same screen starts from an empty form and creates on save (#31). */
@@ -31,11 +32,5 @@ export type MainStackParamList = {
     photoIds: TagScanPhotoIds
     candidate: TagOcrCandidateFields
     species: SpeciesNameSummary[]
-  }
-  TagScanDuplicateOffer: {
-    scanId: string
-    photoIds: TagScanPhotoIds
-    candidate: TagOcrCandidateFields
-    existingPlant: Plant
   }
 }

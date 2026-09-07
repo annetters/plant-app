@@ -1,7 +1,7 @@
 import type { BedRow, PlantingRow, PlantRow, PropertyRow } from '@plant-app/domain'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useLocation } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { PlantsRepositoryProvider } from '../plants/PlantsRepositoryContext'
 import { PlantingsRepositoryProvider } from '../plantings/PlantingsRepositoryContext'
@@ -78,6 +78,11 @@ async function pickFirstCandidate(query: string) {
   await userEvent.type(await screen.findByLabelText('Address'), query)
   const [firstOption] = await screen.findAllByRole('option')
   await userEvent.click(firstOption)
+}
+
+/** Renders whatever is left in the URL, so a test can see what the page has consumed. */
+function LocationProbe() {
+  return <span data-testid="url-search">{useLocation().search}</span>
 }
 
 describe('PropertyPage — no Property yet', () => {
@@ -534,5 +539,53 @@ describe('PropertyPage — existing Property', () => {
 
     const details = await screen.findByRole('region', { name: 'Planting details' })
     expect(within(details).getByText('Quantity: 3')).toBeInTheDocument()
+  })
+
+  it('opens the Add Planting form for the Plant named by ?addPlantingForPlantId= (the duplicate-Plant offer, #37)', async () => {
+    const plantRow: PlantRow = {
+      id: 'plant-1',
+      common_name: 'Coneflower',
+      scientific_name: 'Echinacea purpurea',
+      cultivar: null,
+      flower_color: null,
+      bloom_start_month: null,
+      bloom_start_day: null,
+      bloom_end_month: null,
+      bloom_end_day: null,
+      sun_requirement: null,
+      mature_height_inches: null,
+      mature_spread_inches: null,
+      hardiness_zone_min: null,
+      hardiness_zone_max: null,
+      foliage_type: null,
+      native_status: null,
+      reference_photo_paths: [],
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+    }
+
+    const fake = createFakePropertiesDbClient(availableRow)
+    const beds = createFakeBedsDbClient([bedRow])
+    const plants = createFakePlantsDbClient([plantRow])
+    const plantings = createFakePlantingsDbClient([])
+    render(
+      <MemoryRouter initialEntries={['/map?addPlantingForPlantId=plant-1']}>
+        <LocationProbe />
+        <PropertiesRepositoryProvider client={fake.client}>
+          <BedsRepositoryProvider client={beds.client}>
+            <PlantsRepositoryProvider client={plants.client}>
+              <PlantingsRepositoryProvider client={plantings.client}>
+                <PropertyPage />
+              </PlantingsRepositoryProvider>
+            </PlantsRepositoryProvider>
+          </BedsRepositoryProvider>
+        </PropertiesRepositoryProvider>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByLabelText('Plant *')).toHaveValue('plant-1')
+    // Consumed, not left in the URL: a reload or a Back into this page would
+    // otherwise reopen the form the gardener may have already cancelled.
+    await waitFor(() => expect(screen.getByTestId('url-search').textContent).toBe(''))
   })
 })

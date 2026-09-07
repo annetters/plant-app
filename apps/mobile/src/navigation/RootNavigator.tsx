@@ -12,7 +12,6 @@ import { LoginScreen } from '../screens/LoginScreen'
 import { SignUpScreen } from '../screens/SignUpScreen'
 import { TagScanAmbiguousSpeciesScreen } from '../tagScan/TagScanAmbiguousSpeciesScreen'
 import { TagScanCaptureScreen } from '../tagScan/TagScanCaptureScreen'
-import { TagScanDuplicateOfferScreen } from '../tagScan/TagScanDuplicateOfferScreen'
 import { TagScanMultipleReadingsScreen } from '../tagScan/TagScanMultipleReadingsScreen'
 import { TagScanReviewScreen } from '../tagScan/TagScanReviewScreen'
 import { PlantingTaskHistoryScreen } from '../tasks/PlantingTaskHistoryScreen'
@@ -59,7 +58,6 @@ export function RootNavigator() {
       <MainStack.Screen name="TagScanMultipleReadings" component={TagScanMultipleReadingsScreen} />
       <MainStack.Screen name="TagScanReview" component={TagScanReviewScreen} />
       <MainStack.Screen name="TagScanAmbiguousSpecies" component={TagScanAmbiguousSpeciesScreen} />
-      <MainStack.Screen name="TagScanDuplicateOffer" component={TagScanDuplicateOfferScreen} />
     </MainStack.Navigator>
   )
 }

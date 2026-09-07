@@ -9,7 +9,7 @@ import {
   svgPointsAttribute,
   validatePlantingInput,
 } from '@plant-app/domain'
-import { useFocusEffect, useNavigation } from '@react-navigation/native'
+import { useFocusEffect, useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -140,6 +140,8 @@ const CENTER_OF_SURFACE: BedPoint = { x: STAGE_SIZE_PX / 2, y: STAGE_SIZE_PX / 2
  */
 export function MapScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>()
+  const route = useRoute<RouteProp<MainStackParamList, 'Map'>>()
+  const startAddingForPlantId = route.params?.addPlantingForPlantId
   const propertiesRepository = usePropertiesRepository()
   const bedsRepository = useBedsRepository()
   const plantsRepository = usePlantsRepository()
@@ -374,10 +376,28 @@ export function MapScreen() {
     navigation.navigate('PlantingDetail', { plantingId })
   }
 
-  function handleStartAdding() {
+  // Opens the add form against the Plant a duplicate-Plant offer sent the
+  // gardener here with (#37). Waits for both lists: the form can't offer a
+  // Plant it hasn't loaded, and there's nothing to drop a Pin onto until at
+  // least one Bed exists.
+  //
+  // The param is cleared the moment it's honoured, because it's a one-shot
+  // instruction rather than state to restore: left on the route it would
+  // reopen the add form every time this screen regains focus, long after the
+  // gardener cancelled out of it.
+  useEffect(() => {
+    if (!startAddingForPlantId) return
+    if (beds.length === 0) return
+    if (!plants.some((plant) => plant.id === startAddingForPlantId)) return
+    navigation.setParams({ addPlantingForPlantId: undefined })
+    handleStartAdding(startAddingForPlantId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startAddingForPlantId, beds, plants])
+
+  function handleStartAdding(plantId?: string) {
     setCluster(null)
     setAdding(true)
-    setForm(EMPTY_FORM)
+    setForm({ ...EMPTY_FORM, ...(plantId && { plantId }) })
     setFieldErrors({})
     setFormError(null)
     setPinStage(CENTER_OF_SURFACE)
@@ -664,7 +684,7 @@ export function MapScreen() {
               accessibilityRole="button"
               style={[styles.button, plants.length === 0 && styles.buttonDisabled]}
               disabled={plants.length === 0}
-              onPress={handleStartAdding}
+              onPress={() => handleStartAdding()}
             >
               <Text style={styles.buttonText}>Add Planting</Text>
             </Pressable>

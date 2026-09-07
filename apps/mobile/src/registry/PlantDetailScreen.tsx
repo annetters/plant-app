@@ -1,13 +1,16 @@
 import {
+  DUPLICATE_PLANT_OFFER,
   EMPTY_PLANT_FORM_FIELDS,
   FOLIAGE_TYPES,
   HARDINESS_ZONE_NUMBERS,
   NATIVE_STATUSES,
   SUN_REQUIREMENTS,
+  checkForDuplicatePlant,
   formatOption,
   plantFormFieldsFromPlant,
   plantInputFromFormFields,
   validatePlantInput,
+  type Plant,
   type PlantFormFields,
   type PlantInput,
   type PlantValidationErrors,
@@ -23,6 +26,7 @@ import { KeyboardAwareScrollView } from '../components/KeyboardAwareScrollView'
 import { ChipRow } from '../components/ChipRow'
 import { pickPhoto, type PhotoSource } from '../lib/pickPhoto'
 import type { MainStackParamList } from '../navigation/types'
+import { DuplicatePlantOffer } from '../plants/DuplicatePlantOffer'
 import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
 import { useSpeciesLookupRepository } from '../species/SpeciesLookupRepositoryContext'
 import { SuggestedTraitsConfirmation } from '../species/SuggestedTraitsConfirmation'
@@ -92,6 +96,18 @@ export function PlantDetailScreen() {
     input: PlantInput
     traits: UsdaSpeciesSuggestedTraits
   } | null>(null)
+  // The registry as it stands, for the duplicate check on save (#37). Only
+  // loaded when creating — an existing Plant is already its own record and
+  // would match itself. `null` until it arrives: "no Plants yet" and "not
+  // known yet" are different answers, and Add Plant waits for the second to
+  // become the first.
+  const [existingPlants, setExistingPlants] = useState<Plant[] | null>(
+    routePlantId ? [] : null,
+  )
+  const [duplicateOffer, setDuplicateOffer] = useState<{
+    input: PlantInput
+    existingPlant: Plant
+  } | null>(null)
   const scrollViewRef = useRef<ScrollView>(null)
 
   useEffect(() => {
@@ -115,6 +131,25 @@ export function PlantDetailScreen() {
           setFormError('Could not load this Plant.')
           setLoading(false)
         }
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [routePlantId, repository])
+
+  useEffect(() => {
+    if (routePlantId) return
+    let cancelled = false
+    repository
+      .list()
+      .then((plants) => {
+        if (!cancelled) setExistingPlants(plants)
+      })
+      .catch(() => {
+        // Degrades to "no known duplicates" rather than blocking the form —
+        // the same failure behaviour Tag Scan's review screen has always had
+        // with the same list, and now web's form too.
+        if (!cancelled) setExistingPlants([])
       })
     return () => {
       cancelled = true
@@ -176,6 +211,17 @@ export function PlantDetailScreen() {
     setFormError(null)
     setStatusMessage(null)
     if (!plantId) {
+      // CONTEXT.md, Plant: one source of truth per plant type/cultivar.
+      // Before the USDA trait step, not after — there is no point suggesting
+      // traits for a Plant that may never be created.
+      const duplicate = checkForDuplicatePlant(
+        { scientificName: input.scientificName, cultivar: input.cultivar },
+        existingPlants ?? [],
+      )
+      if (duplicate.status === 'duplicate') {
+        setDuplicateOffer({ input, existingPlant: duplicate.existingPlant })
+        return
+      }
       await offerTraitsThenCreate(input)
       return
     }
@@ -223,6 +269,7 @@ export function PlantDetailScreen() {
 
   async function handleCreate(input: PlantInput, traits?: UsdaSpeciesSuggestedTraits) {
     setPendingCreation(null)
+    setDuplicateOffer(null)
     setSubmitting(true)
     try {
       const created = await repository.create(applySuggestedTraits(input, traits))
@@ -376,6 +423,29 @@ export function PlantDetailScreen() {
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <Text style={styles.loading}>Loading…</Text>
+      </SafeAreaView>
+    )
+  }
+
+  if (duplicateOffer) {
+    const { input, existingPlant } = duplicateOffer
+    return (
+      <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+        <KeyboardAwareScrollView contentContainerStyle={styles.container}>
+          {formError && <Text style={styles.error}>{formError}</Text>}
+          <DuplicatePlantOffer
+            existingPlant={existingPlant}
+            busy={submitting}
+            onAddPlanting={() =>
+              navigation.navigate('Map', { addPlantingForPlantId: existingPlant.id })
+            }
+            onKeepEditing={() => setDuplicateOffer(null)}
+            onCreateAnyway={() => {
+              setDuplicateOffer(null)
+              void offerTraitsThenCreate(input)
+            }}
+          />
+        </KeyboardAwareScrollView>
       </SafeAreaView>
     )
   }
@@ -675,11 +745,16 @@ export function PlantDetailScreen() {
 
         {formError && <Text style={styles.error}>{formError}</Text>}
         {statusMessage && <Text style={styles.status}>{statusMessage}</Text>}
+        {/* The duplicate check can't run until the registry has loaded, so
+            Add Plant waits for it rather than writing a Plant the check
+            would have caught — the same gate, worded the same way, that Tag
+            Scan's review screen puts on Continue. */}
+        {existingPlants === null && <Text>{DUPLICATE_PLANT_OFFER.checkingMessage}</Text>}
 
         <Pressable
           accessibilityRole="button"
           style={styles.saveButton}
-          disabled={submitting}
+          disabled={submitting || existingPlants === null}
           onPress={handleSave}
         >
           <Text style={styles.saveButtonText}>

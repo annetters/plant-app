@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { formatMonthDay, formatOption, MONTH_NAMES, plantLabel } from "./plantDisplay.js";
+import {
+  formatMonthDay,
+  formatOption,
+  MONTH_NAMES,
+  plantIdentityLabel,
+  plantLabel,
+} from "./plantDisplay.js";
 import type { Plant } from "./plant.js";
 
 function plant(overrides: Partial<Plant> & Pick<Plant, "id" | "commonName">): Plant {
@@ -46,5 +52,28 @@ describe("plantLabel", () => {
 
   it("returns a fallback label when the Plant is undefined", () => {
     expect(plantLabel(undefined)).toBe("Unknown plant");
+  });
+});
+
+describe("plantIdentityLabel", () => {
+  it("names the matched record by all three fields the duplicate check matched on", () => {
+    expect(
+      plantIdentityLabel(
+        plant({
+          id: "p1",
+          commonName: "Bee balm",
+          scientificName: "Monarda didyma",
+          cultivar: "Jacob Cline",
+        }),
+      ),
+    ).toBe("Bee balm (Monarda didyma 'Jacob Cline')");
+  });
+
+  it("omits the cultivar when the matched Plant is the straight species", () => {
+    expect(
+      plantIdentityLabel(
+        plant({ id: "p1", commonName: "Bee balm", scientificName: "Monarda didyma" }),
+      ),
+    ).toBe("Bee balm (Monarda didyma)");
   });
 });

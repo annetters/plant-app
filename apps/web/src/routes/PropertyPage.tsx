@@ -15,8 +15,26 @@ export function PropertyPage() {
   // Set by the Registry's "View on the map" link (#10) so a Planting's
   // details open automatically once the map loads, instead of the gardener
   // hunting for its Pin.
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const selectPlantingId = searchParams.get('plantingId') ?? undefined
+  // Set by the duplicate-Plant offer on `/registry/new` (#37) — "add a
+  // Planting against the record you already have" has to arrive with that
+  // record chosen, or it is just a link to the map.
+  //
+  // Unlike `?plantingId=` above, this one is a one-shot instruction rather
+  // than a view to restore, so it's read once into state and then stripped
+  // from the URL: left there, a reload or a Back into this page would remount
+  // and spring the add form open again, long after the gardener cancelled it.
+  const [startAddingForPlantId] = useState(
+    () => searchParams.get('addPlantingForPlantId') ?? undefined,
+  )
+  useEffect(() => {
+    if (!searchParams.has('addPlantingForPlantId')) return
+    const remaining = new URLSearchParams(searchParams)
+    remaining.delete('addPlantingForPlantId')
+    setSearchParams(remaining, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [property, setProperty] = useState<Property | null | undefined>(undefined)
   const [pick, setPick] = useState<PropertyCreateInput | null>(null)
   const [addressError, setAddressError] = useState<string | null>(null)
@@ -217,6 +235,7 @@ export function PropertyPage() {
                 property={property}
                 beds={beds ?? []}
                 selectPlantingId={selectPlantingId}
+                startAddingForPlantId={startAddingForPlantId}
                 hiddenWhileDrawing={bedEditorOpen}
               />
             </>

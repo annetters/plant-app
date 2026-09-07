@@ -32,3 +32,17 @@ export function plantLabel(plant: Plant | undefined): string {
   if (!plant) return "Unknown plant";
   return plant.cultivar ? `${plant.commonName} (${plant.cultivar})` : plant.commonName;
 }
+
+/**
+ * How a matched Plant is named back to the user when a creation path finds a
+ * duplicate. Deliberately fuller than `plantLabel` above: this one names all
+ * three fields `checkForDuplicatePlant` matched on, so the gardener can see
+ * why these two count as the same Plant — a common name alone can span
+ * several species, which is the exact confusion CONTEXT.md's matching rule
+ * exists to avoid.
+ */
+export function plantIdentityLabel(plant: Plant): string {
+  const cultivar = plant.cultivar?.trim();
+  const scientific = cultivar ? `${plant.scientificName} '${cultivar}'` : plant.scientificName;
+  return `${plant.commonName} (${scientific})`;
+}

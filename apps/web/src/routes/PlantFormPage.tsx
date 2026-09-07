@@ -1,18 +1,22 @@
 import {
+  DUPLICATE_PLANT_OFFER,
   EMPTY_PLANT_FORM_FIELDS,
   FOLIAGE_TYPES,
   HARDINESS_ZONE_NUMBERS,
   NATIVE_STATUSES,
   SUN_REQUIREMENTS,
+  checkForDuplicatePlant,
   dateRangeWraps,
   formatOption,
   plantFormFieldsFromPlant,
+  plantIdentityLabel,
   plantInputFromFormFields,
   validateCareTaskTemplateInput,
   validatePlantInput,
   type CareTaskTemplate,
   type CareTaskTemplateInput,
   type CareTaskTemplateValidationErrors,
+  type Plant,
   type PlantFormFields,
   type PlantInput,
   type PlantValidationErrors,
@@ -65,6 +69,14 @@ export function PlantFormPage() {
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [photoBusy, setPhotoBusy] = useState(false)
+  // Only ever loaded in create mode, and `null` until it arrives — "no Plants
+  // yet" and "not known yet" are different answers, and Add Plant waits for
+  // the second to become the first before it can run the duplicate check.
+  const [existingPlants, setExistingPlants] = useState<Plant[] | null>(isEditing ? [] : null)
+  const [duplicateOffer, setDuplicateOffer] = useState<{
+    input: PlantInput
+    existingPlant: Plant
+  } | null>(null)
 
   const [careTaskTemplates, setCareTaskTemplates] = useState<CareTaskTemplate[]>([])
   const [templateForm, setTemplateForm] = useState(EMPTY_TEMPLATE_FORM)
@@ -119,6 +131,29 @@ export function PlantFormPage() {
     }
   }, [referencePhotoPaths, repository])
 
+  /**
+   * The registry as it stands, for the duplicate check `handleSubmit` runs
+   * (#37). Create only: an existing Plant is already its own record, and
+   * would match itself. A failure degrades to "no known duplicates" rather
+   * than blocking the form — exactly what Tag Scan's review screen does with
+   * the same list, so the two surfaces fail the same way.
+   */
+  useEffect(() => {
+    if (isEditing) return
+    let cancelled = false
+    repository
+      .list()
+      .then((plants) => {
+        if (!cancelled) setExistingPlants(plants)
+      })
+      .catch(() => {
+        if (!cancelled) setExistingPlants([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isEditing, repository])
+
   useEffect(() => {
     if (!plantId) return
     let cancelled = false
@@ -147,19 +182,42 @@ export function PlantFormPage() {
     if (!input) return
     setFormError(null)
     setStatusMessage(null)
-    setSubmitting(true)
-    try {
-      if (plantId) {
-        await repository.update(plantId, input)
-        setStatusMessage('Saved.')
-      } else {
-        const created = await repository.create(input)
-        navigate(`/registry/${created.id}`, { replace: true })
+
+    if (!plantId) {
+      // CONTEXT.md, Plant: one source of truth per plant type/cultivar. Runs
+      // before the write, on the same fields Tag Scan checks, so this form
+      // and a scan reach the same verdict about the same plant.
+      const duplicate = checkForDuplicatePlant(
+        { scientificName: input.scientificName, cultivar: input.cultivar },
+        existingPlants ?? [],
+      )
+      if (duplicate.status === 'duplicate') {
+        setDuplicateOffer({ input, existingPlant: duplicate.existingPlant })
         return
       }
+      await createPlant(input)
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      await repository.update(plantId, input)
+      setStatusMessage('Saved.')
     } catch {
       setFormError('Could not save this plant. Please try again.')
     } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function createPlant(input: PlantInput) {
+    setDuplicateOffer(null)
+    setSubmitting(true)
+    try {
+      const created = await repository.create(input)
+      navigate(`/registry/${created.id}`, { replace: true })
+    } catch {
+      setFormError('Could not save this plant. Please try again.')
       setSubmitting(false)
     }
   }
@@ -321,6 +379,47 @@ export function PlantFormPage() {
     return (
       <main>
         <p>Loading…</p>
+      </main>
+    )
+  }
+
+  if (duplicateOffer) {
+    // Stands in for the form rather than sitting above it, exactly as the two
+    // native paths do — one shape of interruption across all three surfaces.
+    // The form's own fields are still in state behind this, unsent, so "go
+    // back and edit" costs nothing and never depends on browser history.
+    const { input, existingPlant } = duplicateOffer
+    return (
+      <main>
+        <h1>Add Plant</h1>
+        <section aria-labelledby="duplicate-plant-heading">
+          <h2 id="duplicate-plant-heading">{DUPLICATE_PLANT_OFFER.heading}</h2>
+          <p>{plantIdentityLabel(existingPlant)}</p>
+          <p>{DUPLICATE_PLANT_OFFER.body}</p>
+          {/* All three disabled while a create is in flight, matching the
+              native `DuplicatePlantOffer`: leaving the other two live mid-save
+              is how the same press lands twice. */}
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={() => navigate(`/map?addPlantingForPlantId=${existingPlant.id}`)}
+          >
+            {DUPLICATE_PLANT_OFFER.addPlantingAction}
+          </button>
+          <button type="button" disabled={submitting} onClick={() => setDuplicateOffer(null)}>
+            {DUPLICATE_PLANT_OFFER.keepEditingAction}
+          </button>
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={() => {
+              void createPlant(input)
+            }}
+          >
+            {DUPLICATE_PLANT_OFFER.createAnywayAction}
+          </button>
+        </section>
+        <Link to="/registry">Back to Registry</Link>
       </main>
     )
   }
@@ -526,8 +625,13 @@ export function PlantFormPage() {
 
         {formError && <p role="alert">{formError}</p>}
         {statusMessage && <p role="status">{statusMessage}</p>}
+        {/* The duplicate check can't run until the registry has loaded, so
+            Add Plant waits for it rather than writing a Plant the check
+            would have caught — the same gate Tag Scan's review screen puts
+            on Continue, worded the same way. */}
+        {existingPlants === null && <p>{DUPLICATE_PLANT_OFFER.checkingMessage}</p>}
 
-        <button type="submit" disabled={submitting}>
+        <button type="submit" disabled={submitting || existingPlants === null}>
           {isEditing ? 'Save changes' : 'Add Plant'}
         </button>
       </form>

@@ -74,6 +74,9 @@ async function renderFlow(fake: ReturnType<typeof createFakes>, entryPoint: stri
           <Stack.Navigator screenOptions={{ headerShown: false }}>
             <Stack.Screen name="Registry" component={RegistryStub} />
             <Stack.Screen name="PlantDetail" component={PlantDetailScreen} />
+            <Stack.Screen name="Map">
+              {({ route }: any) => <Text>map: {JSON.stringify(route.params)}</Text>}
+            </Stack.Screen>
           </Stack.Navigator>
         </NavigationContainer>
       </PlantsRepositoryProvider>
@@ -90,6 +93,30 @@ async function renderScreen(fake = createFakes()) {
 /** Arrives at the same screen with no `plantId` — the manual creation path (#31). */
 async function renderCreateScreen(fake = createFakes([])) {
   return renderFlow(fake, 'add plant')
+}
+
+/**
+ * Breaks only the whole-table listing the duplicate check depends on, so a
+ * test can see what the form does when it can't find out which Plants
+ * already exist. `get`/`create`/`update` keep working.
+ */
+function failListingPlants(fake: ReturnType<typeof createFakes>) {
+  const originalFrom = fake.client.from.bind(fake.client)
+  jest.spyOn(fake.client, 'from').mockImplementation(((table: any) => {
+    const real = originalFrom(table)
+    if (table !== 'plants') return real
+    return {
+      ...real,
+      select: () => ({
+        order: () => Promise.resolve({ data: null, error: { message: 'network error' } }),
+      }),
+    }
+  }) as typeof fake.client.from)
+}
+
+/** Add Plant stays disabled until the registry has loaded — the check can't run without it. */
+async function waitUntilPlantsChecked() {
+  await waitFor(() => expect(screen.queryByText(/Checking your existing Plants/)).toBeNull())
 }
 
 describe('PlantDetailScreen', () => {
@@ -507,6 +534,109 @@ describe('PlantDetailScreen in create mode (#31)', () => {
     await fireEvent.changeText(screen.getByLabelText('Common name'), 'Bee balm')
     await fireEvent.changeText(screen.getByLabelText('Scientific name'), 'Monarda didyma')
     await fireEvent.press(screen.getByRole('button', { name: 'Add Plant' }))
+
+    await waitFor(() => expect(screen.getByText('Saved.')).toBeTruthy())
+    expect(fake.rows()).toHaveLength(1)
+  })
+})
+
+/**
+ * #37: the duplicate check every Plant creation path runs. The same three
+ * decisions, in the same order, as web's `/registry/new` and Tag Scan's
+ * review screen — they share `DuplicatePlantOffer` and its domain-level
+ * wording precisely so these three surfaces can't drift.
+ */
+describe('PlantDetailScreen — duplicate Plant check (#37)', () => {
+  const beeBalm = plantRow({
+    id: 'plant-1',
+    common_name: 'Bee balm',
+    scientific_name: 'Monarda didyma',
+  })
+
+  async function enterBeeBalm() {
+    await waitUntilPlantsChecked()
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'Bee balm')
+    await fireEvent.changeText(screen.getByLabelText('Scientific name'), 'Monarda didyma')
+    await fireEvent.press(screen.getByRole('button', { name: 'Add Plant' }))
+  }
+
+  it('offers the existing Plant instead of writing a duplicate', async () => {
+    const fake = await renderCreateScreen(createFakes([beeBalm]))
+
+    await enterBeeBalm()
+
+    expect(await screen.findByText('You already have this Plant')).toBeTruthy()
+    expect(screen.getByText("Bee balm (Monarda didyma)")).toBeTruthy()
+    expect(fake.rows()).toHaveLength(1) // the existing one, and nothing new
+  })
+
+  it('creates anyway when the gardener says this really is a different Plant', async () => {
+    const fake = await renderCreateScreen(createFakes([beeBalm]))
+    fake.functionsInvoke.mockResolvedValue({ data: { species: [] }, error: null })
+
+    await enterBeeBalm()
+    await fireEvent.press(
+      await screen.findByRole('button', { name: 'This is a different Plant — create it anyway' }),
+    )
+
+    await waitFor(() => expect(fake.rows()).toHaveLength(2))
+    expect(fake.rows()[1]).toMatchObject({ common_name: 'Bee balm', scientific_name: 'Monarda didyma' })
+  })
+
+  it('goes back to the form with nothing written when the gardener chooses to edit', async () => {
+    const fake = await renderCreateScreen(createFakes([beeBalm]))
+
+    await enterBeeBalm()
+    await fireEvent.press(await screen.findByRole('button', { name: 'Go back and edit' }))
+
+    expect(screen.getByLabelText('Common name').props.value).toBe('Bee balm')
+    expect(screen.queryByText('You already have this Plant')).toBeNull()
+    expect(fake.rows()).toHaveLength(1)
+  })
+
+  it('offers a Planting against the matched Plant on the Map — CONTEXT.md\'s alternative to a second record', async () => {
+    const fake = await renderCreateScreen(createFakes([beeBalm]))
+
+    await enterBeeBalm()
+    await fireEvent.press(
+      await screen.findByRole('button', { name: 'Add a Planting against this Plant' }),
+    )
+
+    expect(await screen.findByText(/"addPlantingForPlantId":"plant-1"/)).toBeTruthy()
+    expect(fake.rows()).toHaveLength(1)
+  })
+
+  it('matches on genus+species+cultivar, so a named cultivar is not a duplicate of the straight species', async () => {
+    const fake = await renderCreateScreen(createFakes([beeBalm]))
+    fake.functionsInvoke.mockResolvedValue({ data: { species: [] }, error: null })
+
+    await waitUntilPlantsChecked()
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'Bee balm')
+    await fireEvent.changeText(screen.getByLabelText('Scientific name'), 'Monarda didyma')
+    await fireEvent.changeText(screen.getByLabelText('Cultivar'), 'Jacob Cline')
+    await fireEvent.press(screen.getByRole('button', { name: 'Add Plant' }))
+
+    await waitFor(() => expect(fake.rows()).toHaveLength(2))
+    expect(screen.queryByText('You already have this Plant')).toBeNull()
+  })
+
+  it('degrades to "no known duplicates" rather than blocking the form when the Plant list cannot be loaded', async () => {
+    const fake = createFakes([beeBalm])
+    failListingPlants(fake)
+    await renderCreateScreen(fake)
+    fake.functionsInvoke.mockResolvedValue({ data: { species: [] }, error: null })
+
+    await enterBeeBalm()
+
+    await waitFor(() => expect(fake.rows()).toHaveLength(2))
+    expect(screen.queryByText('You already have this Plant')).toBeNull()
+  })
+
+  it('does not run the check when editing an existing Plant — it is already its own record', async () => {
+    const fake = await renderScreen(createFakes([beeBalm]))
+    await screen.findByDisplayValue('Bee balm')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Save changes' }))
 
     await waitFor(() => expect(screen.getByText('Saved.')).toBeTruthy())
     expect(fake.rows()).toHaveLength(1)

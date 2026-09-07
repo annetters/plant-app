@@ -1,4 +1,5 @@
 import {
+  DUPLICATE_PLANT_OFFER,
   checkForDuplicatePlant,
   validatePlantInput,
   type Plant,
@@ -13,6 +14,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { KeyboardAwareScrollView } from '../components/KeyboardAwareScrollView'
 import type { MainStackParamList, TagScanPhotoIds } from '../navigation/types'
+import { DuplicatePlantOffer } from '../plants/DuplicatePlantOffer'
 import { useSpeciesLookupRepository } from '../species/SpeciesLookupRepositoryContext'
 import { SuggestedTraitsConfirmation } from '../species/SuggestedTraitsConfirmation'
 import {
@@ -53,6 +55,10 @@ export function TagScanReviewScreen() {
   const [pendingCreation, setPendingCreation] = useState<{
     input: PlantInput
     traits: UsdaSpeciesSuggestedTraits
+  } | null>(null)
+  const [duplicateOffer, setDuplicateOffer] = useState<{
+    input: PlantInput
+    existingPlant: Plant
   } | null>(null)
 
   // Re-syncs fields when the user returns from picking an ambiguous species
@@ -125,6 +131,7 @@ export function TagScanReviewScreen() {
    * tag-photo link is a much smaller problem than a duplicate Plant record.
    */
   async function createPlant(input: PlantInput, traits?: UsdaSpeciesSuggestedTraits) {
+    setDuplicateOffer(null)
     setBusy(true)
     setFormError(null)
     let plant: Plant
@@ -160,15 +167,18 @@ export function TagScanReviewScreen() {
       existingPlants,
     )
     if (duplicateCheck.status === 'duplicate') {
-      navigation.navigate('TagScanDuplicateOffer', {
-        scanId,
-        photoIds,
-        candidate: { commonName: input.commonName, scientificName: input.scientificName, cultivar: input.cultivar },
-        existingPlant: duplicateCheck.existingPlant,
-      })
+      // Inline, not a screen of its own (#37): the same `DuplicatePlantOffer`
+      // the two typed-entry forms show, and "create anyway" re-enters the
+      // create below — tag-photo linking and all — rather than a second copy
+      // of it living on another screen.
+      setDuplicateOffer({ input, existingPlant: duplicateCheck.existingPlant })
       return
     }
 
+    await offerTraitsThenCreate(input)
+  }
+
+  async function offerTraitsThenCreate(input: PlantInput) {
     setBusy(true)
     try {
       const traits = await suggestSpeciesTraits(speciesLookup, input.scientificName)
@@ -185,8 +195,55 @@ export function TagScanReviewScreen() {
     }
   }
 
+  /**
+   * Takes up the offer: the scan ends here, on the Map, with the Plant the
+   * gardener already has ready to place.
+   *
+   * Deliberately writes nothing. Linking this scan's tag photos onto the
+   * matched Plant was considered and dropped: it would modify a record the
+   * gardener came here to *avoid* duplicating, irreversibly from the UI, and
+   * before they have committed to anything — including when they back out of
+   * the Planting. The photos stay unlinked, exactly as they did when this
+   * path pushed a screen instead (#37 didn't ask to change that).
+   */
+  function addPlantingAgainst(existingPlant: Plant) {
+    // Dashboard underneath, so Back leaves the Map rather than re-entering a
+    // scan that is finished with.
+    navigation.reset({
+      index: 1,
+      routes: [
+        { name: 'Dashboard' },
+        { name: 'Map', params: { addPlantingForPlantId: existingPlant.id } },
+      ],
+    })
+  }
+
   function cancelScan() {
     navigation.reset({ index: 0, routes: [{ name: 'Dashboard' }] })
+  }
+
+  if (duplicateOffer) {
+    const { input, existingPlant } = duplicateOffer
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <KeyboardAwareScrollView contentContainerStyle={styles.container}>
+          <Pressable accessibilityRole="button" disabled={busy} onPress={cancelScan}>
+            <Text style={styles.cancelText}>Cancel</Text>
+          </Pressable>
+          {formError && <Text style={styles.error}>{formError}</Text>}
+          <DuplicatePlantOffer
+            existingPlant={existingPlant}
+            busy={busy}
+            onAddPlanting={() => addPlantingAgainst(existingPlant)}
+            onKeepEditing={() => setDuplicateOffer(null)}
+            onCreateAnyway={() => {
+              setDuplicateOffer(null)
+              void offerTraitsThenCreate(input)
+            }}
+          />
+        </KeyboardAwareScrollView>
+      </SafeAreaView>
+    )
   }
 
   if (pendingCreation) {
@@ -262,7 +319,7 @@ export function TagScanReviewScreen() {
         />
 
         {formError && <Text style={styles.error}>{formError}</Text>}
-        {!plantsLoaded && <Text>Checking your existing Plants for a match…</Text>}
+        {!plantsLoaded && <Text>{DUPLICATE_PLANT_OFFER.checkingMessage}</Text>}
 
         <Pressable
           accessibilityRole="button"

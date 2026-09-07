@@ -51,8 +51,8 @@ async function renderReviewFlow(
           <Stack.Screen name="TagScanAmbiguousSpecies">
             {({ route }: any) => <Text>ambiguous: {JSON.stringify(route.params)}</Text>}
           </Stack.Screen>
-          <Stack.Screen name="TagScanDuplicateOffer">
-            {({ route }: any) => <Text>duplicate: {JSON.stringify(route.params)}</Text>}
+          <Stack.Screen name="Map">
+            {({ route }: any) => <Text>map: {JSON.stringify(route.params)}</Text>}
           </Stack.Screen>
           <Stack.Screen name="Dashboard">{() => <Text>dashboard screen</Text>}</Stack.Screen>
         </Stack.Navigator>
@@ -160,12 +160,13 @@ describe('TagScanReviewScreen', () => {
     expect(screen.getByLabelText('Common name').props.value).toBe('bee balm')
   })
 
-  it('offers a new Planting against an existing matching Plant instead of creating a duplicate', async () => {
-    const fake = await renderReviewFlow(
-      createFakes([
-        plantRow({ id: 'plant-1', common_name: 'Bee balm', scientific_name: 'Monarda didyma' }),
-      ]),
-    )
+  /**
+   * #37 replaced this path's pushed screen with the same inline offer the
+   * two typed-entry forms show — one `DuplicatePlantOffer`, one wording, and
+   * one place where "create anyway" re-enters this screen's own create (tag
+   * photos and all), rather than a second copy of it on another screen.
+   */
+  async function offerShownFor(fake: ReturnType<typeof createFakes>) {
     await waitFor(() => expect(screen.getByLabelText('Common name')).toBeTruthy())
     await waitUntilPlantsLoaded()
 
@@ -173,11 +174,62 @@ describe('TagScanReviewScreen', () => {
     await fireEvent.changeText(screen.getByLabelText('Scientific name'), 'Monarda didyma')
     await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))
 
-    const duplicateText = await screen.findByText(/duplicate:/)
-    const params = JSON.parse(duplicateText.props.children.join('').replace('duplicate: ', ''))
-    expect(params.existingPlant).toMatchObject({ id: 'plant-1', scientificName: 'Monarda didyma' })
-    expect(params.photoIds).toEqual(defaultPhotoIds)
+    expect(await screen.findByText('You already have this Plant')).toBeTruthy()
+    return fake
+  }
+
+  const existingBeeBalm = () =>
+    createFakes(
+      [plantRow({ id: 'plant-1', common_name: 'Bee balm', scientific_name: 'Monarda didyma' })],
+      [tagPhotoRow('tag-photo-1')],
+    )
+
+  it('offers a new Planting against an existing matching Plant instead of creating a duplicate', async () => {
+    const fake = await offerShownFor(await renderReviewFlow(existingBeeBalm()))
+
+    expect(screen.getByText('Bee balm (Monarda didyma)')).toBeTruthy()
     expect(fake.plantRows()).toHaveLength(1) // no new Plant row was created
+  })
+
+  it('sends "add a Planting" to the Map against the existing Plant, writing nothing on the way', async () => {
+    const fake = await offerShownFor(await renderReviewFlow(existingBeeBalm()))
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Add a Planting against this Plant' }))
+
+    expect(await screen.findByText(/"addPlantingForPlantId":"plant-1"/)).toBeTruthy()
+    expect(fake.plantRows()).toHaveLength(1)
+    // Nothing is written to the Plant the gardener came here not to duplicate
+    // — least of all a tag-photo link they can't undo from the app.
+    expect(fake.tagPhotoRows()).toHaveLength(1)
+    expect(fake.tagPhotoRows()[0].plant_id).toBeUndefined() // never linked to it
+  })
+
+  it('goes back to the review fields, unwritten, when the user chooses to edit', async () => {
+    const fake = await offerShownFor(await renderReviewFlow(existingBeeBalm()))
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Go back and edit' }))
+
+    expect(screen.getByLabelText('Scientific name').props.value).toBe('Monarda didyma')
+    expect(screen.queryByText('You already have this Plant')).toBeNull()
+    expect(fake.plantRows()).toHaveLength(1)
+  })
+
+  it('creates a second Plant anyway on the user\'s say-so, linking the tag photo to it', async () => {
+    const fake = existingBeeBalm()
+    await renderReviewFlow(fake)
+    fake.functionsInvoke.mockResolvedValueOnce({ data: { species: [] }, error: null })
+    await offerShownFor(fake)
+
+    await fireEvent.press(
+      screen.getByRole('button', { name: 'This is a different Plant — create it anyway' }),
+    )
+
+    expect(await screen.findByText('dashboard screen')).toBeTruthy()
+    expect(fake.plantRows()).toHaveLength(2)
+    const createdId = fake.plantRows()[1].id
+    expect(fake.tagPhotoRows()).toEqual([
+      expect.objectContaining({ id: 'tag-photo-1', plant_id: createdId }),
+    ])
   })
 
   it('disables Continue until the existing-Plants check has finished loading, closing the duplicate-detection race', async () => {

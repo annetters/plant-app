@@ -1,7 +1,7 @@
 import type { CareTaskTemplateRow, PlantRow } from '@plant-app/domain'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useSearchParams } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { PlantsRepositoryProvider } from '../plants/PlantsRepositoryContext'
 import { careTaskTemplateRow } from '../test/careTaskTemplateRowFixture'
@@ -9,14 +9,46 @@ import { createFakePlantsDbClient } from '../test/fakePlantsDbClient'
 import { plantRow as row } from '../test/plantRowFixture'
 import { PlantFormPage } from './PlantFormPage'
 
-function renderAt(path: string, rows: PlantRow[] = [], careTaskTemplateRows: CareTaskTemplateRow[] = []) {
+/** Stands in for the Map page, so a test can see which Plant the duplicate offer sent it to add a Planting against. */
+function MapProbe() {
+  const [searchParams] = useSearchParams()
+  return <p>map page, adding for: {searchParams.get('addPlantingForPlantId') ?? 'nobody'}</p>
+}
+
+/**
+ * Breaks only the whole-table listing the duplicate check depends on —
+ * `get`/`create`/`update` still work, so a test can see what the form does
+ * when it can't find out which Plants already exist.
+ */
+function failListingPlants(fake: ReturnType<typeof createFakePlantsDbClient>) {
+  const originalFrom = fake.client.from.bind(fake.client)
+  vi.spyOn(fake.client, 'from').mockImplementation(((table: 'plants' | 'care_task_templates') => {
+    const real = originalFrom(table)
+    if (table !== 'plants') return real
+    return {
+      ...real,
+      select: () => ({
+        order: () => Promise.resolve({ data: null, error: { message: 'network error' } }),
+      }),
+    }
+  }) as typeof fake.client.from)
+}
+
+function renderAt(
+  path: string,
+  rows: PlantRow[] = [],
+  careTaskTemplateRows: CareTaskTemplateRow[] = [],
+  { failPlantListing = false }: { failPlantListing?: boolean } = {},
+) {
   const fake = createFakePlantsDbClient(rows, careTaskTemplateRows)
+  if (failPlantListing) failListingPlants(fake)
   render(
     <MemoryRouter initialEntries={[path]}>
       <PlantsRepositoryProvider client={fake.client}>
         <Routes>
           <Route path="/registry/new" element={<PlantFormPage />} />
           <Route path="/registry/:plantId" element={<PlantFormPage />} />
+          <Route path="/map" element={<MapProbe />} />
         </Routes>
       </PlantsRepositoryProvider>
     </MemoryRouter>,
@@ -280,5 +312,103 @@ describe('PlantFormPage — care task templates', () => {
 
     await waitFor(() => expect(fake.careTaskTemplateRows()).toHaveLength(0))
     expect(screen.queryByText('Prune', { exact: false })).not.toBeInTheDocument()
+  })
+})
+
+describe('PlantFormPage — duplicate Plant check', () => {
+  const beeBalm = { id: 'p1', common_name: 'Bee balm', scientific_name: 'Monarda didyma' }
+
+  async function submitBeeBalm(fake: ReturnType<typeof renderAt>) {
+    const user = userEvent.setup()
+    await waitFor(() =>
+      expect(screen.queryByText(/Checking your existing Plants/)).not.toBeInTheDocument(),
+    )
+    await user.type(screen.getByLabelText('Common name *'), 'Bee balm')
+    await user.type(screen.getByLabelText('Scientific name *'), 'Monarda didyma')
+    await user.click(screen.getByRole('button', { name: 'Add Plant' }))
+    return { user, fake }
+  }
+
+  it('offers the existing Plant instead of writing a duplicate', async () => {
+    const fake = renderAt('/registry/new', [row(beeBalm)])
+
+    await submitBeeBalm(fake)
+
+    expect(await screen.findByText('You already have this Plant')).toBeInTheDocument()
+    expect(screen.getByText("Bee balm (Monarda didyma)")).toBeInTheDocument()
+    expect(fake.rows()).toHaveLength(1) // the existing one, and nothing new
+  })
+
+  it('creates anyway when the gardener says this really is a different Plant', async () => {
+    const fake = renderAt('/registry/new', [row(beeBalm)])
+
+    const { user } = await submitBeeBalm(fake)
+    await user.click(
+      await screen.findByRole('button', { name: 'This is a different Plant — create it anyway' }),
+    )
+
+    await waitFor(() => expect(fake.rows()).toHaveLength(2))
+    expect(fake.rows()[1]).toMatchObject({ common_name: 'Bee balm', scientific_name: 'Monarda didyma' })
+  })
+
+  it('goes back to the form with nothing written when the gardener chooses to edit', async () => {
+    const fake = renderAt('/registry/new', [row(beeBalm)])
+
+    const { user } = await submitBeeBalm(fake)
+    await user.click(await screen.findByRole('button', { name: 'Go back and edit' }))
+
+    expect(screen.getByLabelText('Common name *')).toHaveValue('Bee balm')
+    expect(screen.queryByText('You already have this Plant')).not.toBeInTheDocument()
+    expect(fake.rows()).toHaveLength(1)
+  })
+
+  it('offers a Planting against the matched Plant on the map — CONTEXT.md\'s alternative to a second record', async () => {
+    const fake = renderAt('/registry/new', [row(beeBalm)])
+
+    const { user } = await submitBeeBalm(fake)
+    await user.click(
+      await screen.findByRole('button', { name: 'Add a Planting against this Plant' }),
+    )
+
+    expect(await screen.findByText(/map page, adding for: p1/)).toBeInTheDocument()
+    expect(fake.rows()).toHaveLength(1)
+  })
+
+  it('matches on genus+species+cultivar, so a named cultivar is not a duplicate of the straight species', async () => {
+    const fake = renderAt('/registry/new', [row(beeBalm)])
+    const user = userEvent.setup()
+
+    await waitFor(() =>
+      expect(screen.queryByText(/Checking your existing Plants/)).not.toBeInTheDocument(),
+    )
+    await user.type(screen.getByLabelText('Common name *'), 'Bee balm')
+    await user.type(screen.getByLabelText('Scientific name *'), 'Monarda didyma')
+    await user.type(screen.getByLabelText('Cultivar'), 'Jacob Cline')
+    await user.click(screen.getByRole('button', { name: 'Add Plant' }))
+
+    await waitFor(() => expect(fake.rows()).toHaveLength(2))
+    expect(screen.queryByText('You already have this Plant')).not.toBeInTheDocument()
+  })
+
+  it('degrades to "no known duplicates" rather than blocking the form when the Plant list cannot be loaded', async () => {
+    const fake = renderAt('/registry/new', [row(beeBalm)], [], { failPlantListing: true })
+
+    await submitBeeBalm(fake)
+
+    await waitFor(() => expect(fake.rows()).toHaveLength(2))
+    expect(screen.queryByText('You already have this Plant')).not.toBeInTheDocument()
+  })
+
+  it('does not run the check when editing an existing Plant — it is already its own record', async () => {
+    const user = userEvent.setup()
+    const fake = renderAt('/registry/p1', [row(beeBalm)])
+
+    const commonName = await screen.findByDisplayValue('Bee balm')
+    await user.clear(commonName)
+    await user.type(commonName, 'Scarlet bee balm')
+    await user.click(screen.getByRole('button', { name: 'Save changes' }))
+
+    expect(await screen.findByText('Saved.')).toBeInTheDocument()
+    expect(fake.rows()).toHaveLength(1)
   })
 })

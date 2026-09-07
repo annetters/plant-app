@@ -11,6 +11,16 @@ non-mixed category of photo), and care task templates (outside the MVP
 commitment — see Care task template). One Plant record may underlie many
 Plantings. Never use "plant" to mean both Plant and Planting.
 
+Before creating a new Plant record, the app checks whether the user already
+has a matching Plant (same genus/species/cultivar) and offers to add a new
+Planting against the existing record instead — one source of truth per plant
+type/cultivar, not a registry that fragments across repeat purchases from
+different nurseries. This holds however the record is being created: a Tag
+Scan, the phone's Add Plant form, or the web Registry's, all check the same
+way and present the same offer. It offers an alternative, it never
+prohibits — a gardener who means to keep a second record can always create
+one anyway.
+
 ### Tag Scan
 Creating or enriching a Plant record from a photographed nursery tag. OCR
 extracts candidate text (common name, scientific name, cultivar); the user
@@ -24,12 +34,6 @@ covers both *spicata* and *aspera*), and a species can span both a straight
 form and named cultivars (e.g. Joe Pye Weed as the species, or as 'Gateway').
 When a scan doesn't resolve unambiguously, the app shows the candidates and
 asks the user to check the physical tag rather than guessing.
-
-Before creating a new Plant record, a Tag Scan checks whether the user
-already has a matching Plant (same genus/species/cultivar) and offers to add
-a new Planting against the existing record instead — one source of truth per
-plant type/cultivar, not a registry that fragments across repeat purchases
-from different nurseries.
 
 Species-level trait suggestions (hardiness, mature size, sun/shade — never
 bloom window, which is climate-dependent, not a species/cultivar fact, and

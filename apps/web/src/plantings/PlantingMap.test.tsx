@@ -141,12 +141,14 @@ function renderMap({
   plantingRows = [] as PlantingRow[],
   photoRows = [] as PlantingPhotoRow[],
   selectPlantingId,
+  startAddingForPlantId,
 }: {
   bedRows?: BedRow[]
   plantRows?: PlantRow[]
   plantingRows?: PlantingRow[]
   photoRows?: PlantingPhotoRow[]
   selectPlantingId?: string
+  startAddingForPlantId?: string
 } = {}) {
   const property = propertyFromRow(AVAILABLE_ROW)
   const beds = createFakeBedsDbClient(bedRows)
@@ -156,7 +158,11 @@ function renderMap({
     <BedsRepositoryProvider client={beds.client}>
       <PlantsRepositoryProvider client={plants.client}>
         <PlantingsRepositoryProvider client={plantings.client}>
-          <PlantingMap property={property} selectPlantingId={selectPlantingId} />
+          <PlantingMap
+            property={property}
+            selectPlantingId={selectPlantingId}
+            startAddingForPlantId={startAddingForPlantId}
+          />
         </PlantingsRepositoryProvider>
       </PlantsRepositoryProvider>
     </BedsRepositoryProvider>,
@@ -385,5 +391,33 @@ describe('PlantingMap — jumping to a Planting (#10 Registry link)', () => {
     renderMap({ plantingRows: [PLANTING_ROW], selectPlantingId: 'no-such-planting' })
     await screen.findByText(/Coneflower ×3/)
     expect(screen.queryByRole('region', { name: 'Planting details' })).not.toBeInTheDocument()
+  })
+})
+
+describe('PlantingMap — arriving from a duplicate-Plant offer (#37)', () => {
+  it('opens the Add Planting form with the matched Plant already chosen', async () => {
+    renderMap({ startAddingForPlantId: 'plant-1' })
+
+    const select = await screen.findByLabelText('Plant *')
+    expect(select).toHaveValue('plant-1')
+    // The offer chooses the Plant, never the spot — placing the Pin is still
+    // the gardener's, and it's the only thing the form is still waiting on.
+    expect(screen.queryByText('Choose a Plant to save.')).not.toBeInTheDocument()
+  })
+
+  it('leaves the map alone when the requested Plant matches nothing loaded', async () => {
+    renderMap({ startAddingForPlantId: 'no-such-plant' })
+
+    expect(await screen.findByRole('button', { name: 'Add Planting' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('Plant *')).not.toBeInTheDocument()
+  })
+
+  it('does not reopen the form after the gardener cancels out of it', async () => {
+    renderMap({ startAddingForPlantId: 'plant-1' })
+    await screen.findByLabelText('Plant *')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(screen.queryByLabelText('Plant *')).not.toBeInTheDocument()
   })
 })

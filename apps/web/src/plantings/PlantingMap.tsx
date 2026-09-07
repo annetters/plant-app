@@ -48,6 +48,7 @@ export function PlantingMap({
   property,
   beds: bedsProp,
   selectPlantingId,
+  startAddingForPlantId,
   hiddenWhileDrawing = false,
 }: {
   property: Property
@@ -55,6 +56,8 @@ export function PlantingMap({
   beds?: Bed[]
   /** A Planting to jump straight to once loaded — the Registry's "View on the map" link (#10) lands here via `?plantingId=`, so a gardener reaches that Planting's details without hunting for its Pin. */
   selectPlantingId?: string
+  /** A Plant to open the Add Planting form against once loaded — the duplicate-Plant offer on `/registry/new` lands here via `?addPlantingForPlantId=` (#37), so "add a Planting against the record you already have" arrives with that record chosen. */
+  startAddingForPlantId?: string
   /** Set while a sibling `BedEditor` has its drawing panel open. Both components draw the same base map at the same size, and two stacked 768px maps — one drawable, one not — read as one confusing screen with no way to tell which is which. Reported during #25's QA; pre-existing since #7/#8. */
   hiddenWhileDrawing?: boolean
 }) {
@@ -96,6 +99,8 @@ export function PlantingMap({
   // reopen a panel the gardener has since closed. Resets only when
   // `selectPlantingId` itself changes to a new value.
   const autoSelectedPlantingIdRef = useRef<string | undefined>(undefined)
+  /** The same once-only guard `autoSelectedPlantingIdRef` provides, for the add form — a cancelled form must not spring back open. `PropertyPage` also strips the query param that sets it, so a reload can't reopen the form either. */
+  const autoStartedAddingForPlantIdRef = useRef<string | undefined>(undefined)
 
   const pixelsPerFootValue = pixelsPerFootForProperty(property)
 
@@ -327,9 +332,23 @@ export function PlantingMap({
     }
   }, [photos, plantingsRepository])
 
-  function handleStartAdding() {
+  // Opens the add form against the Plant a duplicate-Plant offer sent the
+  // gardener here with (#37). Waits for both lists: the form can't offer a
+  // Plant it hasn't loaded, and there is nothing to drop a Pin onto until at
+  // least one Bed exists. Once only, like the auto-select above.
+  useEffect(() => {
+    if (!startAddingForPlantId) return
+    if (autoStartedAddingForPlantIdRef.current === startAddingForPlantId) return
+    if (beds.length === 0) return
+    if (!plants.some((plant) => plant.id === startAddingForPlantId)) return
+    autoStartedAddingForPlantIdRef.current = startAddingForPlantId
+    handleStartAdding(startAddingForPlantId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [startAddingForPlantId, beds, plants])
+
+  function handleStartAdding(plantId?: string) {
     setAdding(true)
-    setForm(EMPTY_FORM)
+    setForm({ ...EMPTY_FORM, ...(plantId && { plantId }) })
     setFormError(null)
     newPinPxRef.current = { x: STAGE_SIZE_PX / 2, y: STAGE_SIZE_PX / 2 }
     setPinFeet(null)
@@ -504,7 +523,7 @@ export function PlantingMap({
       {beds.length > 0 && (
         <>
           {!adding ? (
-            <button type="button" onClick={handleStartAdding} disabled={plants.length === 0}>
+            <button type="button" onClick={() => handleStartAdding()} disabled={plants.length === 0}>
               Add Planting
             </button>
           ) : (

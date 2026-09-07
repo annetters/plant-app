@@ -1,7 +1,7 @@
 export { DASHBOARD_TILES } from "./dashboard.js";
 export type { DashboardTile } from "./dashboard.js";
 
-export { MONTH_NAMES, formatMonthDay, formatOption, plantLabel } from "./plantDisplay.js";
+export { MONTH_NAMES, formatMonthDay, formatOption, plantIdentityLabel, plantLabel } from "./plantDisplay.js";
 
 export {
   FOLIAGE_TYPES,
@@ -121,6 +121,8 @@ export type {
   TagPhotoInput,
   TagScanCandidateReview,
 } from "./tagScanCandidate.js";
+
+export { DUPLICATE_PLANT_OFFER } from "./duplicatePlantOffer.js";
 
 export { checkForDuplicatePlant, parseScientificName } from "./tagScanMatching.js";
 export type { DuplicatePlantCheck, ParsedScientificName, TagScanPlantIdentity } from "./tagScanMatching.js";

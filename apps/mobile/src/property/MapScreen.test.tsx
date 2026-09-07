@@ -1,6 +1,11 @@
 import type { BedRow, PlantRow, PlantingRow, PropertyRow } from '@plant-app/domain'
 import { STAGE_SIZE_PX } from '@plant-app/domain'
-import { NavigationContainer, useRoute, type RouteProp } from '@react-navigation/native'
+import {
+  NavigationContainer,
+  useRoute,
+  type NavigationState,
+  type RouteProp,
+} from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
 import { Alert, Text } from 'react-native'
@@ -100,6 +105,7 @@ async function renderScreen({
   plantingRows = [] as PlantingRow[],
   propertiesClient = createFakePropertiesDbClient(property).client,
   bedsClient = createFakeBedsDbClient(bedRows).client,
+  initialParams,
 }: {
   property?: PropertyRow | null
   bedRows?: BedRow[]
@@ -107,18 +113,22 @@ async function renderScreen({
   plantingRows?: PlantingRow[]
   propertiesClient?: PropertiesDbClient
   bedsClient?: BedsDbClient
+  initialParams?: Record<string, unknown>
 } = {}) {
   const { client: plantsClient } = createFakePlantsDbClient(plantRows)
   const plantings = createFakePlantingsDbClient(plantingRows)
+
+  // Lets a test see what's left on the route after the screen has consumed a param.
+  const navigationState: { current: NavigationState | undefined } = { current: undefined }
 
   const view = await render(
     <PropertiesRepositoryProvider client={propertiesClient}>
       <BedsRepositoryProvider client={bedsClient}>
         <PlantingsRepositoryProvider client={plantings.client}>
           <PlantsRepositoryProvider client={plantsClient}>
-            <NavigationContainer>
+            <NavigationContainer onStateChange={(state) => (navigationState.current = state)}>
               <Stack.Navigator screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="Map" component={MapScreen} />
+                <Stack.Screen name="Map" component={MapScreen} initialParams={initialParams} />
                 <Stack.Screen name="PlantingDetail" component={PlantingDetailStub} />
                 <Stack.Screen name="BaseMapSetup" component={BaseMapSetupStub} />
               </Stack.Navigator>
@@ -128,7 +138,7 @@ async function renderScreen({
       </BedsRepositoryProvider>
     </PropertiesRepositoryProvider>,
   )
-  return { ...view, plantings }
+  return { ...view, plantings, navigationState }
 }
 
 /** Stands in for the real base-map setup screen (#15), so the Map's empty states can be asserted to route somewhere without pulling that screen's own loading and photo picker in. */
@@ -611,5 +621,48 @@ describe('MapScreen — placing a Pin', () => {
 
     await screen.findByText(/Add a Plant to the Registry/)
     expect(screen.getByText('Add Planting').parent?.props.accessibilityState?.disabled).toBe(true)
+  })
+})
+
+describe('MapScreen — arriving from a duplicate-Plant offer (#37)', () => {
+  it('opens the Add Planting form with the matched Plant already chosen', async () => {
+    await renderScreen({ initialParams: { addPlantingForPlantId: 'plant-coneflower' } })
+
+    // The form is open, on the Plant the offer named, with only the Pin left
+    // to place — the offer chooses the Plant, never the spot.
+    expect(await screen.findByLabelText('Add Planting')).toBeTruthy()
+    expect(
+      screen.getByText('Drag the pin onto a Bed to place this Planting.', { exact: false }),
+    ).toBeTruthy()
+    expect(screen.queryByText('Choose a Plant to save.', { exact: false })).toBeNull()
+  })
+
+  it('leaves the map alone when the named Plant matches nothing loaded', async () => {
+    await renderScreen({ initialParams: { addPlantingForPlantId: 'no-such-plant' } })
+
+    expect(await screen.findByText('Add Planting')).toBeTruthy()
+    expect(screen.queryByLabelText('Add Planting')).toBeNull()
+  })
+
+  it('does not reopen the form after the gardener cancels out of it', async () => {
+    await renderScreen({ initialParams: { addPlantingForPlantId: 'plant-coneflower' } })
+    await screen.findByLabelText('Add Planting')
+
+    await fireEvent.press(screen.getByText('Cancel'))
+
+    expect(screen.queryByLabelText('Add Planting')).toBeNull()
+  })
+
+  it('clears the param once it has been honoured, so refocusing the screen cannot reopen the form', async () => {
+    const { navigationState } = await renderScreen({
+      initialParams: { addPlantingForPlantId: 'plant-coneflower' },
+    })
+    await screen.findByLabelText('Add Planting')
+
+    await waitFor(() =>
+      expect(navigationState.current?.routes[0]?.params).toMatchObject({
+        addPlantingForPlantId: undefined,
+      }),
+    )
   })
 })
