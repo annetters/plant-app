@@ -208,6 +208,14 @@ order below since each one masked the next:
    account/Homebrew-permissions class of issue documented above, not fully
    diagnosed. Treat tunnel mode as unreliable on this machine for now; the
    manual-URL entry in point 4 is the practical fallback.
+6. A local native module can be **silently dropped from the build with no
+   error anywhere** if its iOS deployment target is higher than the app's.
+   `TagOcr.swift` requires iOS 16.4 while the app targeted a lower version;
+   Expo's autolinking excluded it without warning, so the JS side just saw
+   a missing module. Diagnosing it needed temporary debug logging in the JS
+   adapter plus patching the gitignored `Podfile` to dump CocoaPods'
+   resolved-package list. If a future local module is inexplicably absent,
+   check its deployment target first.
 
 ## Commands
 
