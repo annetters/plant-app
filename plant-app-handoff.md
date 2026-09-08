@@ -7,8 +7,9 @@ hardiness zone is gone from `usdaTraits.ts`, and `UsdaCharacteristic.value`
 is now `string | null` so the null case is enforced by the type rather than
 absorbed incidentally. The issue and its status comment hold the detail.
 **#42 filed**: a flaky `BedEditor` test that fails only under full-suite
-load. **#40 is fixed but still open, and its one open question is a QA
-decision — see "What to do next".**
+load. **#40 is fixed but still open**; a user-run dev-client QA sitting is agreed
+for next session — see "Next session starts here", including the sampling
+that shows #40's own blank case can't be driven from live USDA data.
 
 The session before: three QA findings fixed (self-crossing Bed outlines
 rejected, duplicate Plants caught when the scientific name isn't a
@@ -760,8 +761,9 @@ convention is new**, invented for this and used only in #1 so far.
 **The MVP has no unbuilt features, and the manual-QA backlog is empty.**
 #34 tracked it and was closed 2026-09-07; #8's Bed-delete cascade, the last
 item on it, passed. There is no open issue for QA — the checklists under
-"Deferred QA by ticket" are the record. (One QA *decision* is open, on #40,
-and it is post-MVP: see "The one question waiting on the user" below.)
+"Deferred QA by ticket" are the record. (One user-run sitting is agreed for
+next session, on #40 and #31, and it is post-MVP: see "Next session starts
+here" below.)
 
 **One half-check is genuinely outstanding, and nothing tracks it.** #7's
 item 4 asked for the aerial imagery *and* drawn Bed alignment at an address
@@ -803,24 +805,56 @@ to north, the rectangle tool is effectively unusable until it lands. #40 no
 longer carries its caveat: it was a live defect wearing a deferral label,
 and it is now fixed.
 
-## The one question waiting on the user
+## Next session starts here: one dev-client QA sitting, user-run
 
-**Does #40 need a manual QA pass before it can close, and who runs it?**
-Asked at the end of the 2026-09-07 session and **not yet answered** — the
-session paused here.
+**Decided 2026-09-07 by the user:** they run a dev-client Tag Scan pass
+covering **#31's** last item and **#40** together, in one sitting. Read the
+caveat below before planning it — it shrinks what that sitting can actually
+prove.
 
-What's already verified: typecheck clean across workspaces, full suite green
-(229 web + 263 domain/mobile), and six unit tests covering all four
-acceptance cases. What manual QA would add is the only thing tests can't:
-Tag Scan against a *real* USDA response, confirming a species whose
-minimum-temperature characteristic comes back blank now shows no zone.
+### The one item that is straightforwardly runnable
 
-Note that **Playwright isn't an option here.** `speciesLookup` lives in
-`apps/mobile` only, so this path is the native dev client — the same surface
-as #31's one unrun Tag Scan item, which is the natural thing to pair it
-with. So the real choice is: the user runs both on the dev client, or #40
-rides on its unit coverage and closes without a manual pass. Don't assume
-either — `CLAUDE.md` requires asking who owns a QA pass before starting one.
+**#31's `formatOption` display change** — "full shade", not "full-shade" —
+reachable only through a real tag scan, and therefore only from the custom
+dev client. Cosmetic; the stored value is unchanged. Needs a rebuild.
+
+### #40's check is probably not reproducible from live USDA data
+
+Checked directly against the API on 2026-09-07, before proposing the pass.
+**250 species sampled** (two disjoint strides across the full 2,186-entry
+`characteristicSearchResults` catalog, ~11%):
+
+- `Temperature, Minimum (°F)` present with a real value: **249**
+- present but blank or null: **0**
+- absent entirely: **1** (*Psydrax odorata*)
+- blank/null values on **any** characteristic, across every row of all 250:
+  **0**
+
+So USDA appears to **omit** a characteristic it has no reading for rather
+than return it blank — which is the case the code already handled correctly
+via `Number(undefined) -> NaN`. No live species has been found that triggers
+#40's defect.
+
+**What that means, and doesn't.** The fix is still right: the blank branch is
+a real, reachable code path (`Number("") === 0`), the ticket called it, and
+the guard costs nothing. But it is **defensive hardening against a shape not
+observed in this dataset**, not a fix for something a user is hitting today.
+The four unit tests in `packages/domain` are its real coverage, and they are
+the only place the blank case can be exercised at all.
+
+Two options for the sitting, neither of them "just scan a tag and look":
+
+1. **Cover the absent case instead**, which is live and free: look up
+   *Psydrax odorata* (the one species in the sample with no temperature row)
+   and confirm no hardiness zone is offered. This proves the no-regression
+   half of #40's acceptance against real data, not the blank half.
+2. **Stub the response** to drive the blank case honestly — temporarily have
+   `usda-plant-traits` return a `Temperature, Minimum (°F)` row with `""`.
+   That is testing the stub as much as the app, which is why it wasn't done
+   unasked.
+
+If neither appeals, #40 rides on its unit coverage — that is a reasonable
+call given the sampling, not a gap.
 
 ## After both QA passes — later the same session
 
