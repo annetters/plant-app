@@ -749,19 +749,25 @@ convention is new**, invented for this and used only in #1 so far.
 
 ## What to do next
 
-**The MVP has no unbuilt features.** What remains is manual QA, and
-**[#34](https://github.com/annetters/plant-app/issues/34) is the live status
-for it** — read its latest comment before planning a QA sitting, not the
-checklists further down this doc.
+**The MVP has no unbuilt features, and the manual-QA backlog is empty.**
+#34 tracked it and was closed 2026-09-07; #8's Bed-delete cascade, the last
+item on it, passed. There is no open issue for QA — the checklists under
+"Deferred QA by ticket" are the record.
 
-As of 2026-09-07 **one QA item is left**: #8's Bed-delete cascade — remove a
-Bed that has Plantings on it and see whether the UI list goes stale until a
-reload. It's destructive, so it wants a throwaway account.
+**One half-check is genuinely outstanding, and nothing tracks it.** #7's
+item 4 asked for the aerial imagery *and* drawn Bed alignment at an address
+the user cares about, rather than the Cambridge, MA test address. On
+2026-09-07 the **imagery half passed** — a Property created at the real
+address on a throwaway account, imagery good at that latitude and zoom.
 
-Alongside it sits one thing that isn't QA: #7's "a real address you care
-about". It's one Property per account, so pointing a Property at a real
-address means deleting the existing one and everything under it — a decision
-about whether and where, not a check to run.
+The **alignment half has not been run**: does a Bed drawn on that imagery
+line up with the bed that's actually on the ground? It needs Beds drawn
+against a place the user can walk, and `properties_one_per_user`
+(`0006_properties.sql`) allows no second Property — so on the real account
+it costs the existing Property and everything cascading from it (Beds,
+Plantings, photos, task completions; the Plant registry survives, since
+`plants` hangs off `auth.users`). That cost is why it keeps being deferred.
+Don't record it as passed on the strength of the imagery half.
 
 The Larger Text pass (#17's item, plus #14's own item 16 — same phone, same
 settings, one sitting) was run and **passed** 2026-09-07. The alignment risk
@@ -1258,11 +1264,13 @@ Bed that has Plantings on it doesn't leave the UI stale — `PlantingMap`'s
 plantings effect keys off `beds`, so it refetches on its own. No QA items
 remain from either ticket.
 
-**#7's real-address check is the one thing left, and it isn't QA.** It's one
-Property per account, so aiming a Property at an address the user cares
-about means deleting the existing one and everything under it — a decision
-about whether and where, not a check to run. It closed unresolved with #34
-on 2026-09-07 and has no issue of its own; it lives here only.
+**#7's real-address check is half done.** Its item 4 wanted both the aerial
+imagery and drawn Bed alignment confirmed at an address the user cares
+about. The **imagery half passed 2026-09-07** on a throwaway account at the
+real address. The **alignment half is unrun** — it needs Beds drawn against
+ground the user can inspect, and `properties_one_per_user` means that costs
+the existing Property and its whole cascade on the real account. It closed
+unresolved with #34; no issue tracks it, so this doc is its only record.
 
 **#8's touch/mobile item is out of scope, not outstanding.** It asked about
 finger-dragging a Pin in a *phone browser*. ADR-0003 was amended 2026-09-07
