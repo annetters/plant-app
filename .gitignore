@@ -11,3 +11,8 @@ dist-ssr
 .claude/settings.local.json
 .claude/*.local.json
 .mcp.local.json
+
+# Playwright (ticket #10 e2e)
+apps/web/e2e/.auth
+apps/web/playwright-report
+apps/web/test-results

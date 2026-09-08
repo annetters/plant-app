@@ -19,5 +19,10 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     globals: true,
+    // Vitest's default include matches *.spec.ts, which would sweep up the
+    // Playwright specs in e2e/ and fail them on Playwright's own hooks.
+    // Those run under `npm run e2e`, against a real browser and the real
+    // Supabase project — a different runner entirely.
+    exclude: ['**/node_modules/**', '**/dist/**', 'e2e/**'],
   },
 })
