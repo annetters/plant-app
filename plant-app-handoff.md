@@ -1,15 +1,21 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-07
+**Date:** 2026-09-08
 
-**Most recent session.** **#40 fixed** (`e44325d`) — the fabricated
-hardiness zone is gone from `usdaTraits.ts`, and `UsdaCharacteristic.value`
-is now `string | null` so the null case is enforced by the type rather than
-absorbed incidentally. The issue and its status comment hold the detail.
-**#42 filed**: a flaky `BedEditor` test that fails only under full-suite
-load. **#40 is fixed but still open**; a user-run dev-client QA sitting is agreed
-for next session — see "Next session starts here", including the sampling
-that shows #40's own blank case can't be driven from live USDA data.
+**Most recent session.** **#44 filed**: USDA's `Shade Tolerance` is
+unreliable and close to inverted, so the app suggests `full shade` for a
+prickly pear and `part sun` for eastern hemlock — and unlike the hardiness
+zone, that value is *persisted*. Found while preparing the QA sitting below,
+which is **still unrun**; the sitting is now cheaper than previously
+recorded (no Xcode, no tag scan, nothing written). See "Next session starts
+here".
+
+Also still standing from the same stretch of work: **#40 fixed**
+(`e44325d`) — the fabricated hardiness zone is gone from `usdaTraits.ts`,
+and `UsdaCharacteristic.value` is now `string | null` so the null case is
+enforced by the type rather than absorbed incidentally. The issue and its
+status comment hold the detail. **#42 filed**: a flaky `BedEditor` test that
+fails only under full-suite load. **#40 is fixed but still open.**
 
 The session before: three QA findings fixed (self-crossing Bed outlines
 rejected, duplicate Plants caught when the scientific name isn't a
@@ -798,8 +804,10 @@ worth having worried about — `BloomTimelineScreen`'s fixed `AXIS_HEIGHT`
 spacer drifting against the axis row and putting bars beside the wrong
 plant's name — did not materialise.
 
-Every open issue is labelled `post-mvp` except **#1**, the spec itself, and
-**#42** (`needs-triage`, filed 2026-09-07). **#41**'s deferral is a scope
+Every open issue is labelled `post-mvp` except **#1**, the spec itself,
+**#42** (`needs-triage`, filed 2026-09-07) and **#43** (`enhancement`,
+`needs-triage`, filed 2026-09-08 — untriaged, not yet looked at by any
+session here). **#41**'s deferral is a scope
 decision, not a judgement that it's minor — for a property that isn't square
 to north, the rectangle tool is effectively unusable until it lands. #40 no
 longer carries its caveat: it was a live defect wearing a deferral label,
@@ -807,16 +815,41 @@ and it is now fixed.
 
 ## Next session starts here: one dev-client QA sitting, user-run
 
-**Decided 2026-09-07 by the user:** they run a dev-client Tag Scan pass
-covering **#31's** last item and **#40** together, in one sitting. Read the
-caveat below before planning it — it shrinks what that sitting can actually
-prove.
+**Decided 2026-09-07 by the user:** they run a dev-client pass covering
+**#31's** last item and **#40** together, in one sitting. **Approach settled
+2026-09-08** (option 1 below, the user's call): two scientific names typed
+into the manual Add Plant form. Still unrun.
 
-### The one item that is straightforwardly runnable
+**Two corrections to how this was previously written up**, both established
+2026-09-08:
 
-**#31's `formatOption` display change** — "full shade", not "full-shade" —
-reachable only through a real tag scan, and therefore only from the custom
-dev client. Cosmetic; the stored value is unchanged. Needs a rebuild.
+- **No Xcode rebuild is needed.** The last native-affecting commit is
+  `c6f9497` (2026-09-01, #14's Map screen), whose rebuild was already done
+  and device-QA'd; nothing native has changed since. `formatOption` lives in
+  `packages/domain` and Metro serves it. `npx expo start --dev-client` is
+  the whole setup.
+- **No tag scan is needed either.** #31 moved
+  `SuggestedTraitsConfirmation` into shared code, so the manual Add Plant
+  form reaches the same panel: `PlantDetailScreen.handleSave` →
+  `offerTraitsThenCreate` → `suggestSpeciesTraits`. The panel also has a
+  **"Back to the form"** escape, so the whole pass writes **nothing** to the
+  Registry.
+
+### The agreed two-species pass
+
+Expected values below were produced by running the real
+`projectUsdaSpeciesTraits` over live USDA responses, not derived by hand.
+Leave **Sun/shade and Mature height blank** on the form — `traitsNotAlreadySetBy`
+strips any suggestion for a field the user has filled in.
+
+1. ***Psydrax odorata*** (#40's no-regression half) → `{matureHeightInches: 240}`.
+   Panel must show **only** `Mature height: 240"`. Any "survives to about
+   zone N" line is a failure; zone 7 is #40's exact signature.
+2. ***Tsuga canadensis*** (#31's item, plus a positive control) →
+   `{sunRequirement: "part-sun", matureHeightInches: 1260, minimumHardinessZone: 3}`.
+   `Sun/shade: part sun` unhyphenated is #31's check. The zone-3 line is the
+   control: it proves the zone paragraph *does* render when USDA has data,
+   so its absence on *Psydrax* is a real result rather than a dead panel.
 
 ### #40's check is probably not reproducible from live USDA data
 
@@ -842,19 +875,36 @@ observed in this dataset**, not a fix for something a user is hitting today.
 The four unit tests in `packages/domain` are its real coverage, and they are
 the only place the blank case can be exercised at all.
 
-Two options for the sitting, neither of them "just scan a tag and look":
+Two options were put to the user, and **option 1 was chosen** on 2026-09-08:
 
 1. **Cover the absent case instead**, which is live and free: look up
    *Psydrax odorata* (the one species in the sample with no temperature row)
    and confirm no hardiness zone is offered. This proves the no-regression
-   half of #40's acceptance against real data, not the blank half.
+   half of #40's acceptance against real data, not the blank half. ← chosen.
 2. **Stub the response** to drive the blank case honestly — temporarily have
    `usda-plant-traits` return a `Temperature, Minimum (°F)` row with `""`.
    That is testing the stub as much as the app, which is why it wasn't done
-   unasked.
+   unasked. Note this could not be done locally regardless: with no local
+   Supabase stack it would mean deploying a stub to the real project and
+   reverting.
 
-If neither appeals, #40 rides on its unit coverage — that is a reasonable
-call given the sampling, not a gap.
+So the blank half rides on its four unit tests in `packages/domain`, which
+is a reasonable call given the sampling, not a gap.
+
+### What preparing this sitting turned up: #44
+
+Hunting for a species that would render "full shade" for check 2 surfaced
+**#44** — USDA's `Shade Tolerance` is unreliable and close to inverted
+(prickly pear and coconut palm come back `"High"` → `full shade`; hemlock,
+beech and sugar maple come back `"Low"` → `part sun`). Unlike the
+reference-only hardiness zone, a suggested `sunRequirement` **is persisted**
+via `applySuggestedTraits`, so it is the more damaging of the two defects.
+The user confirmed the botanical read before it was filed. Labelled
+`post-mvp` only, at their instruction — no `bug`, no triage label.
+
+This is also why check 2 uses *Tsuga canadensis* (`"Low"` → `part sun`)
+rather than a "full shade" species: any unhyphenated value proves
+`formatOption`, and every `"High"` candidate was botanically absurd.
 
 ## After both QA passes — later the same session
 
