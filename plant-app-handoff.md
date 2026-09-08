@@ -855,9 +855,12 @@ into the manual Add Plant form.
 
 **#31 now has no QA outstanding at all.** **#40's blank half remains
 unrunnable** from live data and rides on its four unit tests, as decided
-below. **#40 is fixed and fully QA'd to the extent it can be, and is still
-open awaiting the user's decision** — per `CLAUDE.md`, a finished ticket is
-never authorization to close.
+below. **#40 was closed on GitHub 2026-09-08 at the user's explicit
+instruction** — per `CLAUDE.md` that instruction is the only thing that ever
+closes an issue here; the finished QA was not itself authorization. The
+close and its summary comment were issued as two separate commands, since
+`gh issue close --comment` silently posts nothing on an already-closed
+issue.
 
 Two corrections to the walkthrough, worth keeping for whoever writes the
 next one: the submit button on a new Plant reads **"Add Plant"**, not
