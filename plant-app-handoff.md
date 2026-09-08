@@ -6,16 +6,17 @@
 unreliable and close to inverted, so the app suggests `full shade` for a
 prickly pear and `part sun` for eastern hemlock — and unlike the hardiness
 zone, that value is *persisted*. Found while preparing the QA sitting below,
-which is **still unrun**; the sitting is now cheaper than previously
-recorded (no Xcode, no tag scan, nothing written). See "Next session starts
-here".
+which has since **run, both checks passing** (2026-09-08) — and proved
+cheaper than first recorded: no Xcode, no tag scan, nothing written. See
+"The dev-client QA sitting".
 
 Also still standing from the same stretch of work: **#40 fixed**
 (`e44325d`) — the fabricated hardiness zone is gone from `usdaTraits.ts`,
 and `UsdaCharacteristic.value` is now `string | null` so the null case is
 enforced by the type rather than absorbed incidentally. The issue and its
 status comment hold the detail. **#42 filed**: a flaky `BedEditor` test that
-fails only under full-suite load. **#40 is fixed but still open.**
+fails only under full-suite load. **#40 was closed 2026-09-08 at the user's
+explicit instruction**, its no-regression half confirmed by that sitting.
 
 The session before: three QA findings fixed (self-crossing Bed outlines
 rejected, duplicate Plants caught when the scientific name isn't a
@@ -397,10 +398,12 @@ offered for overwrite), the post-save transition to edit mode, photos on a
 newly created Plant, and the regression check that editing an existing Plant
 is unchanged.
 
-**One item remains unrun**, and it is the one that needs a rebuild: the Tag
-Scan `formatOption` display change ("full shade", not "full-shade"), reachable
-only through a real tag scan and therefore only from the custom dev client. It
-is cosmetic and the stored value is unchanged.
+**The last item — the `formatOption` display change** ("full shade", not
+"full-shade") — **ran and passed 2026-09-08, and #31 now has no QA
+outstanding.** Two claims made about it here were wrong: it needed no rebuild,
+and it was not reachable only through a real tag scan. #31's own move of
+`SuggestedTraitsConfirmation` into shared code means the manual Add Plant form
+reaches the same panel. See "The dev-client QA sitting".
 
 ### Filed during the pass
 
@@ -811,7 +814,8 @@ plant's name — did not materialise.
 
 Every open issue is labelled `post-mvp` except **#1**, the spec itself, and
 **#42** (`needs-triage`, filed 2026-09-07). **#43** was filed 2026-09-08 and
-triaged the same day to `post-mvp` (the user's call): as-you-type species
+triaged the same day to `post-mvp` + `ready-for-agent` (the user's call):
+as-you-type species
 suggestions on the web Add Plant form, which offers no lookup at all today
 while native has had one since #31.
 
@@ -825,7 +829,9 @@ USDA per lookup. Licensing is explicitly permissive, the bulk file carries a
 real `Last-Modified` header, and it moves an unsupported endpoint out of the
 hot path. Names local, traits live. The issue comment holds the detail and the
 three-step scope. Sequencing matters because swapping the name index changes
-what every USDA surface returns, Tag Scan's included. Note **#44**'s direction
+what every USDA surface returns, Tag Scan's included, and is now encoded as a
+**GitHub issue dependency** (#43 `blocked_by` #36) rather than resting on this
+note — so the frontier query skips #43 while #36 is open. Note **#44**'s direction
 3 proposes folding trait *accuracy* into the same revisit; #36's scope as
 written covers names and coverage only.
 
