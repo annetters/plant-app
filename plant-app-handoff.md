@@ -774,6 +774,13 @@ codebase. So tracing a rectangular bed that's square to an angled house
 means abandoning the rectangle tool for freehand or pen. The geometry is
 correct; drawing it is awkward.
 
+**Filed as #41** — rotate the view (one angle on the Property, applied at
+render) rather than rotating shapes, so stored outlines stay north-up and
+nothing migrates. Two traps are written into that ticket: don't widen the
+tile grid via `GRID_RADIUS`, because `STAGE_SIZE_PX` derives from it and
+every Scale Reference was calibrated against it; and un-rotate at capture
+so the angle stays changeable afterwards.
+
 The Larger Text pass (#17's item, plus #14's own item 16 — same phone, same
 settings, one sitting) was run and **passed** 2026-09-07. The alignment risk
 worth having worried about — `BloomTimelineScreen`'s fixed `AXIS_HEIGHT`
