@@ -6,7 +6,12 @@ import type { SunRequirement } from "./plant.js";
  * stays independent of USDA's exact wire format). */
 export interface UsdaCharacteristic {
   name: string;
-  value: string;
+  /** Nullable because the source is: a characteristic USDA has no reading for
+   * can still come back as a present row carrying a null or blank value, and
+   * the reshaping above only renames the fields — it doesn't clean them.
+   * Typed so the blank-checking in `projectUsdaSpeciesTraits` is enforced
+   * rather than incidental (#40). */
+  value: string | null;
 }
 
 /**
@@ -83,9 +88,17 @@ export function projectUsdaSpeciesTraits(
     traits.matureHeightInches = matureHeightFeet * 12;
   }
 
-  const minimumTemperatureF = Number(byName.get("Temperature, Minimum (°F)"));
-  if (Number.isFinite(minimumTemperatureF)) {
-    traits.minimumHardinessZone = deriveHardinessZoneFromMinimumTemperatureF(minimumTemperatureF);
+  // Blank-checked before `Number()`, not with the mature height's `> 0` guard:
+  // `Number("")`, `Number("   ")` and `Number(null)` are all a finite 0, but
+  // unlike a height, 0°F is a legitimate reading — it is the floor of zone 7
+  // itself. A present-but-empty value has to be rejected on the raw string, or
+  // it derives a real-looking zone 7 that USDA never reported.
+  const minimumTemperatureText = byName.get("Temperature, Minimum (°F)")?.trim();
+  if (minimumTemperatureText) {
+    const minimumTemperatureF = Number(minimumTemperatureText);
+    if (Number.isFinite(minimumTemperatureF)) {
+      traits.minimumHardinessZone = deriveHardinessZoneFromMinimumTemperatureF(minimumTemperatureF);
+    }
   }
 
   return traits;

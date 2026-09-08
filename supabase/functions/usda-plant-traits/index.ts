@@ -28,7 +28,9 @@ interface UsdaSpeciesListEntry {
 
 interface UsdaCharacteristicRow {
   PlantCharacteristicName: string;
-  PlantCharacteristicValue: string;
+  /** Nullable, and passed through as-is — the domain's projection is the one
+   * place that decides what a blank value means (see #40). */
+  PlantCharacteristicValue: string | null;
 }
 
 interface SpeciesNameSummary {
@@ -38,7 +40,7 @@ interface SpeciesNameSummary {
 
 interface UsdaCharacteristic {
   name: string;
-  value: string;
+  value: string | null;
 }
 
 async function get<T>(path: string): Promise<T> {

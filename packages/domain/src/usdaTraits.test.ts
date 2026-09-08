@@ -85,4 +85,36 @@ describe("projectUsdaSpeciesTraits", () => {
     const traits = projectUsdaSpeciesTraits([characteristic("Height, Mature (feet)", "Unknown")]);
     expect(traits).not.toHaveProperty("matureHeightInches");
   });
+
+  it("derives zone 7 from a real 0°F reading — 0 is the floor of zone 7, not a missing value", () => {
+    const traits = projectUsdaSpeciesTraits([characteristic("Temperature, Minimum (°F)", "0")]);
+    expect(traits.minimumHardinessZone).toBe(7);
+  });
+
+  it("omits the hardiness zone when the minimum temperature is present but empty", () => {
+    const traits = projectUsdaSpeciesTraits([characteristic("Temperature, Minimum (°F)", "")]);
+    expect(traits).not.toHaveProperty("minimumHardinessZone");
+  });
+
+  it("omits the hardiness zone when the minimum temperature is only whitespace", () => {
+    const traits = projectUsdaSpeciesTraits([characteristic("Temperature, Minimum (°F)", "   ")]);
+    expect(traits).not.toHaveProperty("minimumHardinessZone");
+  });
+
+  it("omits the hardiness zone when the minimum temperature is null on the wire", () => {
+    const traits = projectUsdaSpeciesTraits([
+      { name: "Temperature, Minimum (°F)", value: null },
+    ]);
+    expect(traits).not.toHaveProperty("minimumHardinessZone");
+  });
+
+  it("omits the hardiness zone when the characteristic is absent entirely", () => {
+    const traits = projectUsdaSpeciesTraits([characteristic("Growth Form", "Single Crown")]);
+    expect(traits).not.toHaveProperty("minimumHardinessZone");
+  });
+
+  it("omits the hardiness zone when the value isn't a usable number", () => {
+    const traits = projectUsdaSpeciesTraits([characteristic("Temperature, Minimum (°F)", "Unknown")]);
+    expect(traits).not.toHaveProperty("minimumHardinessZone");
+  });
 });
