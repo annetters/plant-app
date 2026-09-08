@@ -163,7 +163,7 @@ export function TagScanReviewScreen() {
     setFormError(null)
 
     const duplicateCheck = checkForDuplicatePlant(
-      { scientificName: input.scientificName, cultivar: input.cultivar },
+      { commonName: input.commonName, scientificName: input.scientificName, cultivar: input.cultivar },
       existingPlants,
     )
     if (duplicateCheck.status === 'duplicate') {
@@ -234,6 +234,7 @@ export function TagScanReviewScreen() {
           <DuplicatePlantOffer
             existingPlant={existingPlant}
             busy={busy}
+            onViewExisting={() => navigation.push('PlantDetail', { plantId: existingPlant.id })}
             onAddPlanting={() => addPlantingAgainst(existingPlant)}
             onKeepEditing={() => setDuplicateOffer(null)}
             onCreateAnyway={() => {

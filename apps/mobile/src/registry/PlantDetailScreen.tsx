@@ -215,7 +215,7 @@ export function PlantDetailScreen() {
       // Before the USDA trait step, not after — there is no point suggesting
       // traits for a Plant that may never be created.
       const duplicate = checkForDuplicatePlant(
-        { scientificName: input.scientificName, cultivar: input.cultivar },
+        { commonName: input.commonName, scientificName: input.scientificName, cultivar: input.cultivar },
         existingPlants ?? [],
       )
       if (duplicate.status === 'duplicate') {
@@ -436,6 +436,7 @@ export function PlantDetailScreen() {
           <DuplicatePlantOffer
             existingPlant={existingPlant}
             busy={submitting}
+            onViewExisting={() => navigation.push('PlantDetail', { plantId: existingPlant.id })}
             onAddPlanting={() =>
               navigation.navigate('Map', { addPlantingForPlantId: existingPlant.id })
             }

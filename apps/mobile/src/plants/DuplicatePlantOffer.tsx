@@ -19,6 +19,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 export function DuplicatePlantOffer({
   existingPlant,
   busy,
+  onViewExisting,
   onAddPlanting,
   onKeepEditing,
   onCreateAnyway,
@@ -26,6 +27,8 @@ export function DuplicatePlantOffer({
 }: {
   existingPlant: Plant
   busy: boolean
+  /** Open the matched Plant so the gardener can judge whether it really is the same one. Pushed, not replaced, so coming back leaves the half-filled form untouched. */
+  onViewExisting: () => void
   /** Take up the offer: place a Planting against the record that already exists. */
   onAddPlanting: () => void
   /** Back to the form, unwritten — the entered fields are still there to correct. */
@@ -43,6 +46,14 @@ export function DuplicatePlantOffer({
       <Text style={styles.plantIdentity}>{plantIdentityLabel(existingPlant)}</Text>
       <Text>{DUPLICATE_PLANT_OFFER.body}</Text>
 
+      <Pressable
+        accessibilityRole="button"
+        disabled={busy}
+        style={styles.buttonSecondary}
+        onPress={onViewExisting}
+      >
+        <Text>{DUPLICATE_PLANT_OFFER.viewExistingAction}</Text>
+      </Pressable>
       <Pressable
         accessibilityRole="button"
         disabled={busy}

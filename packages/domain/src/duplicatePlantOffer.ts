@@ -15,7 +15,9 @@
 export const DUPLICATE_PLANT_OFFER = {
   heading: "You already have this Plant",
   body:
-    "One Plant record per plant type or cultivar is what keeps your Registry from fragmenting across repeat purchases from different nurseries. Add a Planting against the record you already have, or create a second Plant if this really is a different one.",
+    "One Plant record per plant type or cultivar is what keeps your Registry from fragmenting across repeat purchases from different nurseries. Did you mean to create a second record for it? Open the Plant below to check, add a Planting against the record you already have, or create a second Plant if this really is a different one.",
+  /** Opens the matched Plant so the gardener can judge for themselves whether it's the same plant — the offer names it, but only the record itself settles it. */
+  viewExistingAction: "Open the Plant you already have",
   addPlantingAction: "Add a Planting against this Plant",
   createAnywayAction: "This is a different Plant — create it anyway",
   keepEditingAction: "Go back and edit",

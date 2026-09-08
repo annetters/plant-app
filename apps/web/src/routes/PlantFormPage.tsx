@@ -188,7 +188,7 @@ export function PlantFormPage() {
       // before the write, on the same fields Tag Scan checks, so this form
       // and a scan reach the same verdict about the same plant.
       const duplicate = checkForDuplicatePlant(
-        { scientificName: input.scientificName, cultivar: input.cultivar },
+        { commonName: input.commonName, scientificName: input.scientificName, cultivar: input.cultivar },
         existingPlants ?? [],
       )
       if (duplicate.status === 'duplicate') {
@@ -396,6 +396,15 @@ export function PlantFormPage() {
           <h2 id="duplicate-plant-heading">{DUPLICATE_PLANT_OFFER.heading}</h2>
           <p>{plantIdentityLabel(existingPlant)}</p>
           <p>{DUPLICATE_PLANT_OFFER.body}</p>
+          {/* A new tab on purpose: the form's typed fields are still held in
+              state behind this offer, and navigating this tab away to go and
+              look at the existing Plant would throw them away — the same
+              reason "go back and edit" never uses browser history. */}
+          <p>
+            <Link to={`/registry/${existingPlant.id}`} target="_blank" rel="noreferrer">
+              {DUPLICATE_PLANT_OFFER.viewExistingAction}
+            </Link>
+          </p>
           {/* All three disabled while a create is in flight, matching the
               native `DuplicatePlantOffer`: leaving the other two live mid-save
               is how the same press lands twice. */}

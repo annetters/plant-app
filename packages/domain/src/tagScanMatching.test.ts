@@ -49,20 +49,20 @@ function existingPlant(overrides: Partial<Plant> = {}): Plant {
 describe("checkForDuplicatePlant", () => {
   it("flags a duplicate on an exact genus+species match with no cultivar on either side", () => {
     const existing = existingPlant();
-    const result = checkForDuplicatePlant({ scientificName: "Monarda didyma" }, [existing]);
+    const result = checkForDuplicatePlant({ commonName: "Bee balm", scientificName: "Monarda didyma" }, [existing]);
     expect(result).toEqual({ status: "duplicate", existingPlant: existing });
   });
 
   it("matches genus+species case-insensitively", () => {
     const existing = existingPlant({ scientificName: "Monarda didyma" });
-    const result = checkForDuplicatePlant({ scientificName: "monarda DIDYMA" }, [existing]);
+    const result = checkForDuplicatePlant({ commonName: "Bee balm", scientificName: "monarda DIDYMA" }, [existing]);
     expect(result).toEqual({ status: "duplicate", existingPlant: existing });
   });
 
   it("flags a duplicate when the same cultivar matches too", () => {
     const existing = existingPlant({ cultivar: "Gateway" });
     const result = checkForDuplicatePlant(
-      { scientificName: "Monarda didyma", cultivar: "gateway" },
+      { commonName: "Bee balm", scientificName: "Monarda didyma", cultivar: "gateway" },
       [existing],
     );
     expect(result).toEqual({ status: "duplicate", existingPlant: existing });
@@ -71,7 +71,7 @@ describe("checkForDuplicatePlant", () => {
   it("does not flag a duplicate when cultivars differ — same species, different named cultivar", () => {
     const existing = existingPlant({ cultivar: "Gateway" });
     const result = checkForDuplicatePlant(
-      { scientificName: "Monarda didyma", cultivar: "Pardon My Pink" },
+      { commonName: "Bee balm", scientificName: "Monarda didyma", cultivar: "Pardon My Pink" },
       [existing],
     );
     expect(result).toEqual({ status: "new" });
@@ -80,7 +80,7 @@ describe("checkForDuplicatePlant", () => {
   it("does not flag a duplicate between a straight species and a named cultivar of it", () => {
     const existing = existingPlant();
     const result = checkForDuplicatePlant(
-      { scientificName: "Monarda didyma", cultivar: "Pardon My Pink" },
+      { commonName: "Bee balm", scientificName: "Monarda didyma", cultivar: "Pardon My Pink" },
       [existing],
     );
     expect(result).toEqual({ status: "new" });
@@ -88,24 +88,93 @@ describe("checkForDuplicatePlant", () => {
 
   it("does not flag a duplicate for a different species in the same genus", () => {
     const existing = existingPlant({ scientificName: "Monarda didyma" });
-    const result = checkForDuplicatePlant({ scientificName: "Monarda fistulosa" }, [existing]);
+    const result = checkForDuplicatePlant({ commonName: "Bee balm", scientificName: "Monarda fistulosa" }, [existing]);
     expect(result).toEqual({ status: "new" });
   });
 
   it("does not flag a duplicate from a shared common name alone", () => {
-    const existing = existingPlant({ commonName: "Bee balm", scientificName: "Monarda didyma" });
-    const result = checkForDuplicatePlant({ scientificName: "Melissa officinalis" }, [existing]);
+    const existing = existingPlant({ scientificName: "Monarda didyma" });
+    const result = checkForDuplicatePlant({ commonName: "Bee balm", scientificName: "Melissa officinalis" }, [existing]);
     expect(result).toEqual({ status: "new" });
   });
 
-  it("returns new when the candidate's scientific name can't be parsed", () => {
+  it("returns new when only the candidate's scientific name can't be parsed", () => {
+    // Asymmetric on purpose: the existing Plant has a real binomial and this
+    // candidate doesn't, so there is nothing comparable. Several species share
+    // a common name, which is the confusion the genus+species rule avoids —
+    // the common-name fallback applies only when NEITHER side parses.
     const existing = existingPlant();
-    const result = checkForDuplicatePlant({ scientificName: "Monarda" }, [existing]);
+    const result = checkForDuplicatePlant({ commonName: "Bee balm", scientificName: "Monarda" }, [existing]);
     expect(result).toEqual({ status: "new" });
   });
 
   it("returns new against an empty registry", () => {
-    const result = checkForDuplicatePlant({ scientificName: "Monarda didyma" }, []);
+    const result = checkForDuplicatePlant({ commonName: "Bee balm", scientificName: "Monarda didyma" }, []);
+    expect(result).toEqual({ status: "new" });
+  });
+});
+
+describe("checkForDuplicatePlant — neither name is a binomial", () => {
+  // The QA finding (2026-09-07): two Plants both named "rudbeckia" with the
+  // scientific name "idk" were created with no duplicate offer at all,
+  // because an unparseable scientific name used to skip the check outright.
+  it("falls back to the common name when neither scientific name parses", () => {
+    const existing = existingPlant({ commonName: "rudbeckia", scientificName: "idk" });
+    const result = checkForDuplicatePlant({ commonName: "rudbeckia", scientificName: "idk" }, [
+      existing,
+    ]);
+    expect(result).toEqual({ status: "duplicate", existingPlant: existing });
+  });
+
+  it("matches the fallback common name case- and whitespace-insensitively", () => {
+    const existing = existingPlant({ commonName: "Rudbeckia", scientificName: "idk" });
+    const result = checkForDuplicatePlant({ commonName: "  rudbeckia ", scientificName: "unknown" }, [
+      existing,
+    ]);
+    expect(result).toEqual({ status: "duplicate", existingPlant: existing });
+  });
+
+  it("still separates two cultivars that share a common name", () => {
+    // The user's own note: plants can share a scientific name when a cultivar
+    // is the differentiator. Cultivar stays part of the key on this path too.
+    const existing = existingPlant({
+      commonName: "rudbeckia",
+      scientificName: "idk",
+      cultivar: "Goldsturm",
+    });
+    const result = checkForDuplicatePlant(
+      { commonName: "rudbeckia", scientificName: "idk", cultivar: "Little Goldstar" },
+      [existing],
+    );
+    expect(result).toEqual({ status: "new" });
+  });
+
+  it("does not match a straight species against a named cultivar", () => {
+    const existing = existingPlant({
+      commonName: "rudbeckia",
+      scientificName: "idk",
+      cultivar: "Goldsturm",
+    });
+    const result = checkForDuplicatePlant({ commonName: "rudbeckia", scientificName: "idk" }, [
+      existing,
+    ]);
+    expect(result).toEqual({ status: "new" });
+  });
+
+  it("does not match two different common names", () => {
+    const existing = existingPlant({ commonName: "rudbeckia", scientificName: "idk" });
+    const result = checkForDuplicatePlant({ commonName: "echinacea", scientificName: "idk" }, [
+      existing,
+    ]);
+    expect(result).toEqual({ status: "new" });
+  });
+
+  it("returns new when only the existing Plant's scientific name can't be parsed", () => {
+    const existing = existingPlant({ commonName: "Bee balm", scientificName: "idk" });
+    const result = checkForDuplicatePlant(
+      { commonName: "Bee balm", scientificName: "Monarda didyma" },
+      [existing],
+    );
     expect(result).toEqual({ status: "new" });
   });
 });
