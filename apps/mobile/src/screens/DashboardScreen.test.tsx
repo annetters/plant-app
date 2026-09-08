@@ -18,7 +18,6 @@ function renderDashboard(client: ReturnType<typeof createMockAuthClient>['client
           <Stack.Screen name="Registry">{() => <Text>registry screen</Text>}</Stack.Screen>
           <Stack.Screen name="BloomTimeline">{() => <Text>bloom timeline screen</Text>}</Stack.Screen>
           <Stack.Screen name="TagScanCapture">{() => <Text>tag scan capture screen</Text>}</Stack.Screen>
-          <Stack.Screen name="Tasks">{() => <Text>tasks screen</Text>}</Stack.Screen>
         </Stack.Navigator>
       </NavigationContainer>
     </AuthProvider>,
@@ -78,14 +77,5 @@ describe('DashboardScreen', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Scan a tag' }))
 
     expect(await screen.findByText('tag scan capture screen')).toBeTruthy()
-  })
-
-  it('navigates to the Tasks screen via its plain link, not a tile', async () => {
-    const { client } = createMockAuthClient(null)
-    await renderDashboard(client)
-
-    await fireEvent.press(screen.getByRole('button', { name: 'Tasks & To-dos' }))
-
-    expect(await screen.findByText('tasks screen')).toBeTruthy()
   })
 })

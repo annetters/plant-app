@@ -6,53 +6,19 @@ import {
   NATIVE_STATUSES,
   SUN_REQUIREMENTS,
   checkForDuplicatePlant,
-  dateRangeWraps,
   formatOption,
   plantFormFieldsFromPlant,
   plantIdentityLabel,
   plantInputFromFormFields,
-  validateCareTaskTemplateInput,
   validatePlantInput,
-  type CareTaskTemplate,
-  type CareTaskTemplateInput,
-  type CareTaskTemplateValidationErrors,
   type Plant,
   type PlantFormFields,
   type PlantInput,
   type PlantValidationErrors,
-  type TaskTrigger,
 } from '@plant-app/domain'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
-
-function formatTrigger(trigger: TaskTrigger): string {
-  if (trigger.type === 'seasonal-marker') return trigger.text
-  const { start, end } = trigger
-  const range = `${start.month}/${start.day} – ${end.month}/${end.day}`
-  return dateRangeWraps(trigger) ? `${range} (wraps to the following year)` : range
-}
-
-const EMPTY_TEMPLATE_FORM = {
-  name: '',
-  triggerType: '' as TaskTrigger['type'] | '',
-  startMonth: '',
-  startDay: '',
-  endMonth: '',
-  endDay: '',
-  seasonalText: '',
-}
-
-/** Whether the in-progress date-range fields represent a wraparound — `false` while any field is still blank. */
-function templateFormDateRangeWraps(form: typeof EMPTY_TEMPLATE_FORM): boolean {
-  const { startMonth, startDay, endMonth, endDay } = form
-  if (!startMonth || !startDay || !endMonth || !endDay) return false
-  return dateRangeWraps({
-    type: 'date-range',
-    start: { month: Number(startMonth), day: Number(startDay) },
-    end: { month: Number(endMonth), day: Number(endDay) },
-  })
-}
 
 export function PlantFormPage() {
   const { plantId } = useParams<{ plantId: string }>()
@@ -77,14 +43,6 @@ export function PlantFormPage() {
     input: PlantInput
     existingPlant: Plant
   } | null>(null)
-
-  const [careTaskTemplates, setCareTaskTemplates] = useState<CareTaskTemplate[]>([])
-  const [templateForm, setTemplateForm] = useState(EMPTY_TEMPLATE_FORM)
-  const [templateErrors, setTemplateErrors] = useState<CareTaskTemplateValidationErrors>({})
-  const [templateTriggerTypeError, setTemplateTriggerTypeError] = useState<string | null>(null)
-  const [templateBusy, setTemplateBusy] = useState(false)
-  const [templateFormError, setTemplateFormError] = useState<string | null>(null)
-  const [templateStatusMessage, setTemplateStatusMessage] = useState<string | null>(null)
 
   useEffect(() => {
     if (!plantId) return
@@ -153,22 +111,6 @@ export function PlantFormPage() {
       cancelled = true
     }
   }, [isEditing, repository])
-
-  useEffect(() => {
-    if (!plantId) return
-    let cancelled = false
-    repository
-      .listCareTaskTemplates(plantId)
-      .then((templates) => {
-        if (!cancelled) setCareTaskTemplates(templates)
-      })
-      .catch(() => {
-        // Non-fatal, mirroring photo preview loading — the rest of the page still works.
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [plantId, repository])
 
   function updateField<K extends keyof PlantFormFields>(key: K, value: PlantFormFields[K]) {
     setFields((current) => ({ ...current, [key]: value }))
@@ -307,71 +249,6 @@ export function PlantFormPage() {
     } catch {
       setFormError('Could not delete this plant. Please try again.')
       setSubmitting(false)
-    }
-  }
-
-  function updateTemplateField<K extends keyof typeof EMPTY_TEMPLATE_FORM>(
-    key: K,
-    value: (typeof EMPTY_TEMPLATE_FORM)[K],
-  ) {
-    setTemplateForm((current) => ({ ...current, [key]: value }))
-    if (key === 'triggerType') setTemplateTriggerTypeError(null)
-    setTemplateStatusMessage(null)
-  }
-
-  async function handleAddCareTaskTemplate(event: FormEvent) {
-    event.preventDefault()
-    if (!plantId) return
-
-    if (templateForm.triggerType === '') {
-      setTemplateTriggerTypeError('Select a trigger type.')
-      return
-    }
-    setTemplateTriggerTypeError(null)
-
-    const trigger: TaskTrigger =
-      templateForm.triggerType === 'date-range'
-        ? {
-            type: 'date-range',
-            start: { month: Number(templateForm.startMonth), day: Number(templateForm.startDay) },
-            end: { month: Number(templateForm.endMonth), day: Number(templateForm.endDay) },
-          }
-        : { type: 'seasonal-marker', text: templateForm.seasonalText }
-
-    const input: CareTaskTemplateInput = { plantId, name: templateForm.name, trigger }
-    const result = validateCareTaskTemplateInput(input)
-    if (!result.ok) {
-      setTemplateErrors(result.errors)
-      return
-    }
-    setTemplateErrors({})
-    setTemplateBusy(true)
-    setTemplateFormError(null)
-    setTemplateStatusMessage(null)
-    try {
-      const created = await repository.createCareTaskTemplate(input)
-      setCareTaskTemplates((current) => [...current, created])
-      setTemplateForm(EMPTY_TEMPLATE_FORM)
-      setTemplateStatusMessage('Task template added.')
-    } catch {
-      setTemplateFormError('Could not add this task template. Please try again.')
-    } finally {
-      setTemplateBusy(false)
-    }
-  }
-
-  async function handleRemoveCareTaskTemplate(id: string) {
-    setTemplateBusy(true)
-    setTemplateFormError(null)
-    setTemplateStatusMessage(null)
-    try {
-      await repository.removeCareTaskTemplate(id)
-      setCareTaskTemplates((current) => current.filter((template) => template.id !== id))
-      setTemplateStatusMessage('Task template removed.')
-    } catch {
-      setTemplateFormError('Could not remove this task template. Please try again.')
-    } finally {
-      setTemplateBusy(false)
     }
   }
 
@@ -678,136 +555,6 @@ export function PlantFormPage() {
               event.target.value = ''
             }}
           />
-        </section>
-
-        <hr />
-
-        <section aria-label="Care task templates">
-          <h2>Care task templates</h2>
-          <ul>
-            {careTaskTemplates.map((template) => (
-              <li key={template.id}>
-                <strong>{template.name}</strong> — {formatTrigger(template.trigger)}
-                <button
-                  type="button"
-                  aria-label={`Remove ${template.name}`}
-                  onClick={() => handleRemoveCareTaskTemplate(template.id)}
-                  disabled={templateBusy}
-                >
-                  Remove
-                </button>
-              </li>
-            ))}
-          </ul>
-
-          <form onSubmit={handleAddCareTaskTemplate}>
-            <label htmlFor="care-task-name">Name</label>
-            <input
-              id="care-task-name"
-              value={templateForm.name}
-              onChange={(event) => updateTemplateField('name', event.target.value)}
-            />
-            {templateErrors.name && <p role="alert">{templateErrors.name}</p>}
-
-            <label htmlFor="care-task-trigger-type">Trigger type</label>
-            <select
-              id="care-task-trigger-type"
-              value={templateForm.triggerType}
-              onChange={(event) =>
-                updateTemplateField(
-                  'triggerType',
-                  event.target.value as (typeof EMPTY_TEMPLATE_FORM)['triggerType'],
-                )
-              }
-            >
-              <option value="">Select a trigger type</option>
-              <option value="date-range">Fixed date range</option>
-              <option value="seasonal-marker">Seasonal marker</option>
-            </select>
-            {templateTriggerTypeError && <p role="alert">{templateTriggerTypeError}</p>}
-
-            {templateForm.triggerType === 'date-range' && (
-              <fieldset>
-                <legend>Trigger date range</legend>
-                <div className="date-pair">
-                  <div>
-                    <label htmlFor="care-task-start-month">Trigger start month</label>
-                    <input
-                      id="care-task-start-month"
-                      type="number"
-                      min={1}
-                      max={12}
-                      value={templateForm.startMonth}
-                      onChange={(event) => updateTemplateField('startMonth', event.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="care-task-start-day">Trigger start day</label>
-                    <input
-                      id="care-task-start-day"
-                      type="number"
-                      min={1}
-                      max={31}
-                      value={templateForm.startDay}
-                      onChange={(event) => updateTemplateField('startDay', event.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="date-pair">
-                  <div>
-                    <label htmlFor="care-task-end-month">Trigger end month</label>
-                    <input
-                      id="care-task-end-month"
-                      type="number"
-                      min={1}
-                      max={12}
-                      value={templateForm.endMonth}
-                      onChange={(event) => updateTemplateField('endMonth', event.target.value)}
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="care-task-end-day">Trigger end day</label>
-                    <input
-                      id="care-task-end-day"
-                      type="number"
-                      min={1}
-                      max={31}
-                      value={templateForm.endDay}
-                      onChange={(event) => updateTemplateField('endDay', event.target.value)}
-                    />
-                  </div>
-                </div>
-                {(templateErrors['trigger.start'] || templateErrors['trigger.end']) && (
-                  <p role="alert">
-                    {templateErrors['trigger.start'] ?? templateErrors['trigger.end']}
-                  </p>
-                )}
-                {templateFormDateRangeWraps(templateForm) && (
-                  <p>This range wraps into the following year.</p>
-                )}
-              </fieldset>
-            )}
-
-            {templateForm.triggerType === 'seasonal-marker' && (
-              <>
-                <label htmlFor="care-task-seasonal-text">Seasonal marker text</label>
-                <input
-                  id="care-task-seasonal-text"
-                  placeholder="e.g. After first hard frost"
-                  value={templateForm.seasonalText}
-                  onChange={(event) => updateTemplateField('seasonalText', event.target.value)}
-                />
-                {templateErrors['trigger.text'] && <p role="alert">{templateErrors['trigger.text']}</p>}
-              </>
-            )}
-
-            {templateFormError && <p role="alert">{templateFormError}</p>}
-            {templateStatusMessage && <p role="status">{templateStatusMessage}</p>}
-
-            <button type="submit" disabled={templateBusy}>
-              Add task template
-            </button>
-          </form>
         </section>
 
         <hr />

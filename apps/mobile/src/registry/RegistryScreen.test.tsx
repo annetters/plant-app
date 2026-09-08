@@ -112,7 +112,7 @@ describe('RegistryScreen', () => {
     expect(screen.getByText(/Sun: full sun/)).toBeTruthy()
   })
 
-  it('shows the same commonName+cultivar label the Tasks screen uses, not a separate commonName-only heading', async () => {
+  it('shows the commonName+cultivar label from plantLabel(), not a separate commonName-only heading', async () => {
     await renderRegistry({
       plantRows: [
         plantRow({

@@ -1,32 +1,26 @@
-import type { CareTaskTemplateRow, PlantRow } from '@plant-app/domain'
+import type { PlantRow } from '@plant-app/domain'
 import type { PlantsDbClient } from '../plants/plantsRepository'
 
 type Row = Record<string, unknown>
 type Op = 'select' | 'insert' | 'update' | 'delete'
 type StoredRow = Row & { id: string }
-type Table = 'plants' | 'care_task_templates'
+type Table = 'plants'
 
 const ID_PREFIX: Record<Table, string> = {
   plants: 'plant',
-  care_task_templates: 'template',
 }
 
 /**
  * An in-memory stand-in for the slice of Supabase's query builder
- * PlantsRepository calls, spanning both tables the repository reads from.
+ * PlantsRepository calls.
  * Mirrors apps/web's `createFakePlantsDbClient`.
  */
-export function createFakePlantsDbClient(
-  initialPlantRows: PlantRow[] = [],
-  initialCareTaskTemplateRows: CareTaskTemplateRow[] = [],
-) {
+export function createFakePlantsDbClient(initialPlantRows: PlantRow[] = []) {
   const tables: Record<Table, StoredRow[]> = {
     plants: [...initialPlantRows] as unknown as StoredRow[],
-    care_task_templates: [...initialCareTaskTemplateRows] as unknown as StoredRow[],
   }
   const nextId: Record<Table, number> = {
     plants: tables.plants.length + 1,
-    care_task_templates: tables.care_task_templates.length + 1,
   }
   const userId = 'user-1'
 
@@ -143,7 +137,5 @@ export function createFakePlantsDbClient(
     storage,
     userId,
     rows: () => tables.plants as unknown as (PlantRow & Record<string, unknown>)[],
-    careTaskTemplateRows: () =>
-      tables.care_task_templates as unknown as (CareTaskTemplateRow & Record<string, unknown>)[],
   }
 }

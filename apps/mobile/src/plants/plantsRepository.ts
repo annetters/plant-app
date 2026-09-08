@@ -1,11 +1,9 @@
 import type {
-  CareTaskTemplate,
-  CareTaskTemplateRow,
   Plant,
   PlantInput,
   PlantRow,
 } from '@plant-app/domain'
-import { careTaskTemplateFromRow, plantFromRow, plantInputToRow } from '@plant-app/domain'
+import { plantFromRow, plantInputToRow } from '@plant-app/domain'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import * as Crypto from 'expo-crypto'
 
@@ -30,7 +28,7 @@ interface PlantsQuery extends PromiseLike<DbResult<unknown>> {
  * `TagScanRepository.uploadTagPhoto` already uses.
  */
 export interface PlantsDbClient {
-  from(table: 'plants' | 'care_task_templates'): {
+  from(table: 'plants'): {
     select(columns?: string): PlantsQuery
     insert(values: Row): PlantsQuery
     update(values: Row): PlantsQuery
@@ -64,7 +62,6 @@ export function asPlantsDbClient(client: SupabaseClient): PlantsDbClient {
 }
 
 const TABLE = 'plants'
-const CARE_TASK_TEMPLATES_TABLE = 'care_task_templates'
 const REFERENCE_PHOTOS_BUCKET = 'plant-reference-photos'
 
 function unwrap<T>({ data, error }: DbResult<unknown>): T {
@@ -155,16 +152,5 @@ export class PlantsRepository {
   async removeReferencePhoto(path: string): Promise<void> {
     const { error } = await this.client.storage.from(REFERENCE_PHOTOS_BUCKET).remove([path])
     if (error) throw new Error(error.message)
-  }
-
-  async listCareTaskTemplates(plantId: string): Promise<CareTaskTemplate[]> {
-    const result = unwrap<CareTaskTemplateRow[]>(
-      await this.client
-        .from(CARE_TASK_TEMPLATES_TABLE)
-        .select('*')
-        .eq('plant_id', plantId)
-        .order('created_at', { ascending: true }),
-    )
-    return result.map(careTaskTemplateFromRow)
   }
 }

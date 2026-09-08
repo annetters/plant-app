@@ -1,4 +1,3 @@
-import { careTaskTemplateRow } from '../test/careTaskTemplateRowFixture'
 import { createFakePlantsDbClient } from '../test/fakePlantsDbClient'
 import { plantRow } from '../test/plantRowFixture'
 import { PlantsRepository } from './plantsRepository'
@@ -122,20 +121,5 @@ describe('PlantsRepository', () => {
     await repository.removeReferencePhoto('user-1/plant-1/a.jpg')
 
     expect(storage.remove).toHaveBeenCalledWith(['user-1/plant-1/a.jpg'])
-  })
-
-  it("lists a Plant's Care task templates, ordered by creation", async () => {
-    const { client } = createFakePlantsDbClient(
-      [],
-      [
-        careTaskTemplateRow({ id: 't1', plant_id: 'plant-1', name: 'Fertilize' }),
-        careTaskTemplateRow({ id: 't2', plant_id: 'plant-2', name: 'Prune' }),
-      ],
-    )
-    const repository = new PlantsRepository(client)
-
-    const templates = await repository.listCareTaskTemplates('plant-1')
-
-    expect(templates.map((t) => t.id)).toEqual(['t1'])
   })
 })

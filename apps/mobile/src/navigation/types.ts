@@ -18,8 +18,6 @@ export type MainStackParamList = {
   PlantDetail: { plantId: string } | undefined
   PlantingDetail: { plantingId: string }
   BloomTimeline: undefined
-  Tasks: undefined
-  PlantingTaskHistory: { plantingId: string }
   TagScanCapture: undefined
   TagScanMultipleReadings: {
     scanId: string

@@ -623,11 +623,11 @@ every open issue passes it. What remains:
   so it is out of the triage pile too (the bullet above still calls it
   `needs-triage`).
 
-Two small carried-over items: `apps/mobile/AGENTS.md` points at the Expo
+One small carried-over item: `apps/mobile/AGENTS.md` points at the Expo
 **v57** docs while the app is pinned to **54.0.37** (the SDK 54 docs are the
-right ones — see #13's entry for why the downgrade happened); and the
-`[POST-MVP]` tag convention introduced in the task-scope change is still used
-only in #1.
+right ones — see #13's entry for why the downgrade happened). The other one,
+the `[POST-MVP]` tag convention, resolved itself — see the task-system entry
+below.
 
 ---
 
@@ -723,50 +723,53 @@ and it would diverge web from native.
 
 ---
 
-## Scope change (2026-09-03): the task system is out of the MVP
+## The task system is gone (2026-09-08), superseding the 2026-09-03 scope change
 
-**Care task templates, task triggers, task completion logging, and one-off
-todos are no longer part of what the MVP promises.** Decided with the user
-through a `/grill-with-docs` session. This was a scope call, not a quality
-one — scheduling garden care simply matters less than the rest of the
-registry, and holding MVP for its remaining polish wasn't worth it.
+**Care task templates, task triggers, task completion logging and one-off
+todos were removed from the app entirely** — application code and database
+tables. Decided with the user through a `/grill-with-docs` session. **Read
+`docs/adr/0005-remove-the-task-system.md` before acting on any of this**; it
+carries the reasoning and this entry does not repeat it.
 
-**No code was removed, and none should be.** The feature is built, migrated,
-tested, and still fully working on both platforms.
-`packages/domain/src/{careTaskTemplate,taskCompletion,oneOffTodo}.ts`,
-migrations `0003`/`0004`/`0019`/`0020`/`0021`/`0022`, `apps/web/src/tasks/`,
-`TasksPage`, `PlantingTaskHistoryPage` and their native equivalents are
-**not dead code** — do not delete them, and do not treat them as unfinished
-MVP work. **#4, #12 and #18 stay closed** and remain accurate history of work
-that was genuinely done.
+**This supersedes the 2026-09-03 scope change**, which took tasks out of the
+MVP commitment while deliberately keeping the implementation live, and told
+future sessions in three places not to delete it. **That retention rule is no
+longer in force anywhere.** What changed: out-of-MVP was a scope judgement,
+but the user is no longer interested in the feature and does not want to
+spend time supporting it — and retention was not free (3,369 lines, 67 tests
+and three `@plant-app/domain` modules in every run).
 
-What changed instead:
+What landed, all in one commit so a single `git revert` restores the app:
 
-- **`CONTEXT.md`** — the four task glossary entries now lead with "Built and
-  working, but outside the MVP commitment", plus the Plant field list and the
-  Dashboard entry. Deliberately *not* Landmark's "deferred" wording, which
-  would be false here: Landmark was never built, this was. Committed and
-  pushed in `7ccff8a`, along with this doc's own updates.
-- **#1 (the spec)** — 15 `[POST-MVP]` tags across the Solution bullet, user
-  stories 10–12 and 48–51, and the Task model / Task completion /
-  no-per-Planting-overrides bullets. The native-parity claim no longer
-  promises task management; three task example tests moved out of the MVP
-  acceptance list into their own marked bullet; a new Out of Scope entry; and
-  a dated amendment in Further Notes carrying the retention rule above. Story
-  numbering was left unchanged on purpose, so existing references stay valid.
-- **New `post-mvp` label**, applied to **#21** (single-day trigger UX — the
-  only piece of task work never built), which stays open with the reasoning
-  commented on it.
+- **32 files deleted** — `apps/web/src/tasks/`, `TasksPage`,
+  `PlantingTaskHistoryPage`, `apps/mobile/src/tasks/`, `TasksScreen`,
+  `PlantingTaskHistoryScreen`, their fixtures and fakes, and
+  `packages/domain/src/{careTaskTemplate,taskCompletion,oneOffTodo}.ts`.
+- **17 files stripped** — both dashboards' entry links, web's routes and
+  providers (including `apps/mobile/App.tsx`, which sits outside
+  `apps/mobile/src` and is easy to miss), mobile's navigator and route
+  params, `PlantFormPage`'s Care task templates section, both
+  `plantsRepository` implementations, and the domain export list.
+- **`0024_drop_task_system.sql`** drops `task_completions`,
+  `care_task_templates`, `one_off_todos` in FK order. **The rows were not
+  exported** — offered and declined. Reverting the commit does not bring them
+  back.
+- **`CONTEXT.md`** — the four glossary entries collapse into one
+  `Task system — removed` entry that keeps the vocabulary (particularly that
+  a One-off todo sat *outside* the template system) without describing it as
+  something the app does.
+- **#1 (the spec)** — the `[POST-MVP]` convention is retired and replaced by
+  a bare, reusable `[REMOVED]` tag on 12 items, with the date in the legend
+  rather than in the tag. The **`post-mvp` GitHub label is untouched** and
+  still correct: 12 non-task issues carry it, and it stays documented in
+  `docs/agents/triage-labels.md`.
+- **#21 closed as `wontfix`** at the user's explicit instruction — it asked
+  for an affordance on a form that no longer exists. **#4, #12, #18 and #22
+  stay closed and accurate** as history of work genuinely done.
 
-One thing a later session may want to revisit: the **`[POST-MVP]` tag
-convention is new**, invented for this and used only in #1 so far.
-
-> **Updated 2026-09-04.** `post-mvp` is still a scope label rather than a
-> triage role, but it is no longer undocumented: the backlog triage pass (see
-> "Backlog triage: the board now has a verdict on every issue") put it in
-> `docs/agents/triage-labels.md` under its own **Scope labels** heading, held
-> deliberately apart from the five-role mapping table. #21 no longer carries
-> `needs-triage`.
+Do not treat migrations `0003`/`0019`/`0021` creating tables that `0024`
+drops as damage to repair, and do not restore this feature because it looks
+half-removed. It isn't — it's fully removed, deliberately.
 
 ---
 
@@ -1605,12 +1608,12 @@ gh issue list --state open
   MVP** — superseded once the map itself became trustworthy. May return
   later as an optional precision-assist suggestion. Never built.
 
-**Tasks (out of the MVP commitment as of 2026-09-03):**
+**Tasks (removed from the app 2026-09-08):**
 - The whole task system — care task templates, triggers, completion logging,
-  one-off todos — is **built and live, but outside what the MVP promises**.
-  A different status from Landmark's: this one exists and works. Don't
-  re-litigate the cut, and **don't delete the code** — see "Scope change" at
-  the top of this doc for the retention rule and the file list.
+  one-off todos — is **gone: code deleted, tables dropped**. A third status,
+  distinct from Landmark's (never built) and from its own previous one (built
+  and retained). Don't re-litigate it, and don't restore it — see
+  `docs/adr/0005-remove-the-task-system.md`.
 
 **Tag Scan:**
 - Photograph a nursery tag → OCR extracts candidates → human always confirms.
@@ -1640,9 +1643,6 @@ gh issue list --state open
 
 **Everything else (unchanged from the original spec):**
 - One Planting = one record, `quantity` field, never one record per specimen
-- No per-Planting task overrides; task timing lives on Plant only
-- Two task trigger types only: fixed date-range, freeform seasonal-marker
-- Task completion keyed by template + Planting + year (all three needed)
 - Bezier-pen is in scope for the bed editor, alongside freehand and
   rectangle/oval — all three validated in the ADR-0001 prototype
 

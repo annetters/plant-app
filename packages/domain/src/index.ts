@@ -27,24 +27,6 @@ export type {
 } from "./plant.js";
 
 export {
-  careTaskTemplateFromRow,
-  careTaskTemplateInputToRow,
-  computeTriggerDateRange,
-  dateRangeWraps,
-  validateCareTaskTemplateInput,
-} from "./careTaskTemplate.js";
-export type {
-  CareTaskTemplate,
-  CareTaskTemplateInput,
-  CareTaskTemplateRow,
-  CareTaskTemplateValidationErrors,
-  CareTaskTemplateValidationResult,
-  DateRangeTrigger,
-  SeasonalMarkerTrigger,
-  TaskTrigger,
-} from "./careTaskTemplate.js";
-
-export {
   AERIAL_ZOOM_CANDIDATES,
   aerialTileUrl,
   feetPerPixel,
@@ -170,35 +152,6 @@ export type { BloomTimelineBar } from "./bloomTimeline.js";
 
 export { filterRegistryEntries } from "./registry.js";
 export type { RegistryFilters } from "./registry.js";
-
-export {
-  buildPlantingTaskHistory,
-  taskCompletionFromRow,
-  taskCompletionInputToRow,
-  validateTaskCompletionInput,
-} from "./taskCompletion.js";
-export type {
-  PlantingTaskHistoryEntry,
-  TaskCompletion,
-  TaskCompletionInput,
-  TaskCompletionRow,
-  TaskCompletionStatus,
-  TaskCompletionValidationErrors,
-  TaskCompletionValidationResult,
-} from "./taskCompletion.js";
-
-export {
-  oneOffTodoFromRow,
-  oneOffTodoInputToRow,
-  validateOneOffTodoInput,
-} from "./oneOffTodo.js";
-export type {
-  OneOffTodo,
-  OneOffTodoInput,
-  OneOffTodoRow,
-  OneOffTodoValidationErrors,
-  OneOffTodoValidationResult,
-} from "./oneOffTodo.js";
 
 export {
   EMPTY_PLANT_FORM_FIELDS,

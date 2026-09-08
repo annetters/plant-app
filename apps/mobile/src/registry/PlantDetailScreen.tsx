@@ -45,8 +45,7 @@ const HARDINESS_ZONE_OPTIONS = HARDINESS_ZONE_NUMBERS.map(String)
 /**
  * Phone parity for creating, viewing and editing a Plant record and its
  * reference photos — the native counterpart of web's `PlantFormPage`, trimmed
- * to the editing surface #18 asked for: no Care task template management here
- * (that stays web-only; see #12/#18's own scoping).
+ * to the editing surface #18 asked for.
  *
  * One screen serves both create and edit, exactly as web mounts one
  * `PlantFormPage` at `/registry/new` and `/registry/:plantId`. Arriving

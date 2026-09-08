@@ -36,16 +36,6 @@ export function DashboardScreen() {
       >
         <Text style={styles.scanButtonText}>Scan a tag</Text>
       </Pressable>
-      {/* A plain link, not a tile — matching web's TasksPage entry point and
-          CONTEXT.md's Dashboard entry ("Task lists not surfaced immediately —
-          reachable within 2–3 taps"). */}
-      <Pressable
-        accessibilityRole="button"
-        style={styles.tasksLink}
-        onPress={() => navigation.navigate('Tasks')}
-      >
-        <Text style={styles.tasksLinkText}>Tasks &amp; To-dos</Text>
-      </Pressable>
       <View style={styles.tiles}>
         {DASHBOARD_TILES.map((tile) => {
           const route = TILE_ROUTES[tile.id]
@@ -104,15 +94,6 @@ const styles = StyleSheet.create({
   },
   scanButtonText: {
     color: '#fff',
-  },
-  tasksLink: {
-    marginBottom: 24,
-  },
-  tasksLinkText: {
-    color: '#2e7d32',
-    fontSize: 16,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
   },
   tiles: {
     gap: 8,

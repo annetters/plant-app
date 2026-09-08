@@ -14,8 +14,6 @@ import { TagScanAmbiguousSpeciesScreen } from '../tagScan/TagScanAmbiguousSpecie
 import { TagScanCaptureScreen } from '../tagScan/TagScanCaptureScreen'
 import { TagScanMultipleReadingsScreen } from '../tagScan/TagScanMultipleReadingsScreen'
 import { TagScanReviewScreen } from '../tagScan/TagScanReviewScreen'
-import { PlantingTaskHistoryScreen } from '../tasks/PlantingTaskHistoryScreen'
-import { TasksScreen } from '../tasks/TasksScreen'
 import type { AuthStackParamList, MainStackParamList } from './types'
 
 const AuthStack = createNativeStackNavigator<AuthStackParamList>()
@@ -52,8 +50,6 @@ export function RootNavigator() {
       <MainStack.Screen name="PlantDetail" component={PlantDetailScreen} />
       <MainStack.Screen name="PlantingDetail" component={PlantingDetailScreen} />
       <MainStack.Screen name="BloomTimeline" component={BloomTimelineScreen} />
-      <MainStack.Screen name="Tasks" component={TasksScreen} />
-      <MainStack.Screen name="PlantingTaskHistory" component={PlantingTaskHistoryScreen} />
       <MainStack.Screen name="TagScanCapture" component={TagScanCaptureScreen} />
       <MainStack.Screen name="TagScanMultipleReadings" component={TagScanMultipleReadingsScreen} />
       <MainStack.Screen name="TagScanReview" component={TagScanReviewScreen} />

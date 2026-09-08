@@ -17,10 +17,6 @@ import { asSpeciesLookupDbClient } from './src/species/speciesLookupRepository';
 import { SpeciesLookupRepositoryProvider } from './src/species/SpeciesLookupRepositoryContext';
 import { asTagScanDbClient } from './src/tagScan/tagScanRepository';
 import { TagScanRepositoryProvider } from './src/tagScan/TagScanRepositoryContext';
-import { asOneOffTodosDbClient } from './src/tasks/oneOffTodosRepository';
-import { OneOffTodosRepositoryProvider } from './src/tasks/OneOffTodosRepositoryContext';
-import { asTaskCompletionsDbClient } from './src/tasks/taskCompletionsRepository';
-import { TaskCompletionsRepositoryProvider } from './src/tasks/TaskCompletionsRepositoryContext';
 
 function AppShell() {
   useAuthDeepLinkHandler(supabase);
@@ -43,11 +39,7 @@ export default function App() {
               <BedsRepositoryProvider client={asBedsDbClient(supabase)}>
                 <PlantingsRepositoryProvider client={asPlantingsDbClient(supabase)}>
                   <PlantsRepositoryProvider client={asPlantsDbClient(supabase)}>
-                    <OneOffTodosRepositoryProvider client={asOneOffTodosDbClient(supabase)}>
-                      <TaskCompletionsRepositoryProvider client={asTaskCompletionsDbClient(supabase)}>
-                        <AppShell />
-                      </TaskCompletionsRepositoryProvider>
-                    </OneOffTodosRepositoryProvider>
+                    <AppShell />
                   </PlantsRepositoryProvider>
                 </PlantingsRepositoryProvider>
               </BedsRepositoryProvider>
