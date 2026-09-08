@@ -754,10 +754,20 @@ convention is new**, invented for this and used only in #1 so far.
 for it** — read its latest comment before planning a QA sitting, not the
 checklists further down this doc.
 
-As of 2026-09-07 three things are left there: #17's Larger Text pass on a
-phone (which also closes #14's own item 16 — one sitting covers both), #8's
-Bed-delete cascade check, and #7's "a real address you care about" question,
-which is unsettled because it's one Property per account.
+As of 2026-09-07 **one QA item is left**: #8's Bed-delete cascade — remove a
+Bed that has Plantings on it and see whether the UI list goes stale until a
+reload. It's destructive, so it wants a throwaway account.
+
+Alongside it sits one thing that isn't QA: #7's "a real address you care
+about". It's one Property per account, so pointing a Property at a real
+address means deleting the existing one and everything under it — a decision
+about whether and where, not a check to run.
+
+The Larger Text pass (#17's item, plus #14's own item 16 — same phone, same
+settings, one sitting) was run and **passed** 2026-09-07. The alignment risk
+worth having worried about — `BloomTimelineScreen`'s fixed `AXIS_HEIGHT`
+spacer drifting against the axis row and putting bars beside the wrong
+plant's name — did not materialise.
 
 Everything else on the board is labelled `post-mvp` except **#40**, a live
 defect wearing a deferral label — see "Known unfixed defects".
