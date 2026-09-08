@@ -1,6 +1,20 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-06 (updated: **#37 built, reviewed, and closed on the user's instruction — the duplicate-Plant check now runs on all three creation paths, and its "add a Planting instead" offer is real for the first time**; see "#37: the duplicate check on every creation path" immediately below. Also **#29 fixed on `main` and closed by the user — `PropertyPage`'s no-scale message now branches on `baseMapSource`, so a photo/drawn Property is told its Scale Reference isn't calibrated yet rather than that aerial imagery is missing**; see "#29 fixed" below. Also **#33 fixed on `main` and closed by the user earlier the same day** — a dot per placed point in the drawing surface, reusing the treatment `calibrate` already applies to its ScalePoints; see "#33 fixed" below. Previously 2026-09-05: **#33 re-triaged to `ready-for-agent` — the reported symptom is a missing point marker, not the drag-vs-click question the ticket posed**; see "#33 re-triaged" below. Previously 2026-09-04: **the backlog is triaged — `needs-triage` is empty, and only four issues stand between here and the MVP**; see "Backlog triage: the board now has a verdict on every issue" immediately below. Previously the same day: **#31 is built, device-QA'd, closed by the user, and pushed — three QA findings, all fixed**; see "#31: manual Plant creation on native mobile" immediately below. Also filed **#36** against the USDA data source. Previously the same day: **#15 is built, device-QA'd, closed by the user, and pushed — every ticket #2–#20 under the spec now has code, and no build work remains on the frontier**; see "#15: native Scale Reference calibration" below. Previously 2026-09-03: Previously the same day: **#25's blocking gap is fixed and QA'd** — see "#25's last gap closed" immediately below, which supersedes both "What to do next" entries and the "Not yet resolved — blocks closing #25" section. Earlier the same day: the task system was removed from the MVP commitment — see "Scope change". Previous update, 2026-09-02: everything pushed, #18 closed by the user, and the QA orphaned when #3/#7/#8/#17 were closed is now collected in #34 — see "After both QA passes" below, which corrects several claims made elsewhere in this doc)
+**Date:** 2026-09-07
+
+**Most recent session.** Three QA findings fixed (self-crossing Bed
+outlines rejected, duplicate Plants caught when the scientific name isn't a
+binomial, Bed names unique per Property), a Bed rename path added, a
+Playwright e2e suite added covering #10, and **ADR-0003 amended: a mobile
+browser is not a supported surface**. See "The full decision set" for that
+last one and "What to do next" for where QA stands.
+
+> Earlier entries used to be summarised here as a "previously…" chain. It
+> was removed 2026-09-07: every item in it named a section that still has
+> its own heading below, so it only duplicated the table of contents at the
+> top of a doc that is read in full at every session start. Don't re-add it
+> — same reasoning as the 2026-09-06 trim.
+
 **Repo:** `annetters/plant-app` · branch `main`
 
 ---
@@ -596,8 +610,9 @@ only in #1.
 
 ## #25's last gap closed — QA run by the user, everything fixed
 
-**This entry supersedes the "What to do next" section further down and the
-whole of "Not yet resolved — blocks closing #25".** That gap is gone.
+**This entry supersedes the whole of "Not yet resolved — blocks closing
+#25".** That gap is gone. (It also superseded the old "What to do next",
+which was rewritten on 2026-09-07 and no longer discusses #25 at all.)
 
 **The freshly-created-Property gap is fixed and verified.** The user ran the
 pass in a browser (their choice, not Playwright) on a **throwaway account** —
@@ -734,76 +749,18 @@ convention is new**, invented for this and used only in #1 so far.
 
 ## What to do next
 
-> **Also read "After both QA passes" further down.** It was written later and
-> corrects this entry's git state, the standing instruction about #18, and
-> every "not pushed yet" line in this doc.
+**The MVP has no unbuilt features.** What remains is manual QA, and
+**[#34](https://github.com/annetters/plant-app/issues/34) is the live status
+for it** — read its latest comment before planning a QA sitting, not the
+checklists further down this doc.
 
-> **Superseded — see "#25's last gap closed" at the top of this doc.** The
-> unresolved thread named below is fixed and QA'd.
+As of 2026-09-07 three things are left there: #17's Larger Text pass on a
+phone (which also closes #14's own item 16 — one sitting covers both), #8's
+Bed-delete cascade check, and #7's "a real address you care about" question,
+which is unsettled because it's one Property per account.
 
-**#25's browser QA checklist is complete, but #25 is NOT ready to close** —
-one unresolved thread is a real behavior change caused by #25 itself, not a
-side-finding, and it wasn't covered by this session's checklist. See
-"Not yet resolved — blocks closing #25" immediately below before doing
-anything else with this ticket.
-
-The checklist itself: every item scoped to #25 passed (see "#25 checklist
-results" below for the walkthrough). Two unrelated real bugs surfaced along
-the way and are fixed, tested, and committed; two more unrelated ones were
-filed instead of fixed, at the user's choice.
-
-**#25 STAYS OPEN on GitHub regardless — same standing rule as #14 below: never
-close an issue without the user explicitly asking**, even once the item below
-is resolved and the checklist is fully clean.
-
-### Not yet resolved — blocks closing #25
-
-> **RESOLVED — see "#25's last gap closed" at the top of this doc.** Everything
-> in this section is history: the fix was implemented, reviewed and verified by
-> the user. Nothing below blocks #25 any more.
-
-**A freshly created Property shows no imagery at all until "Draw a Bed" is
-clicked** — found during the peer session's #14 pass (see "#25 already has a
-finding, before its own QA has started" further down for the original
-write-up), not by this session's checklist. Neither `PlantingMap` (hidden
-while `beds.length === 0`, #25's own change) nor `BedEditor` (base map only
-renders once its drawing panel is open) shows anything in the gap between —
-before #25, `PlantingMap`'s unconditional canvas was what confirmed a new
-address had resolved correctly. This session's checklist tested "no Beds yet"
-on an *existing* Property, not a Property that was *just created*, so this
-specific path is still unverified against the current code. A fix was
-suggested (render the base map in `BedEditor`'s closed state) but never agreed
-or implemented. **Next step: decide on that fix (or an alternative), test the
-freshly-created-Property path specifically, then #25 is closable** (pending
-the user's explicit ask, per the standing rule above).
-
-**This session ran concurrently with a peer session also working in this
-repo** (the one that did #14's device QA, below). Both sessions shared one
-working tree, so commit `25340f3` — nominally a #14 fix — also carries this
-session's uncommitted `PlantingMap.tsx` transparency fix; it got swept in when
-the peer session committed. Not a mistake, just how two sessions in one
-working tree can interleave. Worth knowing if the two don't obviously line up
-by commit message.
-
-### #25 checklist results
-
-1. **Passes.** Empty state renders with no leftover canvas, grey box, or scroll gap.
-2. **Passes** — draw-and-save-without-reloading still resolves a Pin into the new Bed exactly as before. Along the way, the user found Beds hard to see against the base map: `PlantingMap.tsx`'s `BED_FILL` was `rgba(82,183,136,0.12)`, diverging from `BedEditor.tsx`'s `0.2` despite a code comment claiming the two render identically. **Fixed** — bumped to `0.2` to match (landed in `25340f3`, see above).
-3. **All three base-map sources checked; aerial and photo backdrops correct.** The user found the separate **drawn base-map creation flow** (Property setup, `BaseMapSetup.tsx` — a different screen from anything #25 touches) confusing: dragging to trace a line does nothing until mouseup, because that screen is click-to-place-points by design, not freehand, and nothing in the UI makes that obvious mid-drag. Real UX gap, not a #25 regression. **Filed as #33**, not fixed.
-4. **Inconclusive.** On this pass, Beds and the base map arrived close enough together on reload that the load-order flash wasn't visibly distinguishable either way. No action taken — still an open design trade-off (see #25's own writeup below) if it turns out to matter later.
-5–7. **Pass** — reload with existing Beds, the Registry's `?plantingId=` deep link, and phone-width layout all behave as expected.
-8. **Passes in Safari**, and surfaced a real, pre-existing, non-Safari-specific bug along the way: opening "Draw a Bed" never showed previously-saved Beds on the editor's own canvas, even though they showed correctly in the Beds list below it. Root cause: the effect drawing saved Beds onto the Konva layer depended on `[beds, pixelsPerFootValue]` alone — neither changes again once the Beds fetch resolves, and that fetch almost always resolves before the editor is ever opened, so the effect's one real run found the layer still `null` and never fired again once the layer existed. Same *shape* of bug as #8's original null-ref issue, which #25's own code comment (below) describes. **Fixed and tested** (`b6ff131`): added `open` to the effect's dependency list so it re-runs once the Konva stage actually mounts. A regression test was added and confirmed to fail without the fix before landing it.
-9. **Not testable as written** on the Property used for this pass — its base-map source is an uploaded photo, so genuinely zero `arcgisonline` requests is correct, not a bug. Optional item to begin with; left unverified against an aerial-source Property.
-
-**Also found, unrelated to #25, filed rather than fixed (user's choice):** leaving "Bed name" blank and clicking "Save Bed" shows no visible error. Validation does run and does produce "Name is required.", but the `<p role="alert">` renders at the very top of `BedEditor`'s `<section>` — above the 768px canvas and the Save button, off-screen from where the user is actually looking when they click Save. Same class of bug already fixed once for `PlantDetailScreen` on native (a failed Save with the invalid field scrolled out of view gave no visible feedback). **Filed as #32**.
-
-**The freshly-created-Property gap is not covered by items 1–9 above** — see "Not yet resolved — blocks closing #25" at the top of this doc.
-
-**Full monorepo suite**: web 187/187 passing (+1 from the new regression test), typecheck clean. Domain and mobile untouched this session.
-
-**Git state**: `b6ff131` was the tip when this entry was written. Superseded — see "After both QA passes" immediately below.
-
----
+Everything else on the board is labelled `post-mvp` except **#40**, a live
+defect wearing a deferral label — see "Known unfixed defects".
 
 ## After both QA passes — later the same session
 
@@ -1220,41 +1177,25 @@ Outstanding manual QA carried over from closed tickets is also tracked as
 **#34** (`ready-for-human`). That issue is the live status; the checklists
 below are the detail behind it.
 
-### Ticket #10
+### Ticket #10 — automated, passing
 
-Not run yet — the user couldn't QA this session, so this is queued as
-their own to-do for next time, against the real linked Supabase project
-in a real browser:
+No longer a manual checklist. #10's items are covered by the Playwright
+suite added 2026-09-07 (`npm run e2e` in `apps/web`), which runs on
+Chromium *and* WebKit: every filter axis alone, combinations asserted as an
+intersection rather than a union, clear-and-restore, the empty state,
+alphabetical ordering, the Registry -> map links including the
+reopen-after-close case that exercises the ref-guard, the degraded
+no-Property state, a stale `plantingId`, and phone-width overflow.
 
-1. **Filter/search — the core acceptance criterion.** With several real
-   Plants covering a mix of sun requirements, flower colors, bloom
-   windows, foliage types, and native status: try each filter axis alone
-   (partial common name, scientific name, and cultivar for search; a
-   flower-color substring; bloom month; sun/shade; foliage; native
-   status), then combine 2-3 at once and confirm the result is the
-   intersection, not the union. Clear back to no filters and confirm the
-   full list returns. Search for something matching nothing and confirm
-   "No Plants match these filters." appears rather than a blank list that
-   looks broken.
-2. **Planting-location links — the map jump.** Pick a Plant with a real
-   Planting and confirm a "View in \<Bed name> on the map" link appears
-   under it; click it and confirm `/map` loads with that Planting's
-   details panel (quantity, year, source, photo log) open automatically,
-   with no need to hunt for its Pin. Close the panel, navigate back to the
-   Registry, and click the same link again — confirm it reopens (exercises
-   the ref-guard `/code-review` added, which should reset because
-   `PropertyPage` remounts on navigation). A Plant planted in **more than
-   one** Bed should show multiple links, each opening the correct
-   Planting. A Plant with **no** Planting yet should show no map link.
-3. **Degraded/edge states.** Before any Property/Beds exist: confirm the
-   Registry still loads and filters normally, just with no map links
-   anywhere. A `?plantingId=` naming a since-deleted Planting: confirm the
-   map just loads normally with no panel and no crash.
-4. **Cosmetic.** Phone-width viewport with all six filter fields plus the
-   existing list — check nothing looks cramped or broken (Bloom Timeline's
-   #9 QA found a real phone-width bug here). Cross-browser (Safari/
-   WebKit) — this repo's history (#5's dropdown bug) has found real
-   WebKit-only rendering gaps Chromium alone misses.
+Read `apps/web/e2e/seed.ts` before changing the seed data: the Plant list is
+shaped so that each filter axis is load-bearing in the three-axis
+intersection test. An earlier seed left two of the three axes decorative,
+and a mutation run (disabling the native-status filter) is what caught it.
+
+The suite runs against the real linked Supabase project under a dedicated
+throwaway account, wiped and re-seeded per run. It refuses to run against an
+account whose email doesn't look like a QA one, because it deletes every
+Plant and Property on the account it runs as.
 
 ### Ticket #5 — all done, #5 closed
 
@@ -1292,103 +1233,34 @@ Property row was deleted afterward; the throwaway auth user itself remains
 in the project (no service-role access from this session to remove it) —
 see the closing comment on #5 for full detail.
 
-### Ticket #8 — NOT RUN, and #8 was closed anyway
+### Tickets #8 and #7 — run 2026-09-07, passed
 
-**#8 was closed on GitHub 2026-08-24 with every item below still unrun.** **Tracked in #34.** The
-user confirmed on 2026-09-02 that these remain genuinely outstanding and are
-waiting on their own QA. Item 2 (touch/mobile) is arguably now answered by
-#14's device QA, which exercised real Pin dragging on the native equivalent.
+The real-mouse and WebKit sittings were both run by hand and passed:
+freehand tracing and the smoothing toggle on a hand-drawn shape, bezier-pen
+curve handles, real Pin dragging (out of every Bed and back in), tapping the
+rendered on-canvas Pin, the break-it cases (tiny rect/oval near the discard
+threshold, overlapping Beds, "Clear" mid-draw on all four tools,
+overlapping-Bed Pin resolution, real image files in the photo log), and all
+of it again in Safari. No WebKit-only defect found.
 
+**Two items from these tickets are still open, and live in #34:** #8's
+Bed-delete cascade (does the UI list go stale until reload — needs a
+throwaway account, it's destructive) and #7's real-address check.
 
-Not run — these need real hardware/browsers or human judgment, not the
-synthetic Playwright pass this session already ran (create/view/photo-log/
-remove a Planting, reload persistence, zero console errors — see the #8
-entry in "What to do next" above for that pass's full detail, including the
-two real bugs it caught). Lower priority than a shipping blocker, but worth
-picking up before leaning on this feature for real garden-planning use:
+**#8's touch/mobile item is out of scope, not outstanding.** It asked about
+finger-dragging a Pin in a *phone browser*. ADR-0003 was amended 2026-09-07
+to say a mobile browser is not a supported surface at all — see "The full
+decision set". The item predates the native Map screen (#14), which is the
+surface that commitment actually refers to, and whose device QA passed.
 
-1. **Actually dragging the Pin with a mouse/trackpad.** The automated pass
-   never simulated a real drag on the Pin marker — Konva canvas drags are
-   awkward to script reliably — so it set up the test Bed to already cover
-   the Pin's default starting position and let it resolve with no drag at
-   all. Never exercised: dragging the Pin from center to elsewhere inside a
-   Bed, dragging it outside every Bed (confirm "Drop the pin inside a Bed."
-   appears and Save disables) and back in (confirm Save re-enables), and how
-   the drag actually feels — snappy vs. laggy, any visual glitches mid-drag.
-2. **Touch/mobile behavior.** CONTEXT.md's Pin entry says placement should
-   work identically on desktop and phone (unlike Bed drawing, which stays
-   desktop-only) — `PlantingMap` is deliberately not gated to desktop for
-   this reason, but it's never been touched on an actual phone or even a
-   touch-emulated browser. Check: does a finger-drag move the Pin, does the
-   map/form layout fit reasonably on a small screen.
-3. **Tapping the actual on-canvas Pin, not the list button.** The
-   automated pass used each Planting's "View" list button — same handler as
-   tapping the rendered Pin, but easier to script. Never clicked the actual
-   circle on the canvas; worth confirming hit-testing works reliably at its
-   small radius.
-4. **Cross-browser.** Only Chromium was driven. This repo's own history
-   (#5's dropdown-not-clickable bug) found real WebKit-only rendering
-   differences Chromium missed; `PlantingMap` hasn't been checked in WebKit
-   at all.
-5. **A couple of edge cases**: removing a Bed that already has Plantings on
-   it (the FK cascade-deletes them server-side — does the Plantings list
-   go stale in the UI until a reload, or update cleanly?); two overlapping
-   Beds (a dropped Pin resolves to whichever Bed comes first in the loaded
-   list, which might not be the one visually on top); and real image files
-   for the photo log (the automated pass uploaded a 4-byte fake JPEG) —
-   actual file sizes, multiple photos in one log, and confirming they list
-   most-recent-first.
+### Ticket #3 — all done
 
-### Ticket #7 — NOT RUN, and #7 was closed anyway
-
-**#7 was closed on GitHub 2026-08-23 with every item below still unrun.** **Tracked in #34.** The
-user confirmed on 2026-09-02 that these remain genuinely outstanding and are
-waiting on their own QA — closing the ticket did not retire them.
-
-
-Not run — these need human judgment or a real device/browser, not the
-synthetic Playwright pass this session already ran (all four tools drawn,
-saved, persisted across reload, removed, cascade-deleted, zero console
-errors — see the #7 entry in "What to do next" above for that pass's full
-detail). Lower priority than a shipping blocker, but worth picking up
-before leaning on this feature for real garden-planning use:
-
-1. **How drawing actually feels with a real mouse/trackpad** — the
-   Playwright pass traced a mechanical circle for freehand; a real
-   hand-traced garden-bed shape, and whether the smoothing toggle's
-   rounding looks good on it, is the real test.
-2. **Bezier-pen curve handles (click+drag)** — the automated pass only
-   clicked straight-edged corners. Dragging after a click to pull a curved
-   edge is the one pen-tool interaction never exercised.
-3. **Cross-browser** — only Chromium was driven. This repo's own history
-   (#5's dropdown-not-clickable bug) found real WebKit-only rendering
-   differences Chromium missed; Bed Editor hasn't been checked in WebKit at
-   all.
-4. **A real address the user cares about**, not just the Cambridge, MA test
-   address — confirm the aerial imagery and drawn Bed alignment look right
-   at that property's actual latitude/zoom.
-5. **Trying to break it**: a very tiny rectangle/oval drag (near the
-   8px/5px discard threshold), drawing a Bed that overlaps another Bed, and
-   clicking "Clear" mid-draw for each of the four tools.
-
-### Ticket #3 — item 1 done, three still not run
-
-**#3 was closed on GitHub 2026-08-20 with these items still unrun.** They are
-genuinely outstanding, not abandoned — the user confirmed on 2026-09-02 that
-they are still waiting on their own QA. **Tracked in #34** along with #7's,
-#8's and #17's.
-
-1. ~~**Direct URL to another account's plant ID**~~ — **done, passed**
-   (confirmed by the user 2026-09-02). Logging in as another account and
-   pasting a plant's `/registry/<id>` URL directly gives "Plant not found."
-   via RLS, not a data leak. This was the only item here with an
-   access-control failure mode rather than a cosmetic one.
-2. **Direct URL to a nonexistent plant ID** — same expected result.
-3. **Reload persistence for photos** — upload a reference photo, refresh
-   the page, confirm the thumbnail still renders (exercises the signed-URL
-   fetch on a fresh load, not just in-session state).
-4. **Multiple plants, alphabetical ordering** — add 2-3 plants with
-   different common names, confirm the Registry list sorts by name.
+Item 1 (another account's plant ID -> "Plant not found." via RLS) was
+confirmed by the user 2026-09-02. The remaining three — a nonexistent plant
+ID, reference-photo persistence across a reload, and alphabetical ordering —
+are covered by the #10 Playwright suite as of 2026-09-07. The photo check
+uploads a real PNG, not the 4-byte placeholder an earlier automated pass
+used.
 
 ### Ticket #4 — all done, #4 closed
 
@@ -1457,6 +1329,28 @@ gh issue list --state open
   Property's drawn-in-app base map stay desktop-only; Scale Reference
   calibration (tapping two points) is *not* bundled into that exception and
   works fine on phone.
+- **There are two surfaces, and a mobile browser is not one of them**
+  (ADR-0003, amended 2026-09-07). The web app is the desktop surface, the
+  iPhone app is the phone surface. The web app degrades politely on a
+  phone-sized browser — a standing notice pointing at the iPhone app,
+  nothing blocked, so a link opened on a phone isn't a dead end — but that
+  is a courtesy, not a commitment: **a bug found only in a mobile browser is
+  not an MVP defect.** When a CONTEXT.md term says something works "on
+  phone", it means the iPhone app.
+- **Drawing points at a desktop browser, never at the app.** The native app
+  deliberately has no drawing either, so "unavailable here" messages on a
+  phone browser must send the gardener to a desktop browser — sending them
+  to the app would send them somewhere the feature doesn't exist. The two
+  strings live in `apps/web/src/desktopOnly.tsx` and a test asserts they
+  stay different.
+- **Bed names are unique per Property**, case- and whitespace-insensitively,
+  enforced both in `validateBedInput` and by a unique index (migration
+  0023, applied 2026-09-07). The migration **backfills** existing duplicates
+  by suffixing them rather than grandfathering them, which was only
+  acceptable because every account on this project belongs to one person.
+  **Don't reuse that shape once there are third-party users** — rewriting
+  content a user authored is the thing to avoid, and the standard move is to
+  validate on write and leave history alone.
 - Cloud-hosted backend-as-a-service, Postgres-based (e.g. Supabase), with
   accounts — local-only was ruled out, not deprioritized, since two devices
   need to see the same data.
@@ -1541,8 +1435,8 @@ gh issue list --state open
 
 ### Open, but not blocking
 
-- ~~Which OCR: on-device or a cloud API?~~ **Resolved by ADR-0004** (see the
-  #19 entry in "What to do next" above): on-device, Apple's Vision
+- ~~Which OCR: on-device or a cloud API?~~ **Resolved by ADR-0004**:
+  on-device, Apple's Vision
   framework — tested for real against 8 real nursery tag photos, 8/8
   produced usable text. It runs in the shared client package, not an Edge
   Function, per ADR-0003's split. Cost: `apps/mobile` needs a custom EAS
