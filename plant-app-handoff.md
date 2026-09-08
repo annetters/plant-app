@@ -2,12 +2,20 @@
 
 **Date:** 2026-09-07
 
-**Most recent session.** Three QA findings fixed (self-crossing Bed
-outlines rejected, duplicate Plants caught when the scientific name isn't a
+**Most recent session.** **#40 fixed** (`e44325d`) — the fabricated
+hardiness zone is gone from `usdaTraits.ts`, and `UsdaCharacteristic.value`
+is now `string | null` so the null case is enforced by the type rather than
+absorbed incidentally. The issue and its status comment hold the detail.
+**#42 filed**: a flaky `BedEditor` test that fails only under full-suite
+load. **#40 is fixed but still open, and its one open question is a QA
+decision — see "What to do next".**
+
+The session before: three QA findings fixed (self-crossing Bed outlines
+rejected, duplicate Plants caught when the scientific name isn't a
 binomial, Bed names unique per Property), a Bed rename path added, a
 Playwright e2e suite added covering #10, and **ADR-0003 amended: a mobile
 browser is not a supported surface**. See "The full decision set" for that
-last one and "What to do next" for where QA stands.
+last one.
 
 > Earlier entries used to be summarised here as a "previously…" chain. It
 > was removed 2026-09-07: every item in it named a section that still has
@@ -752,7 +760,8 @@ convention is new**, invented for this and used only in #1 so far.
 **The MVP has no unbuilt features, and the manual-QA backlog is empty.**
 #34 tracked it and was closed 2026-09-07; #8's Bed-delete cascade, the last
 item on it, passed. There is no open issue for QA — the checklists under
-"Deferred QA by ticket" are the record.
+"Deferred QA by ticket" are the record. (One QA *decision* is open, on #40,
+and it is post-MVP: see "The one question waiting on the user" below.)
 
 **One half-check is genuinely outstanding, and nothing tracks it.** #7's
 item 4 asked for the aerial imagery *and* drawn Bed alignment at an address
@@ -787,11 +796,31 @@ worth having worried about — `BloomTimelineScreen`'s fixed `AXIS_HEIGHT`
 spacer drifting against the axis row and putting bars beside the wrong
 plant's name — did not materialise.
 
-Every open issue is labelled `post-mvp` except **#1**, the spec itself. Two
-carry a caveat: **#40** is a live defect wearing a deferral label (see
-"Known unfixed defects"), and **#41**'s deferral is a scope decision, not a
-judgement that it's minor — for a property that isn't square to north, the
-rectangle tool is effectively unusable until it lands.
+Every open issue is labelled `post-mvp` except **#1**, the spec itself, and
+**#42** (`needs-triage`, filed 2026-09-07). **#41**'s deferral is a scope
+decision, not a judgement that it's minor — for a property that isn't square
+to north, the rectangle tool is effectively unusable until it lands. #40 no
+longer carries its caveat: it was a live defect wearing a deferral label,
+and it is now fixed.
+
+## The one question waiting on the user
+
+**Does #40 need a manual QA pass before it can close, and who runs it?**
+Asked at the end of the 2026-09-07 session and **not yet answered** — the
+session paused here.
+
+What's already verified: typecheck clean across workspaces, full suite green
+(229 web + 263 domain/mobile), and six unit tests covering all four
+acceptance cases. What manual QA would add is the only thing tests can't:
+Tag Scan against a *real* USDA response, confirming a species whose
+minimum-temperature characteristic comes back blank now shows no zone.
+
+Note that **Playwright isn't an option here.** `speciesLookup` lives in
+`apps/mobile` only, so this path is the native dev client — the same surface
+as #31's one unrun Tag Scan item, which is the natural thing to pair it
+with. So the real choice is: the user runs both on the dev client, or #40
+rides on its unit coverage and closes without a manual pass. Don't assume
+either — `CLAUDE.md` requires asking who owns a QA pass before starting one.
 
 ## After both QA passes — later the same session
 
@@ -1193,10 +1222,15 @@ Full monorepo typecheck/test suite green throughout (215 domain + 147 mobile + 1
 
 ## Known unfixed defects
 
-**#40** — `packages/domain/src/usdaTraits.ts` derives a fabricated hardiness
-zone when USDA returns an empty minimum-temperature value. Found during #7,
-carried unfiled in this doc's archive until 2026-09-06, still present in
-`main`. The issue has the full write-up; don't restate it here.
+**None outstanding in shipped behaviour.** #40 — the fabricated hardiness
+zone from an empty USDA minimum-temperature value — was **fixed 2026-09-07**
+in `e44325d` and is covered by unit tests in `packages/domain`. The issue is
+still open pending the user's closure.
+
+The one live defect is **#42**, a *test* flake rather than product
+behaviour: `BedEditor`'s "stays silent until the Beds fetch settles" fails
+intermittently under full-suite load and passes in isolation. It has the
+write-up and a hypothesis; don't restate it here.
 
 Anything else in this class belongs on the tracker, not in this section.
 Trimming this doc on 2026-09-06 removed a large archive whose only unique
