@@ -82,3 +82,40 @@ describe('BedsRepository.remove', () => {
     expect(await repository.list('property-1')).toEqual([])
   })
 })
+
+describe('BedsRepository.rename', () => {
+  it('updates the name and returns the Bed mapped from its row', async () => {
+    const { client } = createFakeBedsDbClient([EXISTING_ROW])
+    const repository = new BedsRepository(client)
+
+    const renamed = await repository.rename('bed-1', 'Side border')
+
+    expect(renamed.id).toBe('bed-1')
+    expect(renamed.name).toBe('Side border')
+    expect((await repository.list('property-1'))[0].name).toBe('Side border')
+  })
+
+  it('leaves the outline untouched', async () => {
+    const { client } = createFakeBedsDbClient([EXISTING_ROW])
+    const repository = new BedsRepository(client)
+
+    const renamed = await repository.rename('bed-1', 'Side border')
+
+    expect(renamed.points).toEqual(EXISTING_ROW.points)
+    expect(renamed.tool).toBe('freehand')
+  })
+
+  it('throws when the new name collides on the same Property', async () => {
+    // The database carries beds_unique_name_per_property; callers validate
+    // first, so reaching this is the backstop, not the normal path.
+    const { client } = createFakeBedsDbClient([
+      EXISTING_ROW,
+      { ...EXISTING_ROW, id: 'bed-9', name: 'Side border' },
+    ])
+    const repository = new BedsRepository(client)
+
+    await expect(repository.rename('bed-1', 'side border')).rejects.toThrow(
+      /beds_unique_name_per_property/,
+    )
+  })
+})

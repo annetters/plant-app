@@ -319,3 +319,106 @@ describe('BedEditor', () => {
     })
   })
 })
+
+describe('BedEditor renaming', () => {
+  const SQUARE = [
+    { x: 0, y: 0 },
+    { x: 10, y: 0 },
+    { x: 10, y: 10 },
+    { x: 0, y: 10 },
+  ]
+
+  function bedRow(overrides: Partial<BedRow> = {}): BedRow {
+    return {
+      id: 'bed-1',
+      property_id: 'property-1',
+      name: 'Front border',
+      tool: 'rectangle',
+      points: SQUARE,
+      smoothing_enabled: false,
+      created_at: '2026-01-01T00:00:00.000Z',
+      ...overrides,
+    }
+  }
+
+  it('renames a Bed from the list', async () => {
+    const beds = renderEditor([bedRow()])
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Rename Front border' }))
+    const field = screen.getByLabelText('Bed name')
+    await userEvent.clear(field)
+    await userEvent.type(field, 'Side border')
+    await userEvent.click(screen.getByRole('button', { name: 'Save name' }))
+
+    expect(await screen.findByText('Side border')).toBeInTheDocument()
+    await waitFor(() => expect(beds.getRows()[0].name).toBe('Side border'))
+  })
+
+  it('rejects a rename that collides with another Bed, case-insensitively', async () => {
+    const beds = renderEditor([bedRow(), bedRow({ id: 'bed-2', name: 'Shade bed' })])
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Rename Shade bed' }))
+    const field = screen.getByLabelText('Bed name')
+    await userEvent.clear(field)
+    await userEvent.type(field, 'front border')
+    await userEvent.click(screen.getByRole('button', { name: 'Save name' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /already has a Bed called "Front border"/,
+    )
+    // Nothing was written.
+    expect(beds.getRows().find((row) => row.id === 'bed-2')?.name).toBe('Shade bed')
+  })
+
+  it('lets a Bed keep its own name', async () => {
+    // The editingBedId exclusion: re-saving without changing the name must
+    // not report the Bed as colliding with itself.
+    renderEditor([bedRow()])
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Rename Front border' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save name' }))
+
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Save name' })).not.toBeInTheDocument(),
+    )
+  })
+
+  it('renames a Bed whose stored outline crosses itself', async () => {
+    // Outlines can't be edited, and Beds drawn before the self-crossing rule
+    // existed are still in the data. Blocking their rename would leave them
+    // permanently unfixable — the exact trap this affordance removes.
+    const beds = renderEditor([
+      bedRow({
+        name: 'Bow tie',
+        points: [
+          { x: 0, y: 0 },
+          { x: 10, y: 10 },
+          { x: 10, y: 0 },
+          { x: 0, y: 10 },
+        ],
+      }),
+    ])
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Rename Bow tie' }))
+    const field = screen.getByLabelText('Bed name')
+    await userEvent.clear(field)
+    await userEvent.type(field, 'Renamed anyway')
+    await userEvent.click(screen.getByRole('button', { name: 'Save name' }))
+
+    expect(await screen.findByText('Renamed anyway')).toBeInTheDocument()
+    await waitFor(() => expect(beds.getRows()[0].name).toBe('Renamed anyway'))
+  })
+
+  it('cancelling leaves the name alone', async () => {
+    const beds = renderEditor([bedRow()])
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Rename Front border' }))
+    const field = screen.getByLabelText('Bed name')
+    await userEvent.clear(field)
+    await userEvent.type(field, 'Discarded')
+    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+
+    expect(await screen.findByText('Front border')).toBeInTheDocument()
+    expect(beds.getRows()[0].name).toBe('Front border')
+  })
+})

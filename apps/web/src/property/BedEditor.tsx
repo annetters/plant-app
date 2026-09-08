@@ -91,6 +91,12 @@ export function BedEditor({
   // belongs next to the Save button instead — #32.
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  // Renaming happens in the Bed list below, independently of the drawing
+  // panel — a name can be wrong long after the outline was drawn.
+  const [renamingBedId, setRenamingBedId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
+  const [renameError, setRenameError] = useState<string | null>(null)
+  const [renaming, setRenaming] = useState(false)
 
   const containerRef = useRef<HTMLDivElement | null>(null)
   const stageRef = useRef<Konva.Stage | null>(null)
@@ -484,6 +490,46 @@ export function BedEditor({
     }
   }
 
+  function startRename(bed: Bed) {
+    setRenamingBedId(bed.id)
+    setRenameValue(bed.name)
+    setRenameError(null)
+  }
+
+  function cancelRename() {
+    setRenamingBedId(null)
+    setRenameValue('')
+    setRenameError(null)
+  }
+
+  async function handleRenameSave(bed: Bed) {
+    setRenameError(null)
+    const validation = validateBedInput(
+      { ...bed, name: renameValue },
+      { existingBeds: beds, editingBedId: bed.id },
+    )
+
+    // Only the *name* error is acted on here. A rename doesn't touch the
+    // outline, and outlines can't be edited at all — so a Bed drawn before
+    // the self-crossing rule existed would otherwise be impossible to rename,
+    // which is the trap this whole affordance exists to remove.
+    if (!validation.ok && validation.errors.name) {
+      setRenameError(validation.errors.name)
+      return
+    }
+
+    setRenaming(true)
+    try {
+      const updated = await repository.rename(bed.id, renameValue.trim())
+      setBeds((prev) => prev.map((existing) => (existing.id === updated.id ? updated : existing)))
+      cancelRename()
+    } catch (err) {
+      setRenameError(err instanceof Error ? err.message : 'Could not rename this Bed.')
+    } finally {
+      setRenaming(false)
+    }
+  }
+
   async function handleRemove(id: string) {
     setError(null)
     try {
@@ -592,10 +638,41 @@ export function BedEditor({
       <ul>
         {beds.map((bed) => (
           <li key={bed.id}>
-            {bed.name}
-            <button type="button" aria-label={`Remove ${bed.name}`} onClick={() => handleRemove(bed.id)}>
-              Remove
-            </button>
+            {renamingBedId === bed.id ? (
+              <>
+                <label htmlFor={`bed-rename-${bed.id}`}>Bed name</label>
+                <input
+                  id={`bed-rename-${bed.id}`}
+                  value={renameValue}
+                  onChange={(event) => setRenameValue(event.target.value)}
+                />
+                <button type="button" disabled={renaming} onClick={() => void handleRenameSave(bed)}>
+                  Save name
+                </button>
+                <button type="button" disabled={renaming} onClick={cancelRename}>
+                  Cancel
+                </button>
+                {renameError && <p role="alert">{renameError}</p>}
+              </>
+            ) : (
+              <>
+                {bed.name}
+                <button
+                  type="button"
+                  aria-label={`Rename ${bed.name}`}
+                  onClick={() => startRename(bed)}
+                >
+                  Rename
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Remove ${bed.name}`}
+                  onClick={() => handleRemove(bed.id)}
+                >
+                  Remove
+                </button>
+              </>
+            )}
           </li>
         ))}
       </ul>

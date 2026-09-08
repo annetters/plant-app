@@ -12,7 +12,10 @@ export function createFakeBedsDbClient(initialRows: BedRow[] = []) {
   let rows = [...initialRows]
   let nextId = 1
 
-  function builder(op: 'select' | 'insert' | 'delete', insertValues?: Record<string, unknown>) {
+  function builder(
+    op: 'select' | 'insert' | 'update' | 'delete',
+    values?: Record<string, unknown>,
+  ) {
     const filters: Record<string, string> = {}
     let ordered: { column: string; ascending: boolean } | null = null
 
@@ -52,10 +55,42 @@ export function createFakeBedsDbClient(initialRows: BedRow[] = []) {
         const created: BedRow = {
           id: `bed-${nextId++}`,
           created_at: '2026-01-01T00:00:00.000Z',
-          ...(insertValues as Omit<BedRow, 'id' | 'created_at'>),
+          ...(values as Omit<BedRow, 'id' | 'created_at'>),
         }
         rows.push(created)
         return { data: created, error: null }
+      }
+      if (op === 'update') {
+        // Mirrors the unique index the real `beds` table carries
+        // (beds_unique_name_per_property), so a rename that collides fails
+        // here the way it would in Postgres rather than silently succeeding.
+        const targets = matching()
+        const next = values as Partial<BedRow>
+        if (typeof next.name === 'string') {
+          const normalized = next.name.trim().toLowerCase()
+          const clash = rows.find(
+            (row) =>
+              !targets.some((target) => target.id === row.id) &&
+              row.property_id === targets[0]?.property_id &&
+              row.name.trim().toLowerCase() === normalized,
+          )
+          if (clash) {
+            return {
+              data: null,
+              error: {
+                message:
+                  'duplicate key value violates unique constraint "beds_unique_name_per_property"',
+              },
+            }
+          }
+        }
+        let updated: BedRow | null = null
+        rows = rows.map((row) => {
+          if (!targets.some((target) => target.id === row.id)) return row
+          updated = { ...row, ...next }
+          return updated
+        })
+        return { data: updated, error: null }
       }
       if (op === 'delete') {
         rows = rows.filter(
@@ -87,6 +122,7 @@ export function createFakeBedsDbClient(initialRows: BedRow[] = []) {
       return {
         select: () => builder('select'),
         insert: (values: Record<string, unknown>) => builder('insert', values),
+        update: (values: Record<string, unknown>) => builder('update', values),
         delete: () => builder('delete'),
       }
     },

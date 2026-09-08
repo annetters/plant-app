@@ -18,6 +18,7 @@ export interface BedsDbClient {
   from(table: 'beds'): {
     select(columns?: string): BedsQuery
     insert(values: Row): BedsQuery
+    update(values: Row): BedsQuery
     delete(): BedsQuery
   }
 }
@@ -59,6 +60,24 @@ export class BedsRepository {
   async create(input: BedInput): Promise<Bed> {
     const row = unwrap<BedRow>(
       await this.client.from(TABLE).insert(bedInputToRow(input)).select().single(),
+    )
+    return bedFromRow(row)
+  }
+
+  /**
+   * Renames a Bed. Deliberately narrow rather than a general `update`: the
+   * name is the only part of a Bed that can be edited in place. An outline
+   * can't be adjusted after the fact — changing it means drawing a new Bed —
+   * so a wider update method would imply an affordance that doesn't exist.
+   *
+   * Callers must validate first (`validateBedInput` with `editingBedId`) so a
+   * collision is reported in the gardener's own words. The database's
+   * `beds_unique_name_per_property` index is the backstop, and surfaces as a
+   * raw 23505 if it ever gets here first.
+   */
+  async rename(id: string, name: string): Promise<Bed> {
+    const row = unwrap<BedRow>(
+      await this.client.from(TABLE).update({ name }).eq('id', id).select().single(),
     )
     return bedFromRow(row)
   }
