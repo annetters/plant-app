@@ -1253,9 +1253,15 @@ threshold, overlapping Beds, "Clear" mid-draw on all four tools,
 overlapping-Bed Pin resolution, real image files in the photo log), and all
 of it again in Safari. No WebKit-only defect found.
 
-**Two items from these tickets are still open, and live in #34:** #8's
-Bed-delete cascade (does the UI list go stale until reload — needs a
-throwaway account, it's destructive) and #7's real-address check.
+**#8's Bed-delete cascade also passed** (user-run, 2026-09-07): removing a
+Bed that has Plantings on it doesn't leave the UI stale — `PlantingMap`'s
+plantings effect keys off `beds`, so it refetches on its own. No QA items
+remain from either ticket.
+
+**#7's real-address check is the one thing left, and it isn't QA.** It's one
+Property per account, so aiming a Property at an address the user cares
+about means deleting the existing one and everything under it — a decision
+about whether and where, not a check to run. Tracked on #34.
 
 **#8's touch/mobile item is out of scope, not outstanding.** It asked about
 finger-dragging a Pin in a *phone browser*. ADR-0003 was amended 2026-09-07
