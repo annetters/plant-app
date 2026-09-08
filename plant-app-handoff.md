@@ -760,14 +760,19 @@ the user cares about, rather than the Cambridge, MA test address. On
 2026-09-07 the **imagery half passed** — a Property created at the real
 address on a throwaway account, imagery good at that latitude and zoom.
 
-The **alignment half has not been run**: does a Bed drawn on that imagery
-line up with the bed that's actually on the ground? It needs Beds drawn
-against a place the user can walk, and `properties_one_per_user`
-(`0006_properties.sql`) allows no second Property — so on the real account
-it costs the existing Property and everything cascading from it (Beds,
-Plantings, photos, task completions; the Plant registry survives, since
-`plants` hangs off `auth.users`). That cost is why it keeps being deferred.
-Don't record it as passed on the strength of the imagery half.
+The **alignment half passed too** (2026-09-07): Beds drawn on that imagery
+land where the real beds are. Item 4 is fully settled, and #7 has no QA
+left.
+
+**But it surfaced a real usability gap, which is the thing worth carrying
+forward.** Aerial tiles are Web Mercator, so the base map is always
+north-up, while a house and its property lines usually sit at an angle to
+north. Nothing in the app can rotate: not the base map, and not a drawn
+shape — `rectangleToPoints`/`ovalToPoints` in `dragShapeGeometry.ts` are
+axis-aligned by construction, and there is no rotation anywhere in the
+codebase. So tracing a rectangular bed that's square to an angled house
+means abandoning the rectangle tool for freehand or pen. The geometry is
+correct; drawing it is awkward.
 
 The Larger Text pass (#17's item, plus #14's own item 16 — same phone, same
 settings, one sitting) was run and **passed** 2026-09-07. The alignment risk
@@ -1264,13 +1269,14 @@ Bed that has Plantings on it doesn't leave the UI stale — `PlantingMap`'s
 plantings effect keys off `beds`, so it refetches on its own. No QA items
 remain from either ticket.
 
-**#7's real-address check is half done.** Its item 4 wanted both the aerial
-imagery and drawn Bed alignment confirmed at an address the user cares
-about. The **imagery half passed 2026-09-07** on a throwaway account at the
-real address. The **alignment half is unrun** — it needs Beds drawn against
-ground the user can inspect, and `properties_one_per_user` means that costs
-the existing Property and its whole cascade on the real account. It closed
-unresolved with #34; no issue tracks it, so this doc is its only record.
+**#7's real-address check passed in full, 2026-09-07.** Item 4 wanted the
+aerial imagery and drawn Bed alignment confirmed at an address the user
+cares about: imagery is good at that latitude and zoom, and drawn Beds land
+where the real beds are. #7 has no QA left.
+
+It did surface a usability gap — no rotation of the base map or of a drawn
+shape, against north-up Web Mercator tiles and an angled house. See "What
+to do next".
 
 **#8's touch/mobile item is out of scope, not outstanding.** It asked about
 finger-dragging a Pin in a *phone browser*. ADR-0003 was amended 2026-09-07
