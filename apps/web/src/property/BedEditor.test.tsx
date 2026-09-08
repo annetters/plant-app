@@ -4,6 +4,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import Konva from 'konva'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { DESKTOP_ONLY } from '../desktopOnly'
 import { createFakeBedsDbClient } from '../test/fakeBedsDbClient'
 import { BedEditor } from './BedEditor'
 import { BedsRepositoryProvider } from './BedsRepositoryContext'
@@ -295,7 +296,7 @@ describe('BedEditor', () => {
 
       await waitFor(() => expect(onOpenChange).toHaveBeenLastCalledWith(false))
       expect(
-        screen.getByText('Bed drawing is available on a larger, non-touch screen.'),
+        screen.getByText(DESKTOP_ONLY.drawing),
       ).toBeInTheDocument()
     })
   })
@@ -305,7 +306,7 @@ describe('BedEditor', () => {
       setViewport(500, false)
       renderEditor()
       expect(
-        await screen.findByText('Bed drawing is available on a larger, non-touch screen.'),
+        await screen.findByText(DESKTOP_ONLY.drawing),
       ).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Draw a Bed' })).not.toBeInTheDocument()
     })
@@ -314,7 +315,7 @@ describe('BedEditor', () => {
       setViewport(1440, true)
       renderEditor()
       expect(
-        await screen.findByText('Bed drawing is available on a larger, non-touch screen.'),
+        await screen.findByText(DESKTOP_ONLY.drawing),
       ).toBeInTheDocument()
     })
   })

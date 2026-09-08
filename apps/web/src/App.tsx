@@ -17,6 +17,7 @@ import { NotFoundPage } from './routes/NotFoundPage'
 import { PlantFormPage } from './routes/PlantFormPage'
 import { PlantingTaskHistoryPage } from './routes/PlantingTaskHistoryPage'
 import { PlantsPage } from './routes/PlantsPage'
+import { MobileBrowserNotice } from './desktopOnly'
 import { PropertyPage } from './routes/PropertyPage'
 import { SignUpPage } from './routes/SignUpPage'
 import { TasksPage } from './routes/TasksPage'
@@ -34,6 +35,7 @@ export function App() {
             <PlantingsRepositoryProvider client={asPlantingsDbClient(supabase)}>
               <TaskCompletionsRepositoryProvider client={asTaskCompletionsDbClient(supabase)}>
                 <OneOffTodosRepositoryProvider client={asOneOffTodosDbClient(supabase)}>
+                  <MobileBrowserNotice />
                   <Routes>
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/login" element={<LoginPage />} />

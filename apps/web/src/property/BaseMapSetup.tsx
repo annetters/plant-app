@@ -2,6 +2,8 @@ import type { BaseMapSource, BedPoint, Property, ScalePoint, ScaleReferenceMode 
 import { STAGE_SIZE_PX, svgPointsAttribute, validateScaleReferenceInput } from '@plant-app/domain'
 import { useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { usePropertiesRepository } from './PropertiesRepositoryContext'
+import { DESKTOP_ONLY } from '../desktopOnly'
+import { useIsDesktopViewport } from './useIsDesktopViewport'
 
 type Step = 'choose' | 'photo' | 'draw' | 'calibrate'
 
@@ -31,6 +33,7 @@ function clickPoint(event: ReactMouseEvent<HTMLDivElement>): ScalePoint {
  */
 export function BaseMapSetup(props: BaseMapSetupProps) {
   const repository = usePropertiesRepository()
+  const isDesktop = useIsDesktopViewport()
   const [step, setStep] = useState<Step>('choose')
   const [source, setSource] = useState<BaseMapSource | null>(null)
   // Generated up front even in 'update' mode (where it's unused) so the
@@ -165,15 +168,23 @@ export function BaseMapSetup(props: BaseMapSetupProps) {
           >
             Upload a plot plan photo
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSource('drawn')
-              setStep('draw')
-            }}
-          >
-            Draw a base plan
-          </button>
+          {/* ADR-0003 keeps freehand drawing desktop-only, and that covers
+              the in-app drawn base plan as well as Bed outlines. The photo
+              path stays available here, so a phone browser still has a way
+              to set up a base map — it just can't trace one. */}
+          {isDesktop ? (
+            <button
+              type="button"
+              onClick={() => {
+                setSource('drawn')
+                setStep('draw')
+              }}
+            >
+              Draw a base plan
+            </button>
+          ) : (
+            <p>{DESKTOP_ONLY.drawing}</p>
+          )}
         </>
       )}
 
@@ -208,7 +219,9 @@ export function BaseMapSetup(props: BaseMapSetupProps) {
         </>
       )}
 
-      {step === 'draw' && (
+      {step === 'draw' && !isDesktop && <p>{DESKTOP_ONLY.drawing}</p>}
+
+      {step === 'draw' && isDesktop && (
         <>
           <p>
             Click to place points along a structural line — the property boundary, driveway, or

@@ -2,7 +2,8 @@ import type { PropertyRow } from '@plant-app/domain'
 import { propertyFromRow } from '@plant-app/domain'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { DESKTOP_ONLY } from '../desktopOnly'
 import { createFakePropertiesDbClient } from '../test/fakePropertiesDbClient'
 import { BaseMapSetup } from './BaseMapSetup'
 import { PropertiesRepositoryProvider } from './PropertiesRepositoryContext'
@@ -264,5 +265,51 @@ describe('BaseMapSetup — placed-point feedback while drawing', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Finish this line' }))
 
     expect(screen.queryAllByTestId('base-map-placed-point')).toHaveLength(0)
+  })
+})
+
+describe('BaseMapSetup on a mobile browser', () => {
+  function setViewport(width: number, coarsePointer: boolean) {
+    Object.defineProperty(window, 'innerWidth', { value: width, configurable: true })
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockImplementation((query: string) => ({
+        matches: query.includes('coarse') ? coarsePointer : false,
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    )
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('does not offer the drawn base plan, and says why', () => {
+    // ADR-0003 keeps freehand drawing desktop-only and that covers the
+    // in-app drawn base plan, not just Bed outlines. Web was the only
+    // surface not enforcing it: native's BaseMapSetupScreen offers the
+    // photo source alone.
+    setViewport(390, true)
+    renderSetup()
+
+    expect(screen.queryByRole('button', { name: 'Draw a base plan' })).not.toBeInTheDocument()
+    expect(screen.getByText(DESKTOP_ONLY.drawing)).toBeInTheDocument()
+  })
+
+  it('still offers the photo path, so a phone browser is not a dead end', () => {
+    setViewport(390, true)
+    renderSetup()
+
+    expect(screen.getByRole('button', { name: 'Upload a plot plan photo' })).toBeInTheDocument()
+  })
+
+  it('offers drawing again on a desktop viewport', () => {
+    setViewport(1440, false)
+    renderSetup()
+
+    expect(screen.getByRole('button', { name: 'Draw a base plan' })).toBeInTheDocument()
+    expect(screen.queryByText(DESKTOP_ONLY.drawing)).not.toBeInTheDocument()
   })
 })

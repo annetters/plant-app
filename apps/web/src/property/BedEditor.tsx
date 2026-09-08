@@ -7,6 +7,7 @@ import {
 } from '@plant-app/domain'
 import Konva from 'konva'
 import { useEffect, useRef, useState } from 'react'
+import { DESKTOP_ONLY } from '../desktopOnly'
 import { BaseMapBackground } from './BaseMapBackground'
 import { buildOutlineLine } from './bedOutline'
 import { useBedsRepository } from './BedsRepositoryContext'
@@ -552,7 +553,7 @@ export function BedEditor({
       {error && <p role="alert">{error}</p>}
 
       {!isDesktop ? (
-        <p>Bed drawing is available on a larger, non-touch screen.</p>
+        <p>{DESKTOP_ONLY.drawing}</p>
       ) : !open ? (
         <button type="button" onClick={() => setOpen(true)}>
           Draw a Bed
