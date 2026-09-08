@@ -1,5 +1,28 @@
 # CONTEXT.md — Personal Garden Plant Registry
 
+## Surfaces
+
+There are **two** surfaces, and only two (ADR-0003): the **web app**, which is
+the desktop surface, and the **iPhone app**, which is the phone surface.
+
+**A mobile browser is not a third surface.** The web app is not expected to
+work as a phone experience, is not designed against one, and is not QA'd on
+one. On a phone-sized browser it says so and points at the iPhone app. It
+stays readable rather than refusing outright — a link opened on a phone
+shouldn't be a dead end — but that is a courtesy, not a supported way to use
+the app, and no feature is held to working there.
+
+So when a term below says something works "on phone", it means the iPhone
+app. It is never a claim about a phone browser.
+
+**Drawing is the exception that belongs to neither phone surface.** Freehand
+Bed outlines and the in-app drawn base plan are **desktop-browser-only**:
+ADR-0001 evaluated touchscreen tracing and rejected it as impractical, and
+ADR-0003 kept that as the single gap in otherwise-full native parity. The
+iPhone app deliberately doesn't offer drawing either. So a phone browser
+that can't draw must point the gardener at a *desktop browser* — pointing at
+the iPhone app would send them somewhere the feature doesn't exist.
+
 ## Glossary
 
 ### Plant
@@ -142,9 +165,11 @@ numeric input.
 ### Pin
 A map marker for a Planting's location within a Bed, placed by dragging
 directly to position on the map. No manual distance or number entry is
-required. Works identically on desktop and phone. Optional precision-assist
-suggestions (e.g. referencing a Landmark) may be added later — not required
-for MVP.
+required. Works identically on the **desktop web app and the iPhone app** —
+the two supported surfaces (see Surfaces). This is not a claim about a phone
+browser; the iPhone app is what makes Pin placement work on a phone.
+Optional precision-assist suggestions (e.g. referencing a Landmark) may be
+added later — not required for MVP.
 
 ### Bloom window
 A Plant's typical flowering period, stored as start and end month/day

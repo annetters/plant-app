@@ -9,6 +9,11 @@ Accepted — 2026-08-18. Resolves the tech-stack and persistence decision
 "Domain logic execution", flagged there as **held with lower confidence**
 than the rest of this ADR.
 
+**Amended 2026-09-07**: makes explicit that a mobile browser is not a
+supported surface — see "A mobile browser is not a surface" below. The
+original wording named the two surfaces but never said what a phone
+*browser* is, which left it readable as an implied third surface.
+
 ## Context
 
 The spec is deliberately stack-agnostic. ADR-0001's prototype used vanilla
@@ -80,6 +85,39 @@ needs to contain.
   neither is a phone-only fallback for the other. The horizontal-scroll
   experience must be fluid and pleasant to use, not merely technically
   functional.
+
+### A mobile browser is not a surface
+
+**Amendment, 2026-09-07.** The Platform section above names two surfaces:
+desktop browser, and native phone app. It never said what happens when
+someone opens the web app *on a phone browser*, and the silence was read as
+"a supported third thing" more than once — a QA sitting was planned around
+finger-dragging a Pin in mobile Safari, which is not something this app
+promises anywhere. The spec is explicit in the other direction (story 53
+wants a native app "not just a website ... not like using a phone browser").
+
+- **A mobile browser is not a supported surface.** The web app is the
+  desktop surface. Nothing is designed, held to, or QA'd against a
+  phone-sized browser.
+- **It degrades, it doesn't refuse.** On a phone-sized browser the web app
+  shows a standing notice pointing at the iPhone app, and otherwise stays
+  usable — opening a link on a phone without the app installed shouldn't be
+  a dead end. Read that as a courtesy, not a commitment: no feature is held
+  to working there, and a bug found only on a mobile browser is not an MVP
+  defect.
+- **Drawing must point at a desktop browser, not at the app.** Freehand Bed
+  outlines and the in-app drawn base plan are desktop-browser-only, and the
+  native app deliberately doesn't have them either (that is the "except
+  drawing" gap above). Telling a gardener on a phone browser to "use the
+  app" for drawing would send them somewhere the feature doesn't exist, so
+  the two messages are deliberately different strings.
+
+**Consequence, already applied.** `BedEditor` gated Bed drawing on viewport
+but framed it as a screen-size limitation; that wording now names the mobile
+browser. `BaseMapSetup` had **no viewport gate at all**, so the in-app drawn
+base plan — which this ADR has always called desktop-only — was fully
+reachable from a phone browser. Native was correct throughout:
+`BaseMapSetupScreen` offers the photo source alone and cites this ADR.
 
 ### Domain logic execution
 
