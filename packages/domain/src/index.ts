@@ -95,6 +95,7 @@ export {
   chaikinSmooth,
   decimatePoints,
   feetToPixels,
+  outlineSelfIntersects,
   pixelsToFeet,
   renderedBedOutlines,
   renderedOutlinePoints,
@@ -107,6 +108,7 @@ export type {
   BedPoint,
   BedRow,
   BedTool,
+  BedValidationContext,
   BedValidationErrors,
   BedValidationResult,
 } from "./bed.js";

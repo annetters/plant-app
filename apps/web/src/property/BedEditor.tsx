@@ -463,7 +463,10 @@ export function BedEditor({
       points: draft.points,
       smoothingEnabled: draft.tool === 'freehand' ? smoothingEnabled : false,
     }
-    const validation = validateBedInput(input)
+    // `beds` is this Property's full loaded list, so the name-uniqueness check
+    // sees every Bed it has to be unique against. There is no rename path on
+    // this screen — handleSave always creates — so nothing needs excluding.
+    const validation = validateBedInput(input, { existingBeds: beds })
     if (!validation.ok) {
       setSaveError(Object.values(validation.errors)[0] ?? 'Could not save this Bed.')
       return

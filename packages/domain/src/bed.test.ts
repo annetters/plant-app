@@ -6,6 +6,7 @@ import {
   chaikinSmooth,
   decimatePoints,
   feetToPixels,
+  outlineSelfIntersects,
   pixelsToFeet,
   renderedBedOutlines,
   renderedOutlinePoints,
@@ -280,5 +281,150 @@ describe("bedInputToRow / bedFromRow", () => {
       points: input.points,
       smoothingEnabled: input.smoothingEnabled,
     });
+  });
+});
+
+describe("outlineSelfIntersects", () => {
+  it("accepts a simple closed rectangle", () => {
+    expect(
+      outlineSelfIntersects([
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 10, y: 10 },
+        { x: 0, y: 10 },
+      ]),
+    ).toBe(false);
+  });
+
+  it("detects a bow-tie, where two edges pass through each other", () => {
+    // The classic self-crossing quad: corners taken in the wrong order, so
+    // the two long edges cross in the middle.
+    expect(
+      outlineSelfIntersects([
+        { x: 0, y: 0 },
+        { x: 10, y: 10 },
+        { x: 10, y: 0 },
+        { x: 0, y: 10 },
+      ]),
+    ).toBe(true);
+  });
+
+  it("detects an outline that loops back over an earlier edge", () => {
+    expect(
+      outlineSelfIntersects([
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 10, y: 10 },
+        { x: 5, y: 10 },
+        { x: 5, y: -5 },
+        { x: 0, y: -5 },
+      ]),
+    ).toBe(true);
+  });
+
+  it("does not flag an outline whose corners merely touch", () => {
+    // A hand trace grazes itself constantly; only a proper crossing counts,
+    // otherwise good freehand shapes would be rejected.
+    expect(
+      outlineSelfIntersects([
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 5, y: 5 },
+        { x: 10, y: 10 },
+        { x: 0, y: 10 },
+      ]),
+    ).toBe(false);
+  });
+
+  it("ignores outlines too short to cross", () => {
+    expect(
+      outlineSelfIntersects([
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 5, y: 5 },
+      ]),
+    ).toBe(false);
+  });
+});
+
+describe("validateBedInput — self-crossing outlines", () => {
+  it("rejects a self-crossing outline, naming the Pin consequence", () => {
+    const result = validateBedInput(
+      validInput({
+        tool: "pen",
+        points: [
+          { x: 0, y: 0 },
+          { x: 10, y: 10 },
+          { x: 10, y: 0 },
+          { x: 0, y: 10 },
+        ],
+      }),
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.points).toMatch(/crosses over itself/);
+  });
+
+  it("checks the rendered outline, not the raw trace", () => {
+    // Pin containment runs on the smoothed shape (renderedBedOutlines), so
+    // validation has to agree with it or the two can disagree about the same
+    // Bed. Smoothing a bow-tie keeps the crossing.
+    const result = validateBedInput(
+      validInput({
+        tool: "freehand",
+        smoothingEnabled: true,
+        points: [
+          { x: 0, y: 0 },
+          { x: 10, y: 10 },
+          { x: 10, y: 0 },
+          { x: 0, y: 10 },
+        ],
+      }),
+    );
+    expect(result.ok).toBe(false);
+  });
+
+  it("still accepts an ordinary outline", () => {
+    expect(validateBedInput(validInput()).ok).toBe(true);
+  });
+});
+
+describe("validateBedInput — name uniqueness", () => {
+  const existingBeds = [
+    { id: "bed-1", name: "Front Border" },
+    { id: "bed-2", name: "Shade Bed" },
+  ];
+
+  it("rejects a name that already exists on the Property", () => {
+    const result = validateBedInput(validInput({ name: "Front Border" }), { existingBeds });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.errors.name).toMatch(/already has a Bed called "Front Border"/);
+  });
+
+  it("compares case-insensitively — the QA finding was Test vs test", () => {
+    const result = validateBedInput(validInput({ name: "front border" }), { existingBeds });
+    expect(result.ok).toBe(false);
+  });
+
+  it("compares ignoring surrounding whitespace", () => {
+    const result = validateBedInput(validInput({ name: "  Shade Bed  " }), { existingBeds });
+    expect(result.ok).toBe(false);
+  });
+
+  it("accepts a genuinely new name", () => {
+    expect(validateBedInput(validInput({ name: "Back Border" }), { existingBeds }).ok).toBe(true);
+  });
+
+  it("does not flag a Bed against itself when renaming", () => {
+    const result = validateBedInput(validInput({ name: "Front Border" }), {
+      existingBeds,
+      editingBedId: "bed-1",
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("skips the check entirely when no Bed list is supplied", () => {
+    expect(validateBedInput(validInput({ name: "Front Border" })).ok).toBe(true);
   });
 });

@@ -37,14 +37,103 @@ export type BedValidationResult =
 
 const MIN_OUTLINE_POINTS = 3;
 
-export function validateBedInput(input: BedInput): BedValidationResult {
+/** Below this, a cross-product is floating-point noise from the pixel/feet round trip rather than a real turn. */
+const ORIENTATION_EPSILON = 1e-9;
+
+/** 0 = collinear, 1 = clockwise, 2 = counter-clockwise. */
+function orientation(a: BedPoint, b: BedPoint, c: BedPoint): number {
+  const value = (b.y - a.y) * (c.x - b.x) - (b.x - a.x) * (c.y - b.y);
+  if (Math.abs(value) < ORIENTATION_EPSILON) return 0;
+  return value > 0 ? 1 : 2;
+}
+
+/**
+ * A *proper* crossing only: the two segments pass through each other, with no
+ * endpoint merely touching and nothing collinear. Deliberately strict —
+ * a hand-traced outline grazes or doubles back on itself constantly, and
+ * treating those as errors would reject good freehand traces.
+ */
+function segmentsProperlyCross(p1: BedPoint, q1: BedPoint, p2: BedPoint, q2: BedPoint): boolean {
+  const o1 = orientation(p1, q1, p2);
+  const o2 = orientation(p1, q1, q2);
+  const o3 = orientation(p2, q2, p1);
+  const o4 = orientation(p2, q2, q1);
+  if (o1 === 0 || o2 === 0 || o3 === 0 || o4 === 0) return false;
+  return o1 !== o2 && o3 !== o4;
+}
+
+/**
+ * Whether a closed outline passes through itself.
+ *
+ * This matters because `isPointInPolygon` (`planting.ts`) resolves a dropped
+ * Pin with the even-odd rule: any region a self-overlapping outline encloses
+ * an *even* number of times counts as outside it. A gardener then drops a Pin
+ * somewhere plainly inside their Bed and is told "Drop the pin inside a Bed."
+ * with Save disabled, with nothing on screen explaining why. A garden bed is
+ * a simple region, so the outline that describes it should be one too.
+ *
+ * Test this against the outline a Bed actually *renders* as, not its raw
+ * traced points — smoothing can move edges, and the rendered shape is what
+ * Pin containment runs on. `validateBedInput` does exactly that.
+ */
+export function outlineSelfIntersects(points: readonly BedPoint[]): boolean {
+  const n = points.length;
+  // Fewer than four points can only cross itself by being degenerate, which
+  // the point-count rule already covers.
+  if (n < 4) return false;
+
+  for (let i = 0; i < n; i++) {
+    const p1 = points[i];
+    const q1 = points[(i + 1) % n];
+    for (let j = i + 1; j < n; j++) {
+      // Neighbouring segments share an endpoint by construction, and segment
+      // 0 wraps round to meet the last one — neither is a self-crossing.
+      if (j === i + 1) continue;
+      if (i === 0 && j === n - 1) continue;
+      if (segmentsProperlyCross(p1, q1, points[j], points[(j + 1) % n])) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The other Beds a name is checked against for uniqueness, and the Bed to
+ * exclude from that check when one is being renamed rather than created.
+ */
+export interface BedValidationContext {
+  existingBeds?: readonly { id: string; name: string }[];
+  editingBedId?: string;
+}
+
+/** Bed names are compared case- and whitespace-insensitively: "Test" and " test " are the same name to a reader. */
+function normalizeBedName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+export function validateBedInput(input: BedInput, context: BedValidationContext = {}): BedValidationResult {
   const errors: BedValidationErrors = {};
 
   if (!input.name.trim()) {
     errors.name = "Name is required.";
+  } else if (context.existingBeds) {
+    // A Bed is identified by its id; the name is a convenience layer for the
+    // gardener. But it's the layer the Registry's map links are written in
+    // ("View in Front Border on the map"), so two Beds sharing a name make
+    // those links ambiguous and make a misplaced Pin impossible to describe.
+    const candidate = normalizeBedName(input.name);
+    const clash = context.existingBeds.find(
+      (bed) => bed.id !== context.editingBedId && normalizeBedName(bed.name) === candidate,
+    );
+    if (clash) {
+      errors.name = `This Property already has a Bed called "${clash.name.trim()}". Give this one a different name.`;
+    }
   }
+
   if (input.points.length < MIN_OUTLINE_POINTS) {
     errors.points = `A Bed outline needs at least ${MIN_OUTLINE_POINTS} points.`;
+  } else if (outlineSelfIntersects(renderedOutlinePoints(input.points, input.tool, input.smoothingEnabled))) {
+    errors.points =
+      "This outline crosses over itself, so parts of it wouldn't accept a Pin. Redraw it as a single loop that doesn't cross.";
   }
 
   return Object.keys(errors).length > 0 ? { ok: false, errors } : { ok: true };
