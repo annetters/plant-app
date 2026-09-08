@@ -171,6 +171,11 @@ five-role mapping table on purpose — see the note under "Scope change".
 authorization to close it, and re-labelling is not closure by proxy: #36 is
 `wontfix` and still open, awaiting the user.
 
+> **Superseded 2026-09-08.** #36 no longer carries `wontfix` — it went to
+> `needs-info` after the 2026-09-05 research, and to `ready-for-agent` on
+> 2026-09-08. Both label claims about #36 in this section are history. See the
+> board summary under "What to do next".
+
 ---
 
 ### #29 fixed (2026-09-06): wording branches on `baseMapSource`
@@ -804,10 +809,27 @@ worth having worried about — `BloomTimelineScreen`'s fixed `AXIS_HEIGHT`
 spacer drifting against the axis row and putting bars beside the wrong
 plant's name — did not materialise.
 
-Every open issue is labelled `post-mvp` except **#1**, the spec itself,
-**#42** (`needs-triage`, filed 2026-09-07) and **#43** (`enhancement`,
-`needs-triage`, filed 2026-09-08 — untriaged, not yet looked at by any
-session here). **#41**'s deferral is a scope
+Every open issue is labelled `post-mvp` except **#1**, the spec itself, and
+**#42** (`needs-triage`, filed 2026-09-07). **#43** was filed 2026-09-08 and
+triaged the same day to `post-mvp` (the user's call): as-you-type species
+suggestions on the web Add Plant form, which offers no lookup at all today
+while native has had one since #31.
+
+**#36 is now `ready-for-agent`, and should land before #43** (relabelled from
+`needs-info` 2026-09-08, the user's call). Nothing was waiting on information —
+`docs/research/usda-plants-name-resolution.md` investigated it on 2026-09-05
+and reached a verdict; #43 is the practical gap `CONTEXT.md` asked for before
+revisiting the data source. **Direction agreed: ingest, don't proxy** — the
+name checklist goes into our own Postgres table rather than being fetched from
+USDA per lookup. Licensing is explicitly permissive, the bulk file carries a
+real `Last-Modified` header, and it moves an unsupported endpoint out of the
+hot path. Names local, traits live. The issue comment holds the detail and the
+three-step scope. Sequencing matters because swapping the name index changes
+what every USDA surface returns, Tag Scan's included. Note **#44**'s direction
+3 proposes folding trait *accuracy* into the same revisit; #36's scope as
+written covers names and coverage only.
+
+**#41**'s deferral is a scope
 decision, not a judgement that it's minor — for a property that isn't square
 to north, the rectangle tool is effectively unusable until it lands. #40 no
 longer carries its caveat: it was a live defect wearing a deferral label,
