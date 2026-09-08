@@ -774,9 +774,9 @@ codebase. So tracing a rectangular bed that's square to an angled house
 means abandoning the rectangle tool for freehand or pen. The geometry is
 correct; drawing it is awkward.
 
-**Filed as #41** — rotate the view (one angle on the Property, applied at
-render) rather than rotating shapes, so stored outlines stay north-up and
-nothing migrates. Two traps are written into that ticket: don't widen the
+**Filed as #41** (`post-mvp`, user's call 2026-09-07) — rotate the view (one
+angle on the Property, applied at render) rather than rotating shapes, so
+stored outlines stay north-up and nothing migrates. Two traps are written into that ticket: don't widen the
 tile grid via `GRID_RADIUS`, because `STAGE_SIZE_PX` derives from it and
 every Scale Reference was calibrated against it; and un-rotate at capture
 so the angle stays changeable afterwards.
@@ -787,8 +787,11 @@ worth having worried about — `BloomTimelineScreen`'s fixed `AXIS_HEIGHT`
 spacer drifting against the axis row and putting bars beside the wrong
 plant's name — did not materialise.
 
-Everything else on the board is labelled `post-mvp` except **#40**, a live
-defect wearing a deferral label — see "Known unfixed defects".
+Every open issue is labelled `post-mvp` except **#1**, the spec itself. Two
+carry a caveat: **#40** is a live defect wearing a deferral label (see
+"Known unfixed defects"), and **#41**'s deferral is a scope decision, not a
+judgement that it's minor — for a property that isn't square to north, the
+rectangle tool is effectively unusable until it lands.
 
 ## After both QA passes — later the same session
 
