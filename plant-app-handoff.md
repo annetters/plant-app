@@ -813,12 +813,35 @@ to north, the rectangle tool is effectively unusable until it lands. #40 no
 longer carries its caveat: it was a live defect wearing a deferral label,
 and it is now fixed.
 
-## Next session starts here: one dev-client QA sitting, user-run
+## The dev-client QA sitting — RUN 2026-09-08, both checks passed
 
 **Decided 2026-09-07 by the user:** they run a dev-client pass covering
 **#31's** last item and **#40** together, in one sitting. **Approach settled
 2026-09-08** (option 1 below, the user's call): two scientific names typed
-into the manual Add Plant form. Still unrun.
+into the manual Add Plant form.
+
+**Run by the user on 2026-09-08. Both checks passed, no findings.**
+
+- ***Psydrax odorata*** → panel offered `Mature height: 240"` and **nothing
+  else**. No hardiness-zone sentence. #40's no-regression half confirmed
+  against a live USDA response.
+- ***Tsuga canadensis*** → `part sun` (unhyphenated — **#31's `formatOption`
+  item passes**, and that was #31's last outstanding QA item), `Mature
+  height: 1260"`, and the zone-3 sentence present. The zone line rendering
+  here is what makes its absence on *Psydrax* meaningful rather than a panel
+  that never shows zones.
+
+**#31 now has no QA outstanding at all.** **#40's blank half remains
+unrunnable** from live data and rides on its four unit tests, as decided
+below. **#40 is fixed and fully QA'd to the extent it can be, and is still
+open awaiting the user's decision** — per `CLAUDE.md`, a finished ticket is
+never authorization to close.
+
+Two corrections to the walkthrough, worth keeping for whoever writes the
+next one: the submit button on a new Plant reads **"Add Plant"**, not
+"Save"; and the **"Look up species" button is not part of this flow** — it
+resolves a *common name* to a scientific name, while the traits panel fires
+from `handleSave` on the *scientific* name. Both cost the user a round trip.
 
 **Two corrections to how this was previously written up**, both established
 2026-09-08:
