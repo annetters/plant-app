@@ -1183,9 +1183,9 @@ content was defects like this one — file them when found.
 
 ## Deferred QA by ticket
 
-Outstanding manual QA carried over from closed tickets is also tracked as
-**#34** (`ready-for-human`). That issue is the live status; the checklists
-below are the detail behind it.
+This was tracked as **#34**, closed 2026-09-07 once every item below had
+been run or ruled out of scope. These checklists are now the record; there
+is no open issue behind them.
 
 ### Ticket #10 — automated, passing
 
@@ -1261,7 +1261,8 @@ remain from either ticket.
 **#7's real-address check is the one thing left, and it isn't QA.** It's one
 Property per account, so aiming a Property at an address the user cares
 about means deleting the existing one and everything under it — a decision
-about whether and where, not a check to run. Tracked on #34.
+about whether and where, not a check to run. It closed unresolved with #34
+on 2026-09-07 and has no issue of its own; it lives here only.
 
 **#8's touch/mobile item is out of scope, not outstanding.** It asked about
 finger-dragging a Pin in a *phone browser*. ADR-0003 was amended 2026-09-07
