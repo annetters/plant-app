@@ -2,20 +2,24 @@
 
 **Date:** 2026-09-09
 
-**Most recent session.** **#44 fixed** (`6abcf9d`) — USDA's `Shade
+**Most recent session.** Both tickets worked this session are **closed**, and
+two follow-ups were filed from the conversation around them: **#45** (record
+where a suggested trait value came from) and **#46** (cross-check a second
+source, and bring sun/shade back if it can be trusted — blocked by #45).
+
+**#44 fixed** (`6abcf9d`) — USDA's `Shade
 Tolerance` no longer suggests a `sunRequirement` at all. Direction 1 of the
 three the ticket offered; remapping the apparent inversion was rejected as
 shipping a guess about an undocumented field. Dropped from
 `UsdaSpeciesSuggestedTraits` itself rather than from the projection, so the
-type enforces it — #40's precedent. **Open pending the user's verification;
-do not close it.** See "#44: the inverted Shade Tolerance" below.
+type enforces it — #40's precedent. Device-verified and closed. See "#44: the
+inverted Shade Tolerance" below.
 
 **#23 fixed** in the same session (`d3bcf6c`) — Tag Scan now validates a
 candidate genus against a bundled GBIF vocabulary instead of trusting line
 shape. Against the real transcript it goes from 3 correct / 2 confidently
 wrong / 3 empty to **3 correct / 0 wrong / 5 empty**. ADR-0006 records the
-decision. **Also open pending the user's verification.** See "#23: the genus
-vocabulary" below.
+decision. Closed. See "#23: the genus vocabulary" below.
 
 **The session before.** **#42 fixed and closed** (`7331099`) — the flaky
 `BedEditor` test. The cause was not the one the ticket guessed: the test
@@ -889,9 +893,12 @@ hot path. Names local, traits live. The issue comment holds the detail and the
 three-step scope. Sequencing matters because swapping the name index changes
 what every USDA surface returns, Tag Scan's included, and is now encoded as a
 **GitHub issue dependency** (#43 `blocked_by` #36) rather than resting on this
-note — so the frontier query skips #43 while #36 is open. Note **#44**'s direction
-3 proposes folding trait *accuracy* into the same revisit; #36's scope as
-written covers names and coverage only.
+note — so the frontier query skips #43 while #36 is open. **#36's scope stays
+names and coverage only.** #44 proposed folding trait *accuracy* into the same
+revisit and that was **not** taken — #44 closed 2026-09-09 having dropped the
+one bad field, and the trait-accuracy question now lives in **#46**
+(cross-check a second source), which is its own ticket rather than a widening
+of #36.
 
 **#41**'s deferral is a scope
 decision, not a judgement that it's minor — for a property that isn't square
@@ -1439,11 +1446,12 @@ Full monorepo typecheck/test suite green throughout (215 domain + 147 mobile + 1
 
 ---
 
-## #44: the inverted Shade Tolerance — fixed, VERIFIED, not closed
+## #44: the inverted Shade Tolerance — fixed, verified, CLOSED
 
 `6abcf9d`. **Device-verified by the user 2026-09-09** — the Suggested traits
 panel renders no Sun/shade line, and accepting saves the Plant with no sun
-requirement. Awaiting only the user's instruction to close.
+requirement. **Closed 2026-09-09 at the user's explicit instruction**, which
+per `CLAUDE.md` is the only thing that ever closes an issue here.
 
 USDA's `Shade Tolerance` reading doesn't track shade tolerance
 and appears close to inverted, so the mapping onto `SunRequirement` was
@@ -1495,9 +1503,13 @@ Reviewed on both axes before committing. The one real finding was mine: the
 rationale docblock was orphaned between two functions after the constant it
 documented was deleted — it now sits on the type it describes.
 
-## #23: the genus vocabulary — fixed, NOT closed
+## #23: the genus vocabulary — fixed, CLOSED
 
-`d3bcf6c`. The parser decided what a scientific name was from typography
+`d3bcf6c`. **Closed 2026-09-09 at the user's explicit instruction.** No UI
+changed, so there was nothing to verify on a device beyond a confidence scan
+of a physical tag; the 8-tag transcript covers the regression.
+
+The parser decided what a scientific name was from typography
 alone, and nursery tags always carry marketing copy of exactly that shape:
 "Follow us" and a Vision-split "Sum mer" were proposed as species with the
 same confidence as "Monarda didyma". Run end-to-end over the real 8-tag
