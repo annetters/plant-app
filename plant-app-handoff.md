@@ -1,8 +1,15 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-08
+**Date:** 2026-09-09
 
-**Most recent session.** **#44 filed**: USDA's `Shade Tolerance` is
+**Most recent session.** **#42 fixed and closed** (`7331099`) — the flaky
+`BedEditor` test. The cause was not the one the ticket guessed: the test
+waited on the Bed name reaching the DOM, then asserted on `onBedsChange`,
+and those are one passive-effect flush apart. `BedEditor` itself was never
+wrong — it fired correctly on every failing run too. See "#42: the flaky
+BedEditor test" below.
+
+**The session before.** **#44 filed**: USDA's `Shade Tolerance` is
 unreliable and close to inverted, so the app suggests `full shade` for a
 prickly pear and `part sun` for eastern hemlock — and unlike the hardiness
 zone, that value is *persisted*. Found while preparing the QA sitting below,
@@ -32,6 +39,42 @@ last one.
 > — same reasoning as the 2026-09-06 trim.
 
 **Repo:** `annetters/plant-app` · branch `main`
+
+---
+
+## #42: the flaky BedEditor test — fixed, CLOSED
+
+**Commit `7331099` on `main`; closed 2026-09-09 at the user's explicit
+instruction.** Test-only change, two hunks, no product behaviour touched.
+
+**The cause was not this ticket's hypothesis.** The ticket guessed
+`findByText` resolved on the render while the callback was still pending.
+Instrumented render/notify logging showed something more specific: the Bed
+name enters the DOM when React *commits*, and `onBedsChange` fires from a
+`useEffect` scheduled *after* that commit. `findByText` observes the commit,
+so under load the assertion ran in the gap. The
+`.then(setBeds)`/`.finally(setBedsLoaded)` split was ruled out — React
+batches them, and failing runs show a render sequence identical to passing
+ones.
+
+**`BedEditor` was never wrong.** It stayed silent until the fetch settled on
+every run, the failing ones included. The test asserted a property the
+component does not guarantee and passed ~93% of the time on luck, so this
+replaced a false assertion with a true one. `useLayoutEffect` would have
+made the original assertion hold and was rejected on design grounds — a
+parent notification is not layout work. Untested; an option not taken.
+
+The sibling test at `BedEditor.test.tsx:257` had the identical mechanism and
+was fixed in the same commit.
+
+**Don't restate the detail here** — the issue comment carries the
+instrumentation trace and the verification table (8 failures in 110 stressed
+runs before, 0 in 60 after).
+
+**Left alone deliberately:** `BaseMapSetup.test.tsx:70` and `:135` wait on a
+button already in the DOM before asserting on `onUpdated`/`onCreated`. It
+was stress-run 30x under load with 0 failures, so it is a smell rather than
+a demonstrated flake. The user's call was to leave it and not file it.
 
 ---
 
@@ -815,8 +858,9 @@ worth having worried about — `BloomTimelineScreen`'s fixed `AXIS_HEIGHT`
 spacer drifting against the axis row and putting bars beside the wrong
 plant's name — did not materialise.
 
-Every open issue is labelled `post-mvp` except **#1**, the spec itself, and
-**#42** (`needs-triage`, filed 2026-09-07). **#43** was filed 2026-09-08 and
+Every open issue is labelled `post-mvp` except **#1**, the spec itself.
+(**#42** was the one exception; it was fixed and closed 2026-09-09.)
+**#43** was filed 2026-09-08 and
 triaged the same day to `post-mvp` + `ready-for-agent` (the user's call):
 as-you-type species
 suggestions on the web Add Plant form, which offers no lookup at all today
@@ -1363,17 +1407,13 @@ Full monorepo typecheck/test suite green throughout (215 domain + 147 mobile + 1
 
 ## Known unfixed defects
 
-**None outstanding in shipped behaviour.** #40 — the fabricated hardiness
-zone from an empty USDA minimum-temperature value — was **fixed 2026-09-07**
-in `e44325d` and is covered by unit tests in `packages/domain`. The issue is
-still open pending the user's closure.
+**None outstanding.** #40 — the fabricated hardiness zone from an empty
+USDA minimum-temperature value — was **fixed 2026-09-07** in `e44325d`,
+is covered by unit tests in `packages/domain`, and was **closed 2026-09-08**.
+#42, the `BedEditor` test flake, was **fixed and closed 2026-09-09** in
+`7331099`; it was never product behaviour.
 
-The one live defect is **#42**, a *test* flake rather than product
-behaviour: `BedEditor`'s "stays silent until the Beds fetch settles" fails
-intermittently under full-suite load and passes in isolation. It has the
-write-up and a hypothesis; don't restate it here.
-
-Anything else in this class belongs on the tracker, not in this section.
+Anything in this class belongs on the tracker, not in this section.
 Trimming this doc on 2026-09-06 removed a large archive whose only unique
 content was defects like this one — file them when found.
 
