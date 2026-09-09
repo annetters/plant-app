@@ -2,20 +2,26 @@
 
 **Date:** 2026-09-09
 
-**Most recent session.** **#42 fixed and closed** (`7331099`) — the flaky
+**Most recent session.** **#44 fixed** (`6abcf9d`) — USDA's `Shade
+Tolerance` no longer suggests a `sunRequirement` at all. Direction 1 of the
+three the ticket offered; remapping the apparent inversion was rejected as
+shipping a guess about an undocumented field. Dropped from
+`UsdaSpeciesSuggestedTraits` itself rather than from the projection, so the
+type enforces it — #40's precedent. **Open pending the user's verification;
+do not close it.** See "#44: the inverted Shade Tolerance" below. **#23
+started** in the same session — see "#23: Tag Scan genus validation" for
+where it stands.
+
+**The session before.** **#42 fixed and closed** (`7331099`) — the flaky
 `BedEditor` test. The cause was not the one the ticket guessed: the test
 waited on the Bed name reaching the DOM, then asserted on `onBedsChange`,
 and those are one passive-effect flush apart. `BedEditor` itself was never
 wrong — it fired correctly on every failing run too. See "#42: the flaky
 BedEditor test" below.
 
-**The session before.** **#44 filed**: USDA's `Shade Tolerance` is
-unreliable and close to inverted, so the app suggests `full shade` for a
-prickly pear and `part sun` for eastern hemlock — and unlike the hardiness
-zone, that value is *persisted*. Found while preparing the QA sitting below,
-which has since **run, both checks passing** (2026-09-08) — and proved
-cheaper than first recorded: no Xcode, no tag scan, nothing written. See
-"The dev-client QA sitting".
+Also from that stretch: the dev-client QA sitting **ran, both checks
+passing** (2026-09-08), and proved cheaper than first recorded — no Xcode,
+no tag scan, nothing written. See "The dev-client QA sitting".
 
 Also still standing from the same stretch of work: **#40 fixed**
 (`e44325d`) — the fabricated hardiness zone is gone from `usdaTraits.ts`,
@@ -992,7 +998,7 @@ Two options were put to the user, and **option 1 was chosen** on 2026-09-08:
 So the blank half rides on its four unit tests in `packages/domain`, which
 is a reasonable call given the sampling, not a gap.
 
-### What preparing this sitting turned up: #44
+### What preparing this sitting turned up: #44 — since fixed, see below
 
 Hunting for a species that would render "full shade" for check 2 surfaced
 **#44** — USDA's `Shade Tolerance` is unreliable and close to inverted
@@ -1405,9 +1411,60 @@ Full monorepo typecheck/test suite green throughout (215 domain + 147 mobile + 1
 
 ---
 
+## #44: the inverted Shade Tolerance — fixed, NOT closed
+
+`6abcf9d`. USDA's `Shade Tolerance` reading doesn't track shade tolerance
+and appears close to inverted, so the mapping onto `SunRequirement` was
+deleted rather than corrected. The evidence is on the ticket; the short
+version is that `"High"` (which became `full-shade`) is what USDA reports
+for Utah agave, plains prickly pear and coconut palm, and `"Low"` (which
+became `part-sun`) is what it reports for eastern hemlock, sugar maple,
+Canada yew and northern maidenhair fern.
+
+**Why not remap.** The inversion is clean enough to be tempting, and that is
+the trap. Inverting it ships a guess about an undocumented external field on
+a 58-species sample. The field is absent until a source can supply it
+honestly, and which source that is stays undecided — **#36's revisit is
+scoped to names and coverage**, so this is not quietly folded into it.
+Direction 3 on the ticket proposed that; it was not taken, and #36 was not
+re-scoped.
+
+**Shape of the fix.** `sunRequirement` is gone from
+`UsdaSpeciesSuggestedTraits` itself, not just from `projectUsdaSpeciesTraits`
+— the same move #40 made with `UsdaCharacteristic.value`. The compiler then
+found all seven call sites: `traitsNotAlreadySetBy`, `hasApplicableTraits`,
+`applySuggestedTraits` and the shared `SuggestedTraitsConfirmation` panel.
+Both creation paths follow from that shared code (#31), so neither screen
+needed its own change. Mature height and the reference-only hardiness zone
+are untouched, and `CONTEXT.md`'s trait sentence no longer claims sun/shade
+comes from USDA.
+
+**Two things deliberately not done**, both recorded on the ticket rather
+than silently skipped:
+
+1. **No backfill.** Plants created before this by tapping "Use these
+   suggested traits" still carry a USDA-sourced sun requirement, and the
+   Registry's sun filter still reads it. Nothing identifies which ones they
+   are — the value is indistinguishable from a user-typed one. Outside the
+   ticket's acceptance minimum; needs a decision, and its own issue if the
+   answer is yes.
+2. **No copy change** on the confirmation screen, which still names only
+   bloom window as never-suggested. The honest explanation is about source
+   reliability, which is awkward to say in-app. A copy call, left open.
+
+Reviewed on both axes before committing. The one real finding was mine: the
+rationale docblock was orphaned between two functions after the constant it
+documented was deleted — it now sits on the type it describes.
+
 ## Known unfixed defects
 
-**None outstanding.** #40 — the fabricated hardiness zone from an empty
+**None outstanding in code.** One *data* residue is known and deliberate:
+Plants created before `6abcf9d` may carry a USDA-sourced `sunRequirement`
+from the inverted Shade Tolerance mapping (#44), and nothing distinguishes
+them from user-typed values. Not a code defect, not backfilled, awaiting the
+user's call — see "#44: the inverted Shade Tolerance".
+
+#40 — the fabricated hardiness zone from an empty
 USDA minimum-temperature value — was **fixed 2026-09-07** in `e44325d`,
 is covered by unit tests in `packages/domain`, and was **closed 2026-09-08**.
 #42, the `BedEditor` test flake, was **fixed and closed 2026-09-09** in
