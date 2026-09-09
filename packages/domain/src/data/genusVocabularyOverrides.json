@@ -1,0 +1,24 @@
+{
+  "$comment": [
+    "Local corrections to the GBIF backbone slice in plantGenera.ts (#23).",
+    "Data, not code: merged by genusVocabulary.ts at load, so editing this file",
+    "takes effect without regenerating the vocabulary or touching the parser.",
+    "Every entry carries a justification. #39 is about curating this file from",
+    "real scan outcomes — a name the user keeps clearing, or keeps typing in by",
+    "hand — rather than from guesswork. Nothing here is applied automatically:",
+    "a human edits this file deliberately, per CONTEXT.md's rule that Tag Scan",
+    "proposes and a human decides."
+  ],
+  "additions": [
+    {
+      "genus": "Angelica",
+      "why": "A real, widely sold garden genus (A. archangelica, A. gigas) that sits in the backbone as taxonomicStatus=DOUBTFUL under Apiaceae, so the ACCEPTED/SYNONYM filter drops it. The clearest case that no single status filter is correct."
+    }
+  ],
+  "exclusions": [
+    {
+      "genus": "Aurora",
+      "why": "A doubtful Combretaceae genus that collides with ordinary marketing copy. Already absent while DOUBTFUL is filtered out, so this entry is belt-and-braces: it keeps the exclusion recorded if the status filter is ever loosened, and documents why the filter is drawn where it is."
+    }
+  ]
+}

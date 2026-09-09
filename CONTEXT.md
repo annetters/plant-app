@@ -57,6 +57,24 @@ form and named cultivars (e.g. Joe Pye Weed as the species, or as 'Gateway').
 When a scan doesn't resolve unambiguously, the app shows the candidates and
 asks the user to check the physical tag rather than guessing.
 
+A proposed scientific name is checked against a **genus vocabulary** — a
+bundled list of real plant genera, compiled from GBIF's taxonomic backbone
+and consulted locally, never over the network (ADR-0006). Typography alone
+cannot tell a binomial from marketing copy: "Follow us" has the same shape as
+"Monarda didyma", and both used to be proposed as species. A name is offered
+only if its genus is a real one. Unknown genus means no proposal at all — a
+blank field the gardener fills in beats a confident wrong guess. This is a
+different job from trait suggestion, and deliberately a different source:
+GBIF validates names and carries no traits, USDA suggests traits and its name
+coverage is too narrow to validate against.
+
+No single taxonomic-status filter gets the vocabulary right, so it carries a
+small hand-edited **override layer** beside it — additions for real genera the
+filter drops, exclusions for entries that collide with ordinary tag text, each
+with its reason recorded. It is data the gardener's agent edits deliberately,
+never something the app learns on its own: a filter that quietly changed its
+own behaviour would be exactly the auto-decision Tag Scan's rule forbids.
+
 Species-level trait suggestions (hardiness, mature size — never bloom
 window, which is climate-dependent, not a species/cultivar fact, and stays
 user-observed only regardless of source; and no longer sun/shade, whose

@@ -1,3 +1,4 @@
+import { isKnownPlantGenus } from "./genusVocabulary.js";
 import type { TagOcrCandidateFields } from "./tagScanCandidate.js";
 
 /** One line of text a real OCR pass (e.g. the on-device Vision adapter, issue #22) recognized, with its confidence (0-1). */
@@ -17,6 +18,13 @@ export interface TagOcrTextObservation {
  * followed by untagged extra text on the same line (e.g. the real line
  * "Mangave Catch a Wave PPAF" — correctly not matched, rather than wrongly
  * parsed as genus "Mangave" species "Catch").
+ *
+ * Shape is necessary but not sufficient (#23). "Follow us" and "Sum mer" are
+ * typographically identical to "Monarda didyma", and both matched this
+ * pattern on real tags, so every match is also checked against the genus
+ * vocabulary below. The anchor stays as strict as it is — loosening it was
+ * this ticket's original proposal and was rejected, since with garbage
+ * guaranteed on every tag it would only multiply false positives.
  */
 const SCIENTIFIC_NAME_LINE_PATTERN =
   /^([A-Z][a-zà-ÿ]+)\s+([a-zà-ÿ][a-zà-ÿ-]+)(?:\s*['"“‘]([^'"”’]{2,})['"”’])?$/;
@@ -46,6 +54,10 @@ export function parseOcrTextLines(
   for (const { text } of observations) {
     const match = text.trim().match(SCIENTIFIC_NAME_LINE_PATTERN);
     if (!match) continue;
+    // The shape said "binomial"; the vocabulary decides whether it is one.
+    // No candidate at all beats a confident wrong one here — a blank field the
+    // user fills in themselves is the correct outcome for an unknown genus.
+    if (!isKnownPlantGenus(match[1])) continue;
     matches.push({
       scientificName: `${match[1]} ${match[2]}`,
       ...(match[3] && { cultivar: match[3] }),

@@ -97,6 +97,16 @@ stays user-observed only, never database-suggested.
   be validating that a scientific name is genuinely, validly published — a
   narrower, different task than what Tag Scan needs.
 
+> **Superseded on this point, 2026-09-09 (ADR-0006).** "A narrower, different
+> task than what Tag Scan needs" was wrong about the *needs* half: name
+> validation turned out to be exactly what Tag Scan needs, because shape alone
+> cannot tell "Follow us" from "Monarda didyma" and both were being proposed as
+> species. Tag Scan now validates a candidate genus against a bundled
+> vocabulary. The source chosen for it is **GBIF's backbone, not IPNI** — the
+> verdict on IPNI above (no public API today) still stands, and so does
+> everything here about *trait* sources. It is only the dismissal of
+> name-validation as a job worth doing that no longer holds.
+
 ## Decision
 
 **Start with USDA PLANTS as the sole data source**, for species-level trait

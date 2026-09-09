@@ -10,6 +10,7 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "generate:genera": "node scripts/generate-genus-vocabulary.mjs",
     "test": "vitest",
     "test:run": "vitest run"
   }
