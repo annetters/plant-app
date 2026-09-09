@@ -935,11 +935,13 @@ from `handleSave` on the *scientific* name. Both cost the user a round trip.
 **Two corrections to how this was previously written up**, both established
 2026-09-08:
 
-- **No Xcode rebuild is needed.** The last native-affecting commit is
-  `c6f9497` (2026-09-01, #14's Map screen), whose rebuild was already done
-  and device-QA'd; nothing native has changed since. `formatOption` lives in
-  `packages/domain` and Metro serves it. `npx expo start --dev-client` is
-  the whole setup.
+- **No Xcode rebuild is needed** *for code reasons*. The last
+  native-affecting commit is `c6f9497` (2026-09-01, #14's Map screen), whose
+  rebuild was already done and device-QA'd; nothing native has changed since.
+  `formatOption` lives in `packages/domain` and Metro serves it. `npx expo
+  start --dev-client` is the whole setup. **But see the signing-expiry note
+  below — the build itself expires on a timer regardless of whether the code
+  changed.**
 - **No tag scan is needed either.** #31 moved
   `SuggestedTraitsConfirmation` into shared code, so the manual Add Plant
   form reaches the same panel: `PlantDetailScreen.handleSave` →
@@ -1017,6 +1019,27 @@ The user confirmed the botanical read before it was filed. Labelled
 This is also why check 2 uses *Tsuga canadensis* (`"Low"` → `part sun`)
 rather than a "full shade" species: any unhyphenated value proves
 `formatOption`, and every `"High"` candidate was botanically absurd.
+
+### The dev build expires every 7 days — budget for it
+
+Hit on 2026-09-09, mid-QA. The app wouldn't launch at all: tapping the icon
+gave *"Mobile is no longer available"*. Nothing to do with any code change —
+this is a **local Xcode build signed with a free Apple account, and those
+expire 7 days after install**. It had been installed 2026-09-01, eight days
+earlier.
+
+**Assume any device QA more than a week after the last install starts with a
+reinstall**, and say so when proposing a sitting rather than discovering it
+with the user sitting there. The fix is a rebuild from Xcode: open
+`apps/mobile/ios/mobile.xcworkspace` (**not** the `.xcodeproj` — CocoaPods),
+pick the phone in the device dropdown, press Run, then trust the developer
+under Settings → General → VPN & Device Management if prompted.
+
+Expo Go is not an escape hatch: `apps/mobile/modules/tag-ocr` is a custom
+native module, so the dev client is the only surface that runs this app.
+
+A paid Apple Developer account would stretch the 7 days to a year. Not
+proposed — worth it only if device sittings become frequent.
 
 ## After both QA passes — later the same session
 
@@ -1416,9 +1439,13 @@ Full monorepo typecheck/test suite green throughout (215 domain + 147 mobile + 1
 
 ---
 
-## #44: the inverted Shade Tolerance — fixed, NOT closed
+## #44: the inverted Shade Tolerance — fixed, VERIFIED, not closed
 
-`6abcf9d`. USDA's `Shade Tolerance` reading doesn't track shade tolerance
+`6abcf9d`. **Device-verified by the user 2026-09-09** — the Suggested traits
+panel renders no Sun/shade line, and accepting saves the Plant with no sun
+requirement. Awaiting only the user's instruction to close.
+
+USDA's `Shade Tolerance` reading doesn't track shade tolerance
 and appears close to inverted, so the mapping onto `SunRequirement` was
 deleted rather than corrected. The evidence is on the ticket; the short
 version is that `"High"` (which became `full-shade`) is what USDA reports
@@ -1444,18 +1471,25 @@ needed its own change. Mature height and the reference-only hardiness zone
 are untouched, and `CONTEXT.md`'s trait sentence no longer claims sun/shade
 comes from USDA.
 
-**Two things deliberately not done**, both recorded on the ticket rather
-than silently skipped:
+**Both open questions were answered by the user on 2026-09-09:**
 
-1. **No backfill.** Plants created before this by tapping "Use these
-   suggested traits" still carry a USDA-sourced sun requirement, and the
-   Registry's sun filter still reads it. Nothing identifies which ones they
-   are — the value is indistinguishable from a user-typed one. Outside the
-   ticket's acceptance minimum; needs a decision, and its own issue if the
-   answer is yes.
-2. **No copy change** on the confirmation screen, which still names only
-   bloom window as never-suggested. The honest explanation is about source
-   reliability, which is awkward to say in-app. A copy call, left open.
+1. **No backfill, and none wanted.** Everything in the database is the user's
+   own test data — *not real users' records*. That fact retires this whole
+   class of worry; don't propose migrations for existing rows. What the
+   episode did expose is that a USDA-written value is indistinguishable from
+   a user-typed one, which is now **#45** (record where a suggested value came
+   from, per field).
+2. **Sun/shade has a route back, via #46** (cross-check a second source;
+   blocked by #45). The user's position: dropping a source over inaccuracy is
+   the wrong trade unless the error rate is high. Two things were put on that
+   ticket so they don't get re-argued — the error rate *is* the high case
+   (half of a 58-species sample reads `"High"`; all 16 species re-fetched
+   individually were backwards), and **USDA was never made useless**: #44
+   dropped one field, while mature height, minimum hardiness zone and the
+   entire species-name lookup still come from USDA. That misreading is easy
+   to fall into; the fix removed a field, not a source.
+3. **The copy question rides along with #46.** If sun/shade returns through a
+   cross-check, there is nothing to explain on the confirmation screen.
 
 Reviewed on both axes before committing. The one real finding was mine: the
 rationale docblock was orphaned between two functions after the constant it
