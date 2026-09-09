@@ -253,8 +253,11 @@ describe('BedEditor', () => {
       const onBedsChange = vi.fn()
       renderEditor([bedRow], onBedsChange)
 
-      await screen.findByText('Front border')
-      expect(onBedsChange).toHaveBeenLastCalledWith([expect.objectContaining({ id: 'bed-1' })])
+      // Waits on the callback, not on the Bed name. See the sibling test
+      // below for why the name is the wrong signal (#42).
+      await waitFor(() =>
+        expect(onBedsChange).toHaveBeenLastCalledWith([expect.objectContaining({ id: 'bed-1' })]),
+      )
     })
 
     it('stays silent until the Beds fetch settles, so a caller can tell "none yet" from "not known yet"', async () => {
@@ -274,10 +277,16 @@ describe('BedEditor', () => {
       // Property with no Beds — PropertyPage's base-map preview would mount
       // and fetch a whole base map on that, then tear it down when the real
       // list arrived a moment later.
+      // `render` is act-wrapped, so the mount effects have already run by
+      // this line — this is what proves the `!bedsLoaded` early return, and
+      // it is synchronous, so it can't race.
       expect(onBedsChange).not.toHaveBeenCalled()
 
-      await screen.findByText('Front border')
-      expect(onBedsChange).toHaveBeenCalledTimes(1)
+      // Wait on the callback itself rather than on the Bed name. The name
+      // enters the DOM when React commits; `onBedsChange` fires in a passive
+      // effect, one flush later. `findByText` observes the commit, so under
+      // load it can resolve in that gap and see zero calls — #42's flake.
+      await waitFor(() => expect(onBedsChange).toHaveBeenCalledTimes(1))
       expect(onBedsChange).toHaveBeenCalledWith([expect.objectContaining({ id: 'bed-1' })])
     })
 
