@@ -1503,8 +1503,10 @@ returns `ACCEPTED, confidence 99` for "Follow", "Deer" and "Winners").
    vocabulary rather than silently shipping a short one.
 
 **Bundle: 48,873 genera, 589KB on disk, ~175KB gzipped**, against the
-ticket's ~120KB estimate. Stated on the ticket; worth a decision if that is
-too much to carry.
+ticket's ~120KB estimate. **Settled 2026-09-09 — the user is fine with it**
+("that file size is not a problem to me"), so keep the full vocabulary,
+`SYNONYM` included. Don't reopen this to save space: halving the file means
+dropping the retired names nurseries still print, which is the job itself.
 
 **The residual risk is named, not solved.** Of 34 ordinary English words
 probed at triage, 17 are genuine genera — *Iris*, *Veronica*, *Dahlia*,
