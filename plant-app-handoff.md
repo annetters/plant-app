@@ -8,9 +8,14 @@ three the ticket offered; remapping the apparent inversion was rejected as
 shipping a guess about an undocumented field. Dropped from
 `UsdaSpeciesSuggestedTraits` itself rather than from the projection, so the
 type enforces it — #40's precedent. **Open pending the user's verification;
-do not close it.** See "#44: the inverted Shade Tolerance" below. **#23
-started** in the same session — see "#23: Tag Scan genus validation" for
-where it stands.
+do not close it.** See "#44: the inverted Shade Tolerance" below.
+
+**#23 fixed** in the same session (`d3bcf6c`) — Tag Scan now validates a
+candidate genus against a bundled GBIF vocabulary instead of trusting line
+shape. Against the real transcript it goes from 3 correct / 2 confidently
+wrong / 3 empty to **3 correct / 0 wrong / 5 empty**. ADR-0006 records the
+decision. **Also open pending the user's verification.** See "#23: the genus
+vocabulary" below.
 
 **The session before.** **#42 fixed and closed** (`7331099`) — the flaky
 `BedEditor` test. The cause was not the one the ticket guessed: the test
@@ -1455,6 +1460,69 @@ than silently skipped:
 Reviewed on both axes before committing. The one real finding was mine: the
 rationale docblock was orphaned between two functions after the constant it
 documented was deleted — it now sits on the type it describes.
+
+## #23: the genus vocabulary — fixed, NOT closed
+
+`d3bcf6c`. The parser decided what a scientific name was from typography
+alone, and nursery tags always carry marketing copy of exactly that shape:
+"Follow us" and a Vision-split "Sum mer" were proposed as species with the
+same confidence as "Monarda didyma". Run end-to-end over the real 8-tag
+transcript, the old parser scored **3 correct, 2 confidently wrong, 3
+empty** — ADR-0004's "8/8 usable" had measured what Vision *recognised*, not
+what the parser *extracted*, and the heuristic appears never to have been run
+across the transcript at all. It now scores **3 correct, 0 wrong, 5 empty**.
+
+**There is no third regex**, which is the part worth not re-litigating.
+Loosening the pattern was this ticket's original proposal and makes precision
+worse; tightening it drops real names and it was already whole-line anchored
+while still leaking 2 of 8. The discriminator has to be vocabulary.
+
+**Shape of the fix.** A bundled genus list from GBIF's backbone
+(`kingdom=Plantae`, `rank=GENUS`, status `ACCEPTED` or `SYNONYM`), compiled by
+a checked-in generator, consulted locally. `parseOcrTextLines` stays
+synchronous and pure — a scan never calls the network to decide what a word
+is. The gate stacks *on top of* the shape rule, so a false positive must now
+be both a real genus and followed by a lowercase word. ADR-0006 holds the
+whole decision, including why GBIF's `species/match` endpoint is unusable (it
+returns `ACCEPTED, confidence 99` for "Follow", "Deer" and "Winners").
+
+**Three things to know before touching it:**
+
+1. **The Set is built on first lookup, not at import.** An eager version
+   splits a 589KB string and builds a 48,873-entry Set on the JS thread at
+   every app start, on both surfaces, for every gardener including the many
+   who never open Tag Scan. Found in review. Don't make it eager again.
+2. **Overrides are merged at load, not baked in by the generator** — a
+   deliberate deviation from #23's literal acceptance criteria, flagged on
+   the ticket. It serves the criterion beneath it (editable without touching
+   the parser) and keeps the generated file a faithful GBIF mirror. The cost
+   is that no single file answers "is X in the vocabulary". Reversible.
+3. **Regenerating costs ~7 minutes** of GBIF pagination
+   (`npm run generate:genera` in `packages/domain`) — deep offsets on their
+   search endpoint are slow. The generator now refuses to write a truncated
+   vocabulary rather than silently shipping a short one.
+
+**Bundle: 48,873 genera, 589KB on disk, ~175KB gzipped**, against the
+ticket's ~120KB estimate. Stated on the ticket; worth a decision if that is
+too much to carry.
+
+**The residual risk is named, not solved.** Of 34 ordinary English words
+probed at triage, 17 are genuine genera — *Iris*, *Veronica*, *Dahlia*,
+*Viola*, *Hosta* and more. "Veronica loves full sun" still gets through. They
+are not pre-emptively excluded because they are exactly what a gardener
+legitimately scans; the exclusions layer is where one gets handled if it
+shows up, and #39 is about gathering that evidence.
+
+**Knock-on for #38:** tag3's false-positive species used to carry the real
+cultivar `'Wildberry'`. With the species rejected there is nothing to attach
+it to, so tag3 degrades to `[]`. Whether it should yield a cultivar-only
+candidate is #38's call, unchanged by this.
+
+Reviewed on both axes. The findings that mattered were the eager-Set startup
+cost above, and a verbatim-transcript violation inherited from an existing
+test: the real OCR line is `Heucheralla Capture the Fag'`, and the test had
+silently corrected the misspelling to `Heucherella` — testing a line no tag
+ever produced.
 
 ## Known unfixed defects
 
