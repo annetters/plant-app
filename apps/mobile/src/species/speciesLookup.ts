@@ -79,9 +79,6 @@ export function traitsNotAlreadySetBy(
   input: PlantInput,
 ): UsdaSpeciesSuggestedTraits {
   const remaining: UsdaSpeciesSuggestedTraits = {}
-  if (traits.sunRequirement !== undefined && input.sunRequirement === undefined) {
-    remaining.sunRequirement = traits.sunRequirement
-  }
   if (traits.matureHeightInches !== undefined && input.matureHeightInches === undefined) {
     remaining.matureHeightInches = traits.matureHeightInches
   }
@@ -93,7 +90,7 @@ export function traitsNotAlreadySetBy(
 
 /** Whether accepting these suggestions would actually change the Plant — the reference-only hardiness zone never would. */
 export function hasApplicableTraits(traits: UsdaSpeciesSuggestedTraits): boolean {
-  return traits.sunRequirement !== undefined || traits.matureHeightInches !== undefined
+  return traits.matureHeightInches !== undefined
 }
 
 /** The one place a suggested trait is merged onto user input, shared by both creation paths so they can't drift apart. */
@@ -103,7 +100,6 @@ export function applySuggestedTraits(
 ): PlantInput {
   return {
     ...input,
-    ...(traits?.sunRequirement && { sunRequirement: traits.sunRequirement }),
     ...(traits?.matureHeightInches && { matureHeightInches: traits.matureHeightInches }),
   }
 }

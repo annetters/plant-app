@@ -473,9 +473,9 @@ describe('PlantDetailScreen in create mode (#31)', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Use these suggested traits' }))
 
     await waitFor(() => expect(fake.rows()).toHaveLength(1))
-    expect(fake.rows()[0]).toEqual(
-      expect.objectContaining({ sun_requirement: 'full-sun', mature_height_inches: 48 }),
-    )
+    expect(fake.rows()[0]).toEqual(expect.objectContaining({ mature_height_inches: 48 }))
+    // Shade Tolerance is in the fixture and is deliberately ignored (#44).
+    expect(fake.rows()[0].sun_requirement).toBeNull()
   })
 
   it('never offers to overwrite a trait the user filled in themselves', async () => {
@@ -485,7 +485,7 @@ describe('PlantDetailScreen in create mode (#31)', () => {
       data: {
         species: [],
         characteristics: [
-          { name: 'Shade Tolerance', value: 'None' }, // → full-sun
+          { name: 'Shade Tolerance', value: 'None' }, // ignored since #44
           { name: 'Height, Mature (feet)', value: '4.0' }, // → 48"
         ],
       },
@@ -511,7 +511,10 @@ describe('PlantDetailScreen in create mode (#31)', () => {
     const fake = await renderCreateScreen()
     await screen.findByRole('header', { name: 'Add Plant' })
     fake.functionsInvoke.mockResolvedValueOnce({
-      data: { species: [], characteristics: [{ name: 'Shade Tolerance', value: 'None' }] },
+      data: {
+        species: [],
+        characteristics: [{ name: 'Height, Mature (feet)', value: '4.0' }],
+      },
       error: null,
     })
 
@@ -523,7 +526,7 @@ describe('PlantDetailScreen in create mode (#31)', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Skip suggested traits' }))
 
     await waitFor(() => expect(fake.rows()).toHaveLength(1))
-    expect(fake.rows()[0].sun_requirement).toBeNull()
+    expect(fake.rows()[0].mature_height_inches).toBeNull()
   })
 
   it('still creates the Plant when the USDA lookup fails — a lookup forfeits the suggestion, not the save', async () => {

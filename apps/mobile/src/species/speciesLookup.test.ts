@@ -78,8 +78,24 @@ describe('suggestSpeciesTraits', () => {
       'Monarda didyma',
     )
 
-    expect(traits.sunRequirement).toBe('full-sun')
     expect(traits.matureHeightInches).toBe(48)
+  })
+
+  it('never carries a sun requirement through, whatever Shade Tolerance USDA reports (#44)', async () => {
+    const traits = await suggestSpeciesTraits(
+      source({
+        lookupUsdaByScientificName: jest.fn().mockResolvedValue({
+          species: [],
+          characteristics: [
+            { name: 'Shade Tolerance', value: 'High' },
+            { name: 'Height, Mature (feet)', value: '1.0' },
+          ],
+        }),
+      }),
+      'Opuntia polyacantha',
+    )
+
+    expect(traits).not.toHaveProperty('sunRequirement')
   })
 
   it('returns nothing to suggest when USDA has no characteristics — the routine outcome', async () => {
@@ -89,15 +105,15 @@ describe('suggestSpeciesTraits', () => {
 
 describe('traitsNotAlreadySetBy', () => {
   it('keeps a suggestion for a field the user left blank', () => {
-    const remaining = traitsNotAlreadySetBy({ sunRequirement: 'full-sun' }, plantInput())
+    const remaining = traitsNotAlreadySetBy({ matureHeightInches: 48 }, plantInput())
 
-    expect(remaining.sunRequirement).toBe('full-sun')
+    expect(remaining.matureHeightInches).toBe(48)
   })
 
   it('never proposes overwriting a value the user typed themselves', () => {
     const remaining = traitsNotAlreadySetBy(
-      { sunRequirement: 'full-sun', matureHeightInches: 48 },
-      plantInput({ sunRequirement: 'full-shade', matureHeightInches: 36 }),
+      { matureHeightInches: 48 },
+      plantInput({ matureHeightInches: 36 }),
     )
 
     expect(remaining).toEqual({})
@@ -120,7 +136,6 @@ describe('hasApplicableTraits', () => {
   })
 
   it('is true for a trait that would actually be written', () => {
-    expect(hasApplicableTraits({ sunRequirement: 'full-sun' })).toBe(true)
     expect(hasApplicableTraits({ matureHeightInches: 48 })).toBe(true)
   })
 })
@@ -128,14 +143,11 @@ describe('hasApplicableTraits', () => {
 describe('applySuggestedTraits', () => {
   it('merges accepted traits onto the input, and never the hardiness zone', () => {
     const merged = applySuggestedTraits(plantInput(), {
-      sunRequirement: 'full-sun',
       matureHeightInches: 48,
       minimumHardinessZone: 4,
     })
 
-    expect(merged).toEqual(
-      expect.objectContaining({ sunRequirement: 'full-sun', matureHeightInches: 48 }),
-    )
+    expect(merged).toEqual(expect.objectContaining({ matureHeightInches: 48 }))
     expect(merged.hardinessZoneRange).toBeUndefined()
   })
 

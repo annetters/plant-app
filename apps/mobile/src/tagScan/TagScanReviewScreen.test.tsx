@@ -347,15 +347,18 @@ describe('TagScanReviewScreen', () => {
     await fireEvent.press(screen.getByRole('button', { name: 'Continue' }))
 
     expect(await screen.findByText('Suggested traits')).toBeTruthy()
-    // Displayed via formatOption, the same treatment the Registry gives this
-    // enum — the stored value is still the raw 'full-shade' (asserted below).
-    expect(screen.getByText('Sun/shade: full shade')).toBeTruthy()
+    // USDA reports Shade Tolerance "High" for this species and it is in the
+    // fixture above, but nothing is offered from it any more (#44) — the
+    // reading is close to inverted, so no sun/shade line renders and none is
+    // written on accept.
+    expect(screen.queryByText(/Sun\/shade/)).toBeNull()
     expect(screen.getByText(/For reference only, not saved automatically/)).toBeTruthy()
 
     await fireEvent.press(screen.getByRole('button', { name: 'Use these suggested traits' }))
 
     expect(await screen.findByText('dashboard screen')).toBeTruthy()
-    expect(fake.plantRows()[0]).toMatchObject({ sun_requirement: 'full-shade', mature_height_inches: 60 })
+    expect(fake.plantRows()[0]).toMatchObject({ mature_height_inches: 60 })
+    expect(fake.plantRows()[0].sun_requirement).toBeNull()
     expect(fake.plantRows()[0].hardiness_zone_min).toBeNull() // never fabricated from a min-only USDA value
   })
 })

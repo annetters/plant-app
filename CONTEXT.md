@@ -57,10 +57,11 @@ form and named cultivars (e.g. Joe Pye Weed as the species, or as 'Gateway').
 When a scan doesn't resolve unambiguously, the app shows the candidates and
 asks the user to check the physical tag rather than guessing.
 
-Species-level trait suggestions (hardiness, mature size, sun/shade — never
-bloom window, which is climate-dependent, not a species/cultivar fact, and
-stays user-observed only regardless of source) come from USDA PLANTS, the
-starting data source — see
+Species-level trait suggestions (hardiness, mature size — never bloom
+window, which is climate-dependent, not a species/cultivar fact, and stays
+user-observed only regardless of source; and no longer sun/shade, whose
+USDA reading proved close to inverted and is dropped as of #44) come from
+USDA PLANTS, the starting data source — see
 `docs/research/plant-data-source-cultivar-level-evaluation.md`. Sources are
 a pluggable layer, not a single permanent choice: USDA has no cultivar-level
 data, so for now cultivar identification relies on OCR, the saved tag photo,

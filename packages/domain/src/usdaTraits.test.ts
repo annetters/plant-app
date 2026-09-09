@@ -49,7 +49,6 @@ describe("projectUsdaSpeciesTraits", () => {
     ]);
 
     expect(traits).toEqual({
-      sunRequirement: "full-shade",
       matureHeightInches: 60,
       minimumHardinessZone: 5,
     });
@@ -60,21 +59,35 @@ describe("projectUsdaSpeciesTraits", () => {
     expect(traits).not.toHaveProperty("bloomWindow");
   });
 
-  it("maps each Shade Tolerance value to a sun requirement", () => {
-    expect(projectUsdaSpeciesTraits([characteristic("Shade Tolerance", "None")])).toEqual({
-      sunRequirement: "full-sun",
-    });
-    expect(projectUsdaSpeciesTraits([characteristic("Shade Tolerance", "Low")])).toEqual({
-      sunRequirement: "part-sun",
-    });
-    expect(projectUsdaSpeciesTraits([characteristic("Shade Tolerance", "Intermediate")])).toEqual({
-      sunRequirement: "part-shade",
-    });
+  // #44: USDA's Shade Tolerance readings do not track actual shade tolerance
+  // and appear close to inverted, so no value of it produces a suggestion any
+  // more. The first four are real readings re-fetched in the issue, and are
+  // the cases that made the inversion visible: the two that used to yield
+  // `full-shade` are desert plants, and the two that used to yield `part-sun`
+  // are a textbook shade tree and a woodland understory fern. The rest cover
+  // the remainder of the scale, which no longer has a mapping either.
+  it.each([
+    ["High", "Agave utahensis (Utah agave) — used to yield full-shade"],
+    ["High", "Opuntia polyacantha (plains prickly pear) — used to yield full-shade"],
+    ["Low", "Tsuga canadensis (eastern hemlock) — used to yield part-sun"],
+    ["Low", "Adiantum pedatum (northern maidenhair) — used to yield part-sun"],
+    ["None", "the rest of the scale"],
+    ["Intermediate", "the rest of the scale"],
+    ["Medium", "the rest of the scale"],
+    ["Unknown", "an unrecognized reading"],
+  ])("never suggests a sun requirement from Shade Tolerance %s (%s)", (value) => {
+    const traits = projectUsdaSpeciesTraits([characteristic("Shade Tolerance", value)]);
+    expect(traits).not.toHaveProperty("sunRequirement");
   });
 
-  it("omits sun requirement for an unrecognized Shade Tolerance value rather than guessing", () => {
-    const traits = projectUsdaSpeciesTraits([characteristic("Shade Tolerance", "Unknown")]);
-    expect(traits).not.toHaveProperty("sunRequirement");
+  it("still suggests the traits that are sound alongside a Shade Tolerance reading it ignores", () => {
+    const traits = projectUsdaSpeciesTraits([
+      characteristic("Shade Tolerance", "High"),
+      characteristic("Height, Mature (feet)", "105"),
+      characteristic("Temperature, Minimum (\u00b0F)", "-33"),
+    ]);
+
+    expect(traits).toEqual({ matureHeightInches: 1260, minimumHardinessZone: 3 });
   });
 
   it("omits fields entirely absent from the characteristics list", () => {

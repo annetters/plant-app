@@ -1,4 +1,4 @@
-import { formatOption, type UsdaSpeciesSuggestedTraits } from '@plant-app/domain'
+import type { UsdaSpeciesSuggestedTraits } from '@plant-app/domain'
 import type { ReactNode } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
@@ -36,7 +36,6 @@ export function SuggestedTraitsConfirmation({
         USDA PLANTS suggests the following for fields you haven't filled in yourself. Bloom window
         is never suggested — that's always your own observation.
       </Text>
-      {traits.sunRequirement && <Text>Sun/shade: {formatOption(traits.sunRequirement)}</Text>}
       {traits.matureHeightInches !== undefined && (
         <Text>Mature height: {traits.matureHeightInches}"</Text>
       )}
