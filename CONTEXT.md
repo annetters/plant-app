@@ -120,7 +120,8 @@ other photo.
 ### Planting
 A specific placement decision: one cluster of a given Plant at a given
 location in the garden. Fields: reference to Plant, quantity, map location
-(bed + pin coordinates), year acquired, source/nursery, dated photo log.
+(pin coordinates, plus an optional Bed assignment — see Bed membership),
+year acquired, source/nursery, dated photo log.
 A Planting with quantity 24 = one record for 24 specimens, not 24 records.
 
 ### Property
@@ -130,8 +131,9 @@ top-level container a user's Beds sit within. Owns the one grid scale
 never carries its own independent scale, so a foot means the same distance
 everywhere on the map, not just within one Bed.
 
-Gets a base map one of three ways: an aerial image, with scale auto-derived
-from latitude and tile zoom (ADR-0002); a photograph or scan of an existing
+Carries one or more **Maps** (see Map), each from one of three sources: an
+aerial image, with scale auto-derived from latitude and tile zoom (ADR-0002);
+a photograph or scan of an existing
 plan — a professional plot plan or survey if the user has one (often already
 printed to a stated scale with dimension callouts), otherwise a hand-drawn
 sketch; or a plan drawn directly in the app. In every case, the base map is a
@@ -139,7 +141,7 @@ sketch; or a plan drawn directly in the app. In every case, the base map is a
 hardscaping, house footprint and dimensions — not a stencil Beds are traced
 from. Beds are always hand-drawn (freehand or shape-based, ADR-0001) on top
 of it, positioned by eye against the real features it shows. The latter two
-base-map sources carry no inherent scale and require a Scale Reference to
+Map sources carry no inherent scale and require a Scale Reference to
 establish one.
 
 Which source to use is a **free choice offered up front** when the Property
@@ -149,12 +151,40 @@ plan simply because the imagery available isn't usable (outdated, obscured
 by tree cover, too low-res), or for privacy: choosing photo/drawn skips
 geocoding entirely, so no address is ever sent to Nominatim or Esri for that
 Property. A photo/drawn Property therefore has no address at all — it's
-identified by a user-chosen name instead. The choice is made once, at
-creation; it isn't revisited afterward (a Property is recreated, not
-re-sourced, to change it) — with one exception: an aerial Property whose
-address turns out to have no imagery coverage can still fall back to
-photo/drawn afterward, since that's completing the original setup, not
-switching a settled choice.
+identified by a user-chosen name instead.
+
+**A Property is not limited to one Map, and the choice is not made once**
+(ADR-0008, reversing the rule #6 set). Maps stack: an aerial image with a
+traced plan over it (#52), or a survey beside the imagery it was checked
+against. A Map can be added, hidden, reordered or replaced at any time, and
+none of that moves a Bed or a Pin — those are stored in real-world feet
+against the Property, never against a picture.
+
+### Map
+A reference picture of the Property — aerial imagery, a photographed plot
+plan or survey, or a plan drawn in the app. A Property carries zero or more,
+stacked in an order the gardener sets, each with its own opacity and its own
+show/hide. **A Map is not the garden**: it is what Beds and Pins are
+positioned *against*, never what they are stored in.
+
+Two different things can be done to a Map, and running them together is how
+a map goes quietly wrong:
+
+- **Calibration** — how big the picture is in the real world. This is what
+  Scale Reference establishes and what the stated scale makes checkable. It
+  is the one that can be wrong without looking wrong.
+- **Display transform** — where the picture sits on the canvas: rotation,
+  pan, zoom, framing, opacity.
+
+Changing how a Map is displayed never changes what anything measures, and
+never moves a Bed or a Pin.
+
+Map transforms are non-destructive — the uploaded original is kept — with
+one deliberate exception: an **aerial** Map is flattened to a stored image
+once aligned (#41). That is safe only because its centre lat/lon, bearing and
+px-per-ft are stored alongside it, so the tiles can be re-fetched and the
+result rebuilt. A photographed or drawn Map has no source to go back to, so
+its original is always kept. See ADR-0008.
 
 ### Scale Reference
 Establishes a Property's scale when it has none of its own (i.e. no aerial
@@ -219,6 +249,24 @@ render time, keeps a Bed's shape correct even if its Property's base image is
 later replaced or its scale is re-derived. Landmarks are optional: a Pin
 placed by rough tap needs none.
 
+### Bed membership
+Which Bed a Planting is **assigned** to — a decision the gardener makes, not
+a fact derived from where its Pin happens to sit (ADR-0009).
+
+A Planting may have no Bed at all. That is an ordinary state, not missing
+data: a pot on the patio, a specimen in the lawn, the gap between two beds,
+nursery stock not yet in the ground.
+
+Dropping a Pin inside a Bed **proposes** that Bed, because it is almost
+always the right answer and saves a step. It never decides, and nothing is
+ever refused for landing outside every Bed.
+
+When the geometry and the assignment disagree — a Planting assigned to a Bed
+its Pin does not sit inside — the app **warns and changes nothing**. It
+never silently reassigns a Planting, never clears an
+assignment, never moves a Pin. A plant that has spread past the edge of its
+bed is a real thing to record, not an error to correct.
+
 ### Landmark
 **Deferred — not a required feature for MVP.** Originally spec'd as a named
 reference point tagged during Bed creation, used to refine a Pin's position
@@ -230,9 +278,10 @@ return later as an optional precision-assist suggestion, not a manual
 numeric input.
 
 ### Pin
-A map marker for a Planting's location within a Bed, placed by dragging
+A map marker for a Planting's location on the Property, placed by dragging
 directly to position on the map. No manual distance or number entry is
-required. Works identically on the **desktop web app and the iPhone app** —
+required. A Pin may land inside a Bed or nowhere near one — see Bed
+membership. Works identically on the **desktop web app and the iPhone app** —
 the two supported surfaces (see Surfaces). This is not a claim about a phone
 browser; the iPhone app is what makes Pin placement work on a phone.
 Optional precision-assist suggestions (e.g. referencing a Landmark) may be
@@ -275,13 +324,25 @@ The gardener's own model, and the one the app follows:
 > The Map holds the shelves.
 
 Deleting a Map or a Bed **never** removes items from the Registry. Plants are
-owned by the account, not by the map, and the delete cascade only ever runs
-downward: Property -> Bed -> Planting -> planting photos.
+owned by the account, not by the map. The cascade runs downward from the
+Property, and **a Bed is not on the path to a Planting** (ADR-0009):
 
-What a shelf note records goes with the shelf, and this is expected rather
-than a surprise to be softened: a Planting's quantity, year acquired,
-source/nursery and dated photo log are all properties of the placement, not
-of the Plant. The Plant record itself — name, color, bloom window, reference
+```
+Property -> Map
+Property -> Bed            (its Plantings are unassigned, not deleted)
+Property -> Planting -> planting photos
+```
+
+Deleting a Bed clears its Plantings' Bed assignment and leaves them standing.
+A Planting can sit on no shelf at all — a pot, the lawn, the gap between two
+beds — so losing a shelf no longer has to mean losing what was on it. A Bed
+delete is still destructive, because the outline is gone and cannot be
+recovered, and its confirmation has to say what actually happens now (#48).
+
+What a Planting records is still the placement's own: quantity, year
+acquired, source/nursery and dated photo log belong to the Planting, not to
+the Plant, and deleting the *Planting* loses them. The Plant record
+itself — name, color, bloom window, reference
 photos — always survives. In the other direction, deleting a Plant removes it
 from the collection *and* from every shelf it sits on, since its Plantings
 go with it.
