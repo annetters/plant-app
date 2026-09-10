@@ -1,5 +1,10 @@
 import type { Bed, Property } from '@plant-app/domain'
-import { STAGE_SIZE_PX, pixelsPerFootForProperty } from '@plant-app/domain'
+import {
+  STAGE_SIZE_PX,
+  baseMapCalibration,
+  formatMapWidthFeet,
+  formatPixelsPerFoot,
+} from '@plant-app/domain'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { PlantingMap } from '../plantings/PlantingMap'
@@ -7,6 +12,8 @@ import { AddressAutocomplete } from '../property/AddressAutocomplete'
 import { BaseMapBackground } from '../property/BaseMapBackground'
 import { BaseMapSetup } from '../property/BaseMapSetup'
 import { BedEditor } from '../property/BedEditor'
+import { MeasurementGrid, MeasurementGridControl } from '../property/MeasurementGrid'
+import { MeasurementGridProvider } from '../property/MeasurementGridContext'
 import { usePropertiesRepository } from '../property/PropertiesRepositoryContext'
 import type { PropertyCreateInput } from '../property/propertiesRepository'
 
@@ -57,6 +64,16 @@ export function PropertyPage() {
   // Only so the base-map preview below can step aside while BedEditor is
   // rendering the same imagery behind its own canvas.
   const [bedEditorOpen, setBedEditorOpen] = useState(false)
+  // #28: redoing a Scale Reference that's already set. Kept here rather than
+  // inside BaseMapSetup so the whole calibrated view — maps, grid control and
+  // all — stands down while the two points are being re-picked.
+  const [recalibrating, setRecalibrating] = useState(false)
+
+  // #28: what the Property's scale actually *is*, rather than only whether
+  // there is one. Computed once and handed to the grid provider below, so
+  // the summary line and the squares drawn on the map are describing one
+  // calculation rather than two that happen to agree.
+  const calibration = property ? baseMapCalibration(property) : null
 
   useEffect(() => {
     let cancelled = false
@@ -111,6 +128,7 @@ export function PropertyPage() {
       setOwnMapMode(false)
       setPropertyName('')
       setConfirmedName(null)
+      setRecalibrating(false)
     } catch {
       setFormError('Could not delete this Property. Please try again.')
     } finally {
@@ -176,6 +194,7 @@ export function PropertyPage() {
       )}
 
       {property && (
+        <MeasurementGridProvider calibration={calibration}>
         <section>
           <p>{property.address ?? property.name}</p>
           {property.resolvedAddress && (
@@ -186,8 +205,41 @@ export function PropertyPage() {
             // a Property quietly pinned to the wrong place.
             <p>Matched to: {property.resolvedAddress}</p>
           )}
-          {pixelsPerFootForProperty(property) !== null ? (
+          {/*
+            #28: the derived scale, stated. Both halves matter — the
+            px-per-ft figure is what the code actually multiplies by, but it
+            reads as plausible whatever it is, so the ground width is what a
+            gardener can actually falsify against their own lot. #6 shipped a
+            1.5x-off calibration that a line like this would have made
+            obvious on sight; it took a code review instead.
+
+            Deliberately outside the branch below, so it stays on screen
+            while a replacement is being picked: judging a new calibration
+            means comparing it against the one being replaced, and hiding the
+            old figure at exactly that moment would remove the comparison
+            this whole ticket exists to make possible.
+          */}
+          {calibration?.calibrated && (
+            <p className="base-map-scale">
+              {recalibrating ? 'Current map scale' : 'Map scale'}:{' '}
+              {formatPixelsPerFoot(calibration.pixelsPerFoot)} — this map covers{' '}
+              {formatMapWidthFeet(calibration.mapWidthFeet)}.{' '}
+              {recalibrating
+                ? 'This is what saving a new Scale Reference below replaces.'
+                : calibration.derivedFrom === 'aerial-imagery'
+                  ? 'Derived from the aerial imagery and this location, so there is nothing to set by hand.'
+                  : 'Derived from the Scale Reference you set on this base map.'}
+            </p>
+          )}
+
+          {calibration?.calibrated && !recalibrating ? (
             <>
+              {calibration.recalibratable && (
+                <button type="button" onClick={() => setRecalibrating(true)}>
+                  Recalibrate
+                </button>
+              )}
+              <MeasurementGridControl />
               {/*
                 A Property with no Beds yet has nothing else drawing its base
                 map: BedEditor renders imagery only while its drawing panel
@@ -222,6 +274,7 @@ export function PropertyPage() {
                     }}
                   >
                     <BaseMapBackground property={property} />
+                    <MeasurementGrid />
                   </div>
                   <figcaption>Check this is the right place before drawing Beds.</figcaption>
                 </figure>
@@ -239,6 +292,16 @@ export function PropertyPage() {
                 hiddenWhileDrawing={bedEditorOpen}
               />
             </>
+          ) : recalibrating ? (
+            <BaseMapSetup
+              mode="recalibrate"
+              property={property}
+              onUpdated={(updated) => {
+                setProperty(updated)
+                setRecalibrating(false)
+              }}
+              onCancel={() => setRecalibrating(false)}
+            />
           ) : (
             <>
               {/*
@@ -268,6 +331,7 @@ export function PropertyPage() {
             {deleting ? 'Deleting…' : 'Delete Property'}
           </button>
         </section>
+        </MeasurementGridProvider>
       )}
 
       <Link to="/dashboard">Back to Dashboard</Link>

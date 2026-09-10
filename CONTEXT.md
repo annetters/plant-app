@@ -153,8 +153,39 @@ two points plus a real-world distance:
   furniture or vegetation) and enters the tape-measured distance.
 
 Prefer as long a reference as practical: a longer baseline makes the derived
-scale far less sensitive to small tap or measurement error. Used once per
-Property.
+scale far less sensitive to small tap or measurement error.
+
+A Property has at most one Scale Reference at a time, but it can be **redone**.
+A gardener who can't see the scale can't tell a good calibration from a bad
+one, and a calibration set once and never shown is exactly how #6 shipped a
+map that was ~1.5x off. So the derived scale is always stated on the Property,
+and a Scale Reference can be replaced without touching the base map it was
+measured against. Redoing it is safe precisely because Beds and Plantings are
+stored in real-world units (see Bed): they keep their positions and simply
+redraw against the new scale.
+
+An aerial Property has no Scale Reference to redo — its scale comes from
+latitude and imagery zoom, with no gardener-supplied input in it.
+
+### Measurement grid
+An optional overlay of squares of a known real-world size, drawn over a
+Property's base map on either surface. It exists to make a Property's scale
+**checkable**: a number ("2.75 px per ft") can't be compared against anything
+without arithmetic, where a gardener who knows one real distance on their own
+land — a driveway, a fence run, the house frontage — can count squares along
+it and see at a glance whether the app agrees with them.
+
+It is a reference, never a drawing surface: nothing is snapped to it, no Bed
+or Pin is constrained by it, and turning it on or off changes nothing that is
+stored — it is a way of looking, not a thing the Property has.
+
+The square size opens at whatever suits the Property's scale, and is then the
+gardener's to set. On the desktop surface that means any distance they can
+type, because the check the grid exists for is "count squares along something
+you already know the length of" and a known run is a 37 ft driveway as often
+as a round 25. The phone offers the round values only: it can't set a Scale
+Reference at all yet (#15), so there it is for reading a map rather than
+checking one against a tape measure.
 
 ### Bed
 A drawn map area representing a physical garden section, belonging to

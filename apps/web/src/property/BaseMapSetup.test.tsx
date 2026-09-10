@@ -24,6 +24,71 @@ const DEGRADED_ROW: PropertyRow = {
   created_at: '2026-01-01T00:00:00.000Z',
 }
 
+const CALIBRATED_PHOTO_ROW: PropertyRow = {
+  ...DEGRADED_ROW,
+  address: null,
+  name: 'Backyard plot',
+  latitude: null,
+  longitude: null,
+  base_map_source: 'photo',
+  base_map_photo_path: 'user-1/property-1/plan.jpg',
+  scale_reference: {
+    pointA: { x: 0, y: 0 },
+    pointB: { x: 300, y: 0 },
+    realDistanceFeet: 25,
+    mode: 'known-measurement',
+  },
+}
+
+function renderRecalibrate(onUpdated = vi.fn(), onCancel = vi.fn()) {
+  const property = propertyFromRow(CALIBRATED_PHOTO_ROW)
+  const fake = createFakePropertiesDbClient(CALIBRATED_PHOTO_ROW)
+  const view = render(
+    <PropertiesRepositoryProvider client={fake.client}>
+      <BaseMapSetup mode="recalibrate" property={property} onUpdated={onUpdated} onCancel={onCancel} />
+    </PropertiesRepositoryProvider>,
+  )
+  return { fake, onUpdated, onCancel, view }
+}
+
+describe('BaseMapSetup — recalibrating (#28)', () => {
+  it('reuses the stored photo instead of asking for it again', async () => {
+    renderRecalibrate()
+
+    expect(await screen.findByTestId('scale-reference-surface')).toBeInTheDocument()
+    expect(await screen.findAllByAltText('Uploaded plot plan or survey')).toHaveLength(1)
+    expect(screen.queryByLabelText('Plot plan or survey photo')).not.toBeInTheDocument()
+  })
+
+  /**
+   * Two clicks on an empty box would otherwise save a Scale Reference
+   * measured against nothing — a silently wrong scale, which is precisely
+   * the failure #28 exists to make impossible.
+   */
+  it('refuses to offer a measuring surface when the stored photo cannot be loaded', async () => {
+    const property = propertyFromRow(CALIBRATED_PHOTO_ROW)
+    const fake = createFakePropertiesDbClient(CALIBRATED_PHOTO_ROW)
+    fake.storage.createSignedUrl.mockResolvedValue({ data: null, error: { message: 'gone' } })
+    render(
+      <PropertiesRepositoryProvider client={fake.client}>
+        <BaseMapSetup mode="recalibrate" property={property} onUpdated={vi.fn()} onCancel={vi.fn()} />
+      </PropertiesRepositoryProvider>,
+    )
+
+    expect(await screen.findByText(/hasn.t loaded/)).toBeInTheDocument()
+    expect(screen.queryByTestId('scale-reference-surface')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save Scale Reference' })).not.toBeInTheDocument()
+  })
+
+  it('backs out without saving anything', async () => {
+    const { onCancel, onUpdated } = renderRecalibrate()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Keep the current scale' }))
+    expect(onCancel).toHaveBeenCalled()
+    expect(onUpdated).not.toHaveBeenCalled()
+  })
+})
+
 function renderSetup(onUpdated = vi.fn()) {
   const property = propertyFromRow(DEGRADED_ROW)
   const fake = createFakePropertiesDbClient(DEGRADED_ROW)

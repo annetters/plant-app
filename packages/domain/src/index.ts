@@ -60,6 +60,25 @@ export {
 export type { BaseMapTile } from "./baseMap.js";
 
 export {
+  baseMapCalibration,
+  formatMapWidthFeet,
+  formatPixelsPerFoot,
+} from "./baseMapCalibration.js";
+export type {
+  BaseMapCalibration,
+  CalibratedBaseMap,
+  CalibrationSource,
+  UncalibratedBaseMap,
+} from "./baseMapCalibration.js";
+
+export {
+  GRID_SPACING_CHOICES_FEET,
+  defaultGridSpacingFeet,
+  measurementGrid,
+} from "./measurementGrid.js";
+export type { GridLine, MeasurementGrid } from "./measurementGrid.js";
+
+export {
   derivePixelsPerFootFromScaleReference,
   validateScaleReferenceInput,
 } from "./scaleReference.js";

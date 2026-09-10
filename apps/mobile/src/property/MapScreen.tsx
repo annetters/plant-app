@@ -1,8 +1,13 @@
 import type { Bed, BedPoint, Plant, Planting, PlantingInput, Property } from '@plant-app/domain'
 import {
+  GRID_SPACING_CHOICES_FEET,
   STAGE_SIZE_PX,
+  baseMapCalibration,
+  defaultGridSpacingFeet,
   feetToPixels,
-  pixelsPerFootForProperty,
+  formatMapWidthFeet,
+  formatPixelsPerFoot,
+  measurementGrid,
   plantLabel,
   renderedBedOutlines,
   resolvePinDrop,
@@ -42,6 +47,9 @@ const BED_STROKE = '#52b788'
 const BED_FILL = 'rgba(82,183,136,0.12)'
 const PIN_FILL = '#2d6a4f'
 const NEW_PIN_FILL = '#e63946'
+/** #28's measurement grid — the same red the web overlay uses, and for the same reason: it has to stay legible over both dark aerial imagery and a white plot plan. */
+const GRID_COLOR = '#e63946'
+const GRID_STROKE_WIDTH_PX = 1
 
 /** On-screen sizes in device pixels, divided back out of the display scale wherever they're drawn inside the map's own (shrunk) coordinate space — a Pin has to stay thumb-sized however small the map is drawn, unlike the map's contents, which scale with it. */
 const BED_STROKE_WIDTH_PX = 1.5
@@ -276,7 +284,26 @@ export function MapScreen() {
     }, [bedIds, plantingsRepository]),
   )
 
-  const pixelsPerFootValue = property ? pixelsPerFootForProperty(property) : null
+  // #28: the scale, stated and drawn. The phone can't set a Scale Reference
+  // yet (#15), but it can show what the one on the Property works out to —
+  // which is what makes a wrong one findable at all.
+  const calibration = property ? baseMapCalibration(property) : null
+  // Everything that draws reads its scale off the same calibration the
+  // summary line quotes, rather than calling `pixelsPerFootForProperty`
+  // again alongside it.
+  const pixelsPerFootValue = calibration?.calibrated ? calibration.pixelsPerFoot : null
+  const [gridEnabled, setGridEnabled] = useState(false)
+  // `null` means "whatever suits the current scale", resolved at render so a
+  // recalibration re-picks on its own — same arrangement as web's provider.
+  const [chosenSpacingFeet, setChosenSpacingFeet] = useState<number | null>(null)
+  const grid =
+    gridEnabled && calibration?.calibrated
+      ? measurementGrid(
+          calibration.pixelsPerFoot,
+          chosenSpacingFeet ?? defaultGridSpacingFeet(calibration.pixelsPerFoot),
+          STAGE_SIZE_PX,
+        )
+      : null
 
   // The shapes the Beds are actually drawn as — one source of truth for both
   // what's rendered and what a dropped Pin is tested against, so a Pin can
@@ -536,6 +563,53 @@ export function MapScreen() {
 
     return (
       <>
+        {calibration?.calibrated && (
+          <>
+            <Text style={styles.scaleSummary}>
+              {`Map scale: ${formatPixelsPerFoot(calibration.pixelsPerFoot)} — this map covers ${formatMapWidthFeet(calibration.mapWidthFeet)}.`}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              style={styles.gridToggle}
+              onPress={() => setGridEnabled((on) => !on)}
+            >
+              <Text style={styles.gridToggleText}>
+                {gridEnabled ? 'Hide measurement grid' : 'Show measurement grid'}
+              </Text>
+            </Pressable>
+            {/* The round choices only, unlike web's free number entry: the
+                phone can't set a Scale Reference at all yet (#15), so this
+                is for reading a map rather than checking a calibration
+                against a tape measure, and a row of taps beats a keyboard. */}
+            {grid && (
+              <View style={styles.gridSpacings}>
+                {GRID_SPACING_CHOICES_FEET.map((spacing) => (
+                  <Pressable
+                    key={spacing}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: spacing === grid.spacingFeet }}
+                    testID={`grid-spacing-${spacing}`}
+                    style={[
+                      styles.gridSpacing,
+                      spacing === grid.spacingFeet && styles.gridSpacingSelected,
+                    ]}
+                    onPress={() => setChosenSpacingFeet(spacing)}
+                  >
+                    <Text
+                      style={
+                        spacing === grid.spacingFeet
+                          ? styles.gridSpacingTextSelected
+                          : styles.gridSpacingText
+                      }
+                    >
+                      {`${spacing} ft`}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+          </>
+        )}
         <View style={[styles.surface, { width: surfaceSize, height: surfaceSize }]}>
           <NativeBaseMap property={property} size={surfaceSize} />
           <Svg
@@ -545,6 +619,40 @@ export function MapScreen() {
             style={styles.overlay}
             testID="map-overlay"
           >
+            {/* First in the overlay, so the grid reads under the Beds and
+                Pins rather than over them — it is a reference to check them
+                against, not content in its own right. */}
+            {grid && (
+              <G
+                testID="measurement-grid"
+                accessibilityLabel={`${grid.spacingFeet} ft measurement grid`}
+              >
+                {grid.lines.map((line) => (
+                  <Fragment key={line.offsetFeet}>
+                    <Line
+                      testID={`grid-line-vertical-${line.offsetFeet}`}
+                      x1={line.offsetPx}
+                      y1={0}
+                      x2={line.offsetPx}
+                      y2={STAGE_SIZE_PX}
+                      stroke={GRID_COLOR}
+                      strokeWidth={GRID_STROKE_WIDTH_PX / displayScale}
+                      opacity={0.55}
+                    />
+                    <Line
+                      testID={`grid-line-horizontal-${line.offsetFeet}`}
+                      x1={0}
+                      y1={line.offsetPx}
+                      x2={STAGE_SIZE_PX}
+                      y2={line.offsetPx}
+                      stroke={GRID_COLOR}
+                      strokeWidth={GRID_STROKE_WIDTH_PX / displayScale}
+                      opacity={0.55}
+                    />
+                  </Fragment>
+                ))}
+              </G>
+            )}
             {outlines.map((bed) => (
               <Polygon
                 key={bed.id}
@@ -912,6 +1020,40 @@ export function MapScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
+  },
+  scaleSummary: {
+    color: '#4a4a4a',
+  },
+  gridToggle: {
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+  },
+  gridToggleText: {
+    color: '#2e7d32',
+    fontWeight: '600',
+  },
+  gridSpacings: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  gridSpacing: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#c8c8c8',
+  },
+  gridSpacingSelected: {
+    backgroundColor: '#2e7d32',
+    borderColor: '#2e7d32',
+  },
+  gridSpacingText: {
+    color: '#4a4a4a',
+  },
+  gridSpacingTextSelected: {
+    color: 'white',
+    fontWeight: '600',
   },
   container: {
     flexGrow: 1,

@@ -461,6 +461,92 @@ describe('PropertyPage — existing Property', () => {
     },
   )
 
+  describe('map scale (#28)', () => {
+    const calibratedPhotoRow: PropertyRow = {
+      ...availableRow,
+      address: null,
+      name: 'Backyard plot',
+      resolved_address: null,
+      latitude: null,
+      longitude: null,
+      imagery_zoom: null,
+      imagery_available: false,
+      base_map_source: 'photo',
+      base_map_photo_path: 'user-1/plan.jpg',
+      scale_reference: {
+        pointA: { x: 0, y: 0 },
+        pointB: { x: 300, y: 0 },
+        realDistanceFeet: 25,
+        mode: 'known-measurement',
+      },
+    }
+
+    it('states the derived scale as a ground distance, not only as pixels per foot', async () => {
+      renderPage(calibratedPhotoRow)
+      // 300px over 25ft is 12 px per ft, so the 768px surface covers 64ft.
+      expect(await screen.findByText(/12 px per ft/)).toBeInTheDocument()
+      expect(screen.getByText(/about 64 ft across/)).toBeInTheDocument()
+    })
+
+    it("says where an aerial Property's scale came from, and offers no recalibration for it", async () => {
+      renderPage(availableRow)
+      expect(await screen.findByText(/derived from the aerial imagery/i)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Recalibrate' })).not.toBeInTheDocument()
+    })
+
+    it('offers to redo the Scale Reference on a calibrated photo Property — the one #28 called unreachable', async () => {
+      const user = userEvent.setup()
+      renderPage(calibratedPhotoRow)
+      await user.click(await screen.findByRole('button', { name: 'Recalibrate' }))
+      expect(
+        await screen.findByRole('region', { name: 'Recalibrate this base map' }),
+      ).toBeInTheDocument()
+    })
+
+    it('reuses the base map already uploaded, rather than making the gardener upload it again', async () => {
+      const user = userEvent.setup()
+      renderPage(calibratedPhotoRow)
+      await user.click(await screen.findByRole('button', { name: 'Recalibrate' }))
+      // Straight to picking two points — no source choice, no file input.
+      expect(await screen.findByTestId('scale-reference-surface')).toBeInTheDocument()
+      expect(screen.queryByLabelText('Plot plan or survey photo')).not.toBeInTheDocument()
+    })
+
+    it('keeps the scale being replaced on screen while the new points are picked', async () => {
+      const user = userEvent.setup()
+      renderPage(calibratedPhotoRow)
+      await user.click(await screen.findByRole('button', { name: 'Recalibrate' }))
+
+      // Judging a new calibration means comparing it against the old one.
+      expect(await screen.findByText(/Current map scale: 12 px per ft/)).toBeInTheDocument()
+      expect(screen.getByText(/about 64 ft across/)).toBeInTheDocument()
+    })
+
+    it('can be backed out of, leaving the existing scale untouched', async () => {
+      const user = userEvent.setup()
+      renderPage(calibratedPhotoRow)
+      await user.click(await screen.findByRole('button', { name: 'Recalibrate' }))
+      await user.click(await screen.findByRole('button', { name: 'Keep the current scale' }))
+      expect(screen.queryByTestId('scale-reference-surface')).not.toBeInTheDocument()
+      expect(await screen.findByText(/12 px per ft/)).toBeInTheDocument()
+    })
+
+    it('offers the measurement grid over the base map', async () => {
+      const user = userEvent.setup()
+      renderPage(calibratedPhotoRow)
+      await user.click(await screen.findByLabelText('Show measurement grid'))
+      // 12 px per ft picks 5 ft squares.
+      expect(await screen.findByRole('img', { name: '5 ft measurement grid' })).toBeInTheDocument()
+    })
+
+    it('offers neither a scale line nor a grid on an uncalibrated Property', async () => {
+      renderPage({ ...uncalibratedRow, base_map_source: 'photo', base_map_photo_path: 'p.jpg' })
+      expect(await screen.findByText(/Scale Reference/)).toBeInTheDocument()
+      expect(screen.queryByText(/px per ft/)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Show measurement grid')).not.toBeInTheDocument()
+    })
+  })
+
   it('deletes the Property after confirmation, freeing the account up to create another', async () => {
     const user = userEvent.setup()
     renderPage(availableRow)

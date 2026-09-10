@@ -211,6 +211,72 @@ function touchEvent(
   }
 }
 
+describe('MapScreen — map scale (#28)', () => {
+  it('states the scale as a ground distance, so it can be checked against the real garden', async () => {
+    await renderScreen()
+
+    // 2 px per ft over a 768px surface is 384 ft of ground.
+    expect(await screen.findByText(/2 px per ft/)).toBeTruthy()
+    expect(screen.getByText(/about 384 ft across/)).toBeTruthy()
+  })
+
+  it('draws no measurement grid until the gardener asks for one', async () => {
+    await renderScreen()
+
+    expect(screen.queryByTestId('measurement-grid')).toBeNull()
+  })
+
+  it('draws the grid over the map once switched on', async () => {
+    await renderScreen()
+    await fireEvent.press(await screen.findByText('Show measurement grid'))
+
+    const grid = await screen.findByTestId('measurement-grid')
+    // 2 px per ft picks 25 ft squares (50px), so 768px holds 16 of them.
+    expect(grid.props.accessibilityLabel).toBe('25 ft measurement grid')
+    expect(screen.getAllByTestId(/^grid-line-vertical-/)).toHaveLength(16)
+  })
+
+  it('lets the gardener pick a square size they know a distance for', async () => {
+    await renderScreen()
+    await fireEvent.press(await screen.findByText('Show measurement grid'))
+    await fireEvent.press(await screen.findByTestId('grid-spacing-10'))
+
+    const grid = await screen.findByTestId('measurement-grid')
+    expect(grid.props.accessibilityLabel).toBe('10 ft measurement grid')
+    // 10 ft * 2 px per ft = 20px apart, so 768px holds 39 of them.
+    expect(screen.getAllByTestId(/^grid-line-vertical-/)).toHaveLength(39)
+  })
+
+  it('offers no square sizes until the grid is actually showing', async () => {
+    await renderScreen()
+
+    expect(screen.queryByTestId('grid-spacing-10')).toBeNull()
+  })
+
+  it('can be switched back off', async () => {
+    await renderScreen()
+    await fireEvent.press(await screen.findByText('Show measurement grid'))
+    await fireEvent.press(await screen.findByText('Hide measurement grid'))
+
+    expect(screen.queryByTestId('measurement-grid')).toBeNull()
+  })
+
+  it('says nothing about scale on a Property that has none', async () => {
+    await renderScreen({
+      property: propertyRow({
+        base_map_source: 'aerial',
+        imagery_zoom: null,
+        imagery_available: false,
+        scale_reference: null,
+      }),
+    })
+
+    await screen.findByText(/no map scale yet/)
+    expect(screen.queryByText(/px per ft/)).toBeNull()
+    expect(screen.queryByText('Show measurement grid')).toBeNull()
+  })
+})
+
 describe('MapScreen — viewing the Property', () => {
   it("draws each Bed's outline in the base map's own pixels", async () => {
     await renderScreen()

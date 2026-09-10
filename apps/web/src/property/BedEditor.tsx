@@ -9,6 +9,7 @@ import Konva from 'konva'
 import { useEffect, useRef, useState } from 'react'
 import { DESKTOP_ONLY } from '../desktopOnly'
 import { BaseMapBackground } from './BaseMapBackground'
+import { MeasurementGrid } from './MeasurementGrid'
 import { buildOutlineLine } from './bedOutline'
 import { useBedsRepository } from './BedsRepositoryContext'
 import { ovalToPoints, rectangleToPoints } from './dragShapeGeometry'
@@ -595,6 +596,10 @@ export function BedEditor({
               never drawn twice. */}
           <div style={{ position: 'relative', width: STAGE_SIZE_PX, height: STAGE_SIZE_PX }}>
             <BaseMapBackground property={property} />
+            {/* Over the imagery, under the Konva stage: the grid is a
+                reference to draw against, not something to draw on top of
+                the Beds being traced. */}
+            <MeasurementGrid />
             <div
               ref={containerRef}
               data-testid="bed-drawing-surface"

@@ -1,6 +1,6 @@
 import type { BaseMapSource, BedPoint, Property, ScalePoint, ScaleReferenceMode } from '@plant-app/domain'
 import { STAGE_SIZE_PX, svgPointsAttribute, validateScaleReferenceInput } from '@plant-app/domain'
-import { useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import { usePropertiesRepository } from './PropertiesRepositoryContext'
 import { DESKTOP_ONLY } from '../desktopOnly'
 import { useIsDesktopViewport } from './useIsDesktopViewport'
@@ -13,11 +13,30 @@ type Step = 'choose' | 'photo' | 'draw' | 'calibrate'
  * CONTEXT.md's Property entry). `'update'`: a Property already exists (it
  * was created as `'aerial'`) but its address turned out to have no imagery
  * coverage — this is completing that original setup via a fallback, not
- * changing a settled choice.
+ * changing a settled choice. `'recalibrate'`: the base map is already there
+ * and staying; only its Scale Reference is being redone (#28).
+ *
+ * `'recalibrate'` is deliberately not `'update'` with a flag. It skips the
+ * source choice and the upload/draw steps entirely and reuses the base map
+ * on the Property, because the gardener is fixing a wrong *scale*, not
+ * replacing the map it was measured against — making them re-upload a plot
+ * plan to move two points is what kept anyone from doing it.
  */
 type BaseMapSetupProps =
   | { mode: 'create'; name: string; onCreated: (property: Property) => void }
   | { mode: 'update'; property: Property; onUpdated: (property: Property) => void }
+  | {
+      mode: 'recalibrate'
+      property: Property
+      onUpdated: (property: Property) => void
+      onCancel: () => void
+    }
+
+const SETUP_LABELS: Record<BaseMapSetupProps['mode'], string> = {
+  create: 'Upload or draw your base map',
+  update: 'Set up a base map another way',
+  recalibrate: 'Recalibrate this base map',
+}
 
 function clickPoint(event: ReactMouseEvent<HTMLDivElement>): ScalePoint {
   const rect = event.currentTarget.getBoundingClientRect()
@@ -34,20 +53,29 @@ function clickPoint(event: ReactMouseEvent<HTMLDivElement>): ScalePoint {
 export function BaseMapSetup(props: BaseMapSetupProps) {
   const repository = usePropertiesRepository()
   const isDesktop = useIsDesktopViewport()
-  const [step, setStep] = useState<Step>('choose')
-  const [source, setSource] = useState<BaseMapSource | null>(null)
+  const recalibrating = props.mode === 'recalibrate'
+  // Seeded from the Property when recalibrating, so the gardener lands on
+  // the two-point step over the base map they already have.
+  const [step, setStep] = useState<Step>(recalibrating ? 'calibrate' : 'choose')
+  const [source, setSource] = useState<BaseMapSource | null>(
+    props.mode === 'recalibrate' ? props.property.baseMapSource : null,
+  )
   // Generated up front even in 'update' mode (where it's unused) so the
   // storage path an uploaded photo lands under is stable for the whole flow
   // — see `createWithBaseMap`, which inserts the Property row under this
   // same id afterward.
   const [pendingId] = useState(() => crypto.randomUUID())
-  const propertyId = props.mode === 'update' ? props.property.id : pendingId
+  const propertyId = props.mode === 'create' ? pendingId : props.property.id
 
   const [uploading, setUploading] = useState(false)
-  const [photoPath, setPhotoPath] = useState<string | null>(null)
+  const [photoPath, setPhotoPath] = useState<string | null>(
+    props.mode === 'recalibrate' ? props.property.baseMapPhotoPath : null,
+  )
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState<string | null>(null)
 
-  const [strokes, setStrokes] = useState<BedPoint[][]>([])
+  const [strokes, setStrokes] = useState<BedPoint[][]>(
+    props.mode === 'recalibrate' ? (props.property.baseMapDrawing ?? []) : [],
+  )
   const [currentStroke, setCurrentStroke] = useState<BedPoint[]>([])
 
   const [points, setPoints] = useState<ScalePoint[]>([])
@@ -56,6 +84,36 @@ export function BaseMapSetup(props: BaseMapSetupProps) {
 
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+
+  /**
+   * Whether there is actually something on screen to pick two points
+   * against. Only a photo can be missing here: a drawn plan is in local
+   * state by the time this step is reached, and an aerial Property never
+   * reaches it at all.
+   */
+  const baseMapReady = source !== 'photo' || photoPreviewUrl !== null
+
+  // Recalibrating a photo Property needs the stored photo back on screen to
+  // pick two points against — it was uploaded in some earlier session, so
+  // there's no local preview URL to reuse.
+  useEffect(() => {
+    if (!recalibrating || source !== 'photo' || !photoPath) return
+    let cancelled = false
+    repository
+      .getBaseMapPhotoUrl(photoPath)
+      .then((url) => {
+        if (!cancelled) setPhotoPreviewUrl(url)
+      })
+      .catch(() => {
+        if (!cancelled) setError('Could not load this base map photo. Please try again.')
+      })
+    // No `setPhotoPreviewUrl(null)` on failure is needed — it starts null,
+    // and `baseMapReady` below is what keeps the calibrate surface off
+    // screen until the photo actually arrives.
+    return () => {
+      cancelled = true
+    }
+  }, [recalibrating, source, photoPath, repository])
 
   async function handlePhotoSelected(fileList: FileList | null) {
     const file = fileList?.[0]
@@ -152,7 +210,7 @@ export function BaseMapSetup(props: BaseMapSetupProps) {
 
   return (
     <section
-      aria-label={props.mode === 'create' ? 'Upload or draw your base map' : 'Set up a base map another way'}
+      aria-label={SETUP_LABELS[props.mode]}
       className="base-map-setup"
     >
       {error && <p role="alert">{error}</p>}
@@ -290,9 +348,26 @@ export function BaseMapSetup(props: BaseMapSetupProps) {
         </>
       )}
 
-      {step === 'calibrate' && (
+      {step === 'calibrate' && !baseMapReady && (
+        // Two clicks on an empty box would otherwise save a Scale Reference
+        // measured against nothing at all — a silently wrong scale, which is
+        // the exact failure #28 exists to make impossible.
+        <p>
+          This base map's photo hasn't loaded, so there's nothing to measure against yet. Try again
+          in a moment.
+        </p>
+      )}
+
+      {step === 'calibrate' && baseMapReady && (
         <>
           <h3>Scale Reference</h3>
+          {recalibrating && (
+            <p>
+              This Property already has a scale. Picking two points and saving replaces it — the
+              base map itself is kept, and Beds and Pins keep the real-world positions they were
+              recorded at, so they redraw against the new scale.
+            </p>
+          )}
           <p>Click two points on the base map below, then enter the real-world distance between them.</p>
           <p>
             Pick points as far apart as the base map allows — a longer reference makes the
@@ -377,6 +452,11 @@ export function BaseMapSetup(props: BaseMapSetupProps) {
           <button type="button" onClick={() => void handleSaveScaleReference()} disabled={saving}>
             {saving ? 'Saving…' : 'Save Scale Reference'}
           </button>
+          {props.mode === 'recalibrate' && (
+            <button type="button" onClick={props.onCancel} disabled={saving}>
+              Keep the current scale
+            </button>
+          )}
         </>
       )}
     </section>

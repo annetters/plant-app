@@ -13,6 +13,7 @@ import Konva from 'konva'
 import { useEffect, useRef, useState } from 'react'
 import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
 import { BaseMapBackground } from '../property/BaseMapBackground'
+import { MeasurementGrid } from '../property/MeasurementGrid'
 import { buildOutlineLine } from '../property/bedOutline'
 import { useBedsRepository } from '../property/BedsRepositoryContext'
 import { usePlantingsRepository } from './PlantingsRepositoryContext'
@@ -510,6 +511,7 @@ export function PlantingMap({
           }}
         >
           {beds.length > 0 && <BaseMapBackground property={property} />}
+          {beds.length > 0 && <MeasurementGrid />}
           <div
             ref={containerRef}
             data-testid="planting-map-surface"
