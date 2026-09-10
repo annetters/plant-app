@@ -250,6 +250,38 @@ The searchable, filterable Plant list. Filter axes: name, flower color,
 bloom month, sun/shade, and other Plant fields. Each entry links to its
 Planting location(s) on the Property's map.
 
+### Ownership and deletion
+The gardener's own model, and the one the app follows:
+
+> The Registry is a collection of items. A Bed is a shelf where the items go.
+> The Map holds the shelves.
+
+Deleting a Map or a Bed **never** removes items from the Registry. Plants are
+owned by the account, not by the map, and the delete cascade only ever runs
+downward: Property -> Bed -> Planting -> planting photos.
+
+What a shelf note records goes with the shelf, and this is expected rather
+than a surprise to be softened: a Planting's quantity, year acquired,
+source/nursery and dated photo log are all properties of the placement, not
+of the Plant. The Plant record itself — name, color, bloom window, reference
+photos — always survives. In the other direction, deleting a Plant removes it
+from the collection *and* from every shelf it sits on, since its Plantings
+go with it.
+
+**Every destructive action confirms first**, on every surface, and states
+which of the two is being lost in those terms. A destructive action is one
+that removes a record or an uploaded file that cannot be recovered from
+within the app — deleting a Property, a Bed, a Plant, a Planting, or any
+photo. It is not enough to say "this cannot be undone": that undersells a
+cascade and says nothing about what is kept. Web confirms with an in-page
+modal, never `window.confirm` — a browser can suppress that and answer it
+"no" on the gardener's behalf without showing anything. Native confirms with
+`Alert`. The two carry the same words. See #47.
+
+A delete also removes the files it makes unreachable, not just the rows:
+a photo lives both as a record and as a file in a storage bucket, and the
+database cascade only ever reaches the first.
+
 ### Bloom Timeline
 Year-view bar chart of Plant bloom windows, filterable by Bed. A
 month-filtered list view is a secondary presentation of the same data —
