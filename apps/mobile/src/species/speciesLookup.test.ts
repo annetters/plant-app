@@ -78,7 +78,7 @@ describe('suggestSpeciesTraits', () => {
       'Monarda didyma',
     )
 
-    expect(traits.matureHeightInches).toBe(48)
+    expect(traits.traits.matureHeightInches).toBe(48)
   })
 
   it('never carries a sun requirement through, whatever Shade Tolerance USDA reports (#44)', async () => {
@@ -95,11 +95,38 @@ describe('suggestSpeciesTraits', () => {
       'Opuntia polyacantha',
     )
 
-    expect(traits).not.toHaveProperty('sunRequirement')
+    expect(traits.traits).not.toHaveProperty('sunRequirement')
   })
 
   it('returns nothing to suggest when USDA has no characteristics — the routine outcome', async () => {
-    expect(await suggestSpeciesTraits(source(), 'Monarda didyma')).toEqual({})
+    expect(await suggestSpeciesTraits(source(), 'Monarda didyma')).toEqual({
+      traits: {},
+      profile: { durations: [], growthHabits: [], family: null },
+      traitSourceUnavailable: false,
+    })
+  })
+
+  it('carries the reference-only profile through even when there are no traits at all (#36)', async () => {
+    // The case #36 exists for: *Dahlia pinnata* is a real plant with zero
+    // conservation characteristics. It used to look like a plant that did not
+    // exist; now it comes back with something to show.
+    const detail = await suggestSpeciesTraits(
+      source({
+        lookupUsdaByScientificName: jest.fn().mockResolvedValue({
+          species: [{ scientificName: 'Dahlia pinnata', commonName: 'pinnate dahlia' }],
+          profile: { durations: ['Perennial'], growthHabits: ['Forb/herb'], family: 'Asteraceae' },
+          characteristics: [],
+        }),
+      }),
+      'Dahlia pinnata',
+    )
+
+    expect(detail.traits).toEqual({})
+    expect(detail.profile).toEqual({
+      durations: ['Perennial'],
+      growthHabits: ['Forb/herb'],
+      family: 'Asteraceae',
+    })
   })
 })
 

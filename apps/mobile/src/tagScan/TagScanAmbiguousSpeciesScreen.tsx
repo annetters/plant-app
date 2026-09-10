@@ -15,11 +15,30 @@ export function TagScanAmbiguousSpeciesScreen() {
   const route = useRoute<RouteProp<MainStackParamList, 'TagScanAmbiguousSpecies'>>()
   const { scanId, photoIds, candidate, species } = route.params
 
-  function handleSelect(scientificName: string, commonName: string) {
+  /**
+   * Resolving the species sets the scientific name — that's what was being
+   * asked. It does **not** rewrite the common name the gardener typed, which
+   * is the same rule `traitsNotAlreadySetBy` follows: a value they entered is
+   * their decision, and a lookup proposes rather than decides (CONTEXT.md).
+   *
+   * This used to overwrite it, and #36 is what exposed the problem rather than
+   * causing it. Against the old 2,186-row dataset the two strings were usually
+   * near-identical; against the full checklist, picking *Monarda fistulosa*
+   * after typing "bee balm" replaced it with USDA's "wild bergamot" — both
+   * correct, but only one of them is what the tag in their hand says.
+   *
+   * USDA's name is still taken when the field is empty, including the 5,218
+   * accepted taxa USDA carries no common name for at all.
+   */
+  function handleSelect(scientificName: string, commonName: string | null) {
     navigation.navigate('TagScanReview', {
       scanId,
       photoIds,
-      candidate: { ...candidate, scientificName, commonName },
+      candidate: {
+        ...candidate,
+        scientificName,
+        commonName: candidate.commonName?.trim() ? candidate.commonName : (commonName ?? undefined),
+      },
     })
   }
 
@@ -43,7 +62,7 @@ export function TagScanAmbiguousSpeciesScreen() {
             onPress={() => handleSelect(item.scientificName, item.commonName)}
           >
             <Text style={styles.optionScientificName}>{item.scientificName}</Text>
-            <Text>{item.commonName}</Text>
+            <Text>{item.commonName ?? 'No USDA common name'}</Text>
           </Pressable>
         )}
       />

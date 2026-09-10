@@ -24,7 +24,15 @@ never sized its rows" below, and it's five lines.
 
 ---
 
-**Most recent session.** **#28 implemented** (`0e83cc6`) — a Property's map
+**Most recent session.** **#36 implemented** — the species lookup now
+resolves against USDA's full checklist held in our own Postgres, not the
+2,186-row conservation-traits table it mistook for the species universe.
+"dahlia" finds *Dahlia pinnata*. **Verified against the live project**, not
+only in tests. **Not QA'd by the user, not closed.** See "#36: names local,
+traits live" below. **#50 filed** — native status needs a state-level range;
+split out at the user's direction.
+
+**The session before.** **#28 implemented** (`0e83cc6`) — a Property's map
 scale is now stated on the page, drawn as an optional measurement grid on
 both surfaces, and a wrong one can be redone. Built with `/implement`,
 two-axis reviewed, all three suites green (278 domain / 254 mobile / 222
@@ -45,7 +53,7 @@ Two decisions the user made this session, both worth not relitigating:
   recreate Properties freely. The cascade still costs the *map* (Beds, Pins,
   photo logs) and keeps the Registry, since Plants hang off `user_id`.
 
-**The session before.** **#44 fixed** (`6abcf9d`) — USDA's `Shade Tolerance`
+**Before that.** **#44 fixed** (`6abcf9d`) — USDA's `Shade Tolerance`
 no longer suggests a `sunRequirement` at all; remapping the apparent inversion
 was rejected as shipping a guess about an undocumented field. **#23 fixed**
 (`d3bcf6c`) — Tag Scan validates a candidate genus against a bundled GBIF
@@ -54,7 +62,7 @@ confidently wrong / 3 empty to 3 correct / 0 wrong / 5 empty. ADR-0006 records
 it. Both closed; **#45** and **#46** filed from the conversation around them.
 See their sections below.
 
-**Before that.** **#42 fixed and closed** (`7331099`) — the flaky `BedEditor`
+**And before that.** **#42 fixed and closed** (`7331099`) — the flaky `BedEditor`
 test, whose cause was not the one the ticket guessed: the test waited on the
 Bed name reaching the DOM then asserted on `onBedsChange`, one passive-effect
 flush apart. `BedEditor` was never wrong. The dev-client QA sitting ran and
@@ -69,6 +77,127 @@ surface** — the decision this session leaned on twice.
 > — same reasoning as the 2026-09-06 trim.
 
 **Repo:** `annetters/plant-app` · branch `main`
+
+---
+
+## #36: names local, traits live — built and live-verified, NOT user-QA'd, OPEN
+
+The species lookup missed most garden plants. The cause was never USDA's
+coverage — it was the table being asked. `characteristicSearchResults`, which
+the adapter treated as the species universe, is a 2,186-row NRCS
+conservation-*traits* table. *Dahlia pinnata* is a plain binomial, not a
+cultivar, and it simply isn't in it — so "USDA has no trait record" and "no
+such plant" came out of the app as the same answer, and the second one is what
+the user saw.
+
+**ADR-0007 records the decision.** CONTEXT.md's Tag Scan section was rewritten
+around it, and the now-fired "revisit when cultivar coverage is a real gap"
+condition retired — the species-level revisit happened and was answered inside
+USDA; the *cultivar* question is what stays parked.
+
+### What shipped
+
+**Names local, traits live.** Three tiers, narrowing as they go:
+
+1. **Name** — `public.usda_plant_names`, our own copy of USDA's bulk checklist
+   (48,994 accepted + 44,163 synonyms, 93,157 rows). Always answers.
+2. **Profile** — `PlantProfile?symbol=`, live. Duration and growth habit.
+3. **Traits** — `PlantCharacteristics/{id}`, live, and **only** when the
+   profile's `HasCharacteristics` says the taxon has any.
+
+Migrations `0025` (table, `pg_trgm` indexes, the `search_usda_plant_names`
+RPC), `0026` (the service-role grant), `0027` (species-rank-only). Two Edge
+Functions: the rewritten `usda-plant-traits`, and a new
+`usda-plant-names-refresh` that is **invoked by hand** — USDA publishes no
+update cadence, so there is none to match.
+
+The client reads names **straight from Postgres** via the RPC; only traits go
+through the Edge Function. That is the seam **#43** needs, so #43 doesn't have
+to build it.
+
+### Verified against the live project, not just in tests
+
+Migrations pushed, both functions deployed, the refresh run for real:
+**93,157 rows in 12.8 s**. A second run correctly came back `unchanged` off
+the conditional request. Then, live:
+
+| query | answer |
+| --- | --- |
+| `dahlia` | *Dahlia pinnata*, *Dahlia coccinea* — the ticket's headline symptom |
+| `bee balm` | *Monarda didyma* etc., matched through USDA's spelling "beebalm" |
+| `Sedum spectabile` | accepted *Hylotelephium spectabile*, flagged as a synonym |
+| `Dahlia pinnata` | found, profile present, **0 characteristics** — no longer "not found" |
+| `Echinacea purpurea` | found, 79 characteristics |
+| `Rosa rug` | nothing — no partial-match false positive |
+| `g`, `%` | nothing — the guards hold |
+
+A type-ahead-shaped query returned in **251 ms**.
+
+A throwaway account was created to get a session for this and **deleted
+afterwards**.
+
+### Two bugs the live run caught that tests could not
+
+- **`service_role` had no GRANT.** The first refresh died on `permission
+  denied for table usda_plant_names`. 0025 granted `authenticated` and stopped,
+  reasoning that the refresh bypasses RLS — but bypassing RLS is not having a
+  grant. Exactly the trap `0002_grant_plants_table.sql` documents. Fixed in
+  `0026`.
+- **A bare genus was offered as a species.** `dahlia` ranked the genus row
+  *Dahlia* first, and picking it would have written a genus into
+  `scientific_name` — which CONTEXT.md forbids outright ("never just a common
+  name or genus"). Fixed in `0027`; above-species rows stay in the table but
+  are excluded from search.
+
+### Behaviour changes worth knowing before QA
+
+- **A miss now usually means a cultivar**, and the copy says so. The old
+  message blamed the dataset; that explanation is no longer true.
+- **`SpeciesNameSummary.commonName` is nullable.** USDA has no common name for
+  5,218 accepted taxa and requiring one silently discarded them.
+- **Picking a species no longer overwrites the common name the gardener
+  typed.** Against the old dataset the two strings were near-identical so this
+  never showed; against the full checklist, picking *Monarda fistulosa* after
+  typing "bee balm" replaced it with "wild bergamot".
+- **Duration / growth habit / family** show as attributed reference text
+  ("USDA PLANTS records this species as: perennial · forb/herb · family
+  Asteraceae"). Never saved. USDA's families are Cronquist-era — *Acer
+  palmatum* reads as Aceraceae — which is why they are attributed.
+
+### Native status: deliberately absent, now #50
+
+The user's call, and worth not relitigating: USDA answers native status per
+coarse region ("L48"), and **native is only meaningful against the gardener's
+own area**. Region-level would be read as an answer it isn't, so none is
+shown.
+
+USDA *does* hold state-level nativity, on a different service — the ArcGIS
+layer behind its distribution map
+(`apps.geo.fpac.usda.gov/.../plants/MapServer`, layer 4 "States and
+Provinces", fields `country_subdivision_name` + `plant_nativity_id` + `Symbol`;
+layer 6 is Counties). A `Symbol`-filtered query returned **0 features** and an
+unfiltered one **timed out at 90 s**, so it is plausible and unsolved.
+**#50** carries that, with these findings written down so nobody re-derives
+them.
+
+### The QA that has not been run
+
+None. Everything above is live-verified at the API and database level; **no
+one has used the app**. The pass wants a device or dev client, since the
+lookup lives on native mobile only (the web form gets it in #43):
+
+1. Add Plant → type "dahlia" → Look up species. Should offer *Dahlia
+   pinnata*, not a shrug.
+2. Pick a candidate whose USDA common name differs from what you typed —
+   your text should survive.
+3. A species with no traits (*Dahlia pinnata*) should still save fine and
+   show the grey USDA line.
+4. A species with traits (*Echinacea purpurea*) should still offer mature
+   height for accept/reject.
+5. Tag Scan's review screen — same lookup, same behaviour.
+
+**Ask the user whether they want to run this themselves or have it driven,
+per `CLAUDE.md`.**
 
 ---
 
@@ -1041,24 +1170,22 @@ as-you-type species
 suggestions on the web Add Plant form, which offers no lookup at all today
 while native has had one since #31.
 
-**#36 is now `ready-for-agent`, and should land before #43** (relabelled from
-`needs-info` 2026-09-08, the user's call). Nothing was waiting on information —
-`docs/research/usda-plants-name-resolution.md` investigated it on 2026-09-05
-and reached a verdict; #43 is the practical gap `CONTEXT.md` asked for before
-revisiting the data source. **Direction agreed: ingest, don't proxy** — the
-name checklist goes into our own Postgres table rather than being fetched from
-USDA per lookup. Licensing is explicitly permissive, the bulk file carries a
-real `Last-Modified` header, and it moves an unsupported endpoint out of the
-hot path. Names local, traits live. The issue comment holds the detail and the
-three-step scope. Sequencing matters because swapping the name index changes
-what every USDA surface returns, Tag Scan's included, and is now encoded as a
-**GitHub issue dependency** (#43 `blocked_by` #36) rather than resting on this
-note — so the frontier query skips #43 while #36 is open. **#36's scope stays
-names and coverage only.** #44 proposed folding trait *accuracy* into the same
-revisit and that was **not** taken — #44 closed 2026-09-09 having dropped the
-one bad field, and the trait-accuracy question now lives in **#46**
-(cross-check a second source), which is its own ticket rather than a widening
-of #36.
+**#36 is built** (2026-09-09) and live-verified — see its own section above.
+It is **open and unQA'd**; closing it is the user's call. Its scope stayed
+names and coverage only, as agreed: #44 proposed folding trait *accuracy* into
+the same revisit and that was **not** taken — the trait-accuracy question
+lives in **#46** (cross-check a second source), which is its own ticket rather
+than a widening of #36.
+
+**#43 is now unblocked** on the data side. The GitHub dependency (#43
+`blocked_by` #36) still holds while #36 is open, but the thing it was waiting
+for exists: `search_usda_plant_names` is callable directly by `authenticated`,
+returns ranked matches in ~250 ms, and already caps and guards short queries.
+#43 is a web-UI ticket now, not a data one.
+
+**#50 was filed out of #36** — native status needs a state-level range rather
+than USDA's coarse regions. The user's judgement, and the reason #36 shows no
+native status at all.
 
 **#41**'s deferral is a scope
 decision, not a judgement that it's minor — for a property that isn't square
@@ -1755,6 +1882,11 @@ content was defects like this one — file them when found.
 This was tracked as **#34**, closed 2026-09-07 once every item below had
 been run or ruled out of scope. These checklists are now the record; there
 is no open issue behind them.
+
+**Outstanding, both from 2026-09-09:** **#28**'s pass (top of this doc) and
+**#36**'s (in its own section above — five steps, needs a device or dev
+client, since the lookup is native-mobile-only until #43). Neither has been
+started. Ask the user who runs them before scripting anything.
 
 ### Ticket #10 — automated, passing
 

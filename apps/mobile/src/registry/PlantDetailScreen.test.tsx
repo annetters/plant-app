@@ -63,7 +63,13 @@ function RegistryStub() {
 function createFakes(plantRows = [plantRow({ id: 'plant-1' })]) {
   const plants = createFakePlantsDbClient(plantRows)
   const species = createFakeSpeciesLookupDbClient()
-  return { ...plants, speciesClient: species.client, functionsInvoke: species.functionsInvoke }
+  return {
+    ...plants,
+    speciesClient: species.client,
+    functionsInvoke: species.functionsInvoke,
+    // #36: names resolve against the local index, traits stay live.
+    speciesRpc: species.rpc,
+  }
 }
 
 async function renderFlow(fake: ReturnType<typeof createFakes>, entryPoint: string) {
@@ -279,11 +285,14 @@ describe('PlantDetailScreen in create mode (#31)', () => {
   it('fills the scientific name from the same USDA lookup Tag Scan offers', async () => {
     const fake = await renderCreateScreen()
     await screen.findByRole('header', { name: 'Add Plant' })
-    fake.functionsInvoke.mockResolvedValueOnce({
-      data: { species: [{ scientificName: 'Monarda didyma', commonName: 'bee balm' }] },
+    fake.speciesRpc.mockResolvedValueOnce({
+      data: [{ scientific_name: 'Monarda didyma', common_name: 'scarlet beebalm' }],
       error: null,
     })
 
+    // "bee balm" is how a human writes it; USDA's file holds "beebalm" 29
+    // times and the spaced form zero. Matching that is the index's job now,
+    // which is why the typed text and the returned name need not agree.
     await fireEvent.changeText(screen.getByLabelText('Common name'), 'bee balm')
     await fireEvent.press(screen.getByRole('button', { name: 'Look up species' }))
 
@@ -295,13 +304,11 @@ describe('PlantDetailScreen in create mode (#31)', () => {
   it('never guesses an ambiguous common name — it lists the candidates to pick from', async () => {
     const fake = await renderCreateScreen()
     await screen.findByRole('header', { name: 'Add Plant' })
-    fake.functionsInvoke.mockResolvedValueOnce({
-      data: {
-        species: [
-          { scientificName: 'Liatris spicata', commonName: 'liatris' },
-          { scientificName: 'Liatris aspera', commonName: 'liatris' },
-        ],
-      },
+    fake.speciesRpc.mockResolvedValueOnce({
+      data: [
+        { scientific_name: 'Liatris spicata', common_name: 'dense blazing star' },
+        { scientific_name: 'Liatris aspera', common_name: 'tall blazing star' },
+      ],
       error: null,
     })
 
@@ -329,21 +336,21 @@ describe('PlantDetailScreen in create mode (#31)', () => {
     // species-level, so the copy must not pin it on cultivars.
     const fake = await renderCreateScreen()
     await screen.findByRole('header', { name: 'Add Plant' })
-    fake.functionsInvoke.mockResolvedValueOnce({ data: { species: [] }, error: null })
+    fake.speciesRpc.mockResolvedValueOnce({ data: [], error: null })
 
-    await fireEvent.changeText(screen.getByLabelText('Common name'), 'dahlia')
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'zzzz')
     await fireEvent.press(screen.getByRole('button', { name: 'Look up species' }))
 
     const message = await screen.findByLabelText('Species lookup result')
-    expect(message).toHaveTextContent(/No USDA match for "dahlia"/)
-    expect(message).toHaveTextContent(/conservation-plant trait dataset, not the full flora/)
-    expect(message).toHaveTextContent(/ordinary species names/)
+    expect(message).toHaveTextContent(/No USDA match for "zzzz"/)
+    expect(message).toHaveTextContent(/not cultivar names off a nursery tag/)
+    expect(message).not.toHaveTextContent(/conservation-plant trait dataset/)
   })
 
   it('reports a failed lookup as a lookup failure, not as a plant that does not exist', async () => {
     const fake = await renderCreateScreen()
     await screen.findByRole('header', { name: 'Add Plant' })
-    fake.functionsInvoke.mockRejectedValueOnce(new Error('network down'))
+    fake.speciesRpc.mockRejectedValueOnce(new Error('network down'))
 
     await fireEvent.changeText(screen.getByLabelText('Common name'), 'dahlia')
     await fireEvent.press(screen.getByRole('button', { name: 'Look up species' }))
@@ -356,8 +363,8 @@ describe('PlantDetailScreen in create mode (#31)', () => {
   it('confirms a resolved lookup beside the button too, not only by filling the field', async () => {
     const fake = await renderCreateScreen()
     await screen.findByRole('header', { name: 'Add Plant' })
-    fake.functionsInvoke.mockResolvedValueOnce({
-      data: { species: [{ scientificName: 'Monarda didyma', commonName: 'bee balm' }] },
+    fake.speciesRpc.mockResolvedValueOnce({
+      data: [{ scientific_name: 'Monarda didyma', common_name: 'scarlet beebalm' }],
       error: null,
     })
 
@@ -372,7 +379,7 @@ describe('PlantDetailScreen in create mode (#31)', () => {
   it('clears a lookup result once the name it described is edited', async () => {
     const fake = await renderCreateScreen()
     await screen.findByRole('header', { name: 'Add Plant' })
-    fake.functionsInvoke.mockResolvedValueOnce({ data: { species: [] }, error: null })
+    fake.speciesRpc.mockResolvedValueOnce({ data: [], error: null })
 
     await fireEvent.changeText(screen.getByLabelText('Common name'), 'dahlia')
     await fireEvent.press(screen.getByRole('button', { name: 'Look up species' }))
@@ -394,13 +401,13 @@ describe('PlantDetailScreen in create mode (#31)', () => {
 
     expect(screen.getByText(/Type at least 3 characters/)).toBeTruthy()
     await fireEvent.press(screen.getByRole('button', { name: 'Look up species' }))
-    expect(fake.functionsInvoke).not.toHaveBeenCalled()
+    expect(fake.speciesRpc).not.toHaveBeenCalled()
 
     await fireEvent.changeText(screen.getByLabelText('Common name'), 'rose')
 
     expect(screen.queryByText(/Type at least 3 characters/)).toBeNull()
     await fireEvent.press(screen.getByRole('button', { name: 'Look up species' }))
-    await waitFor(() => expect(fake.functionsInvoke).toHaveBeenCalled())
+    await waitFor(() => expect(fake.speciesRpc).toHaveBeenCalled())
   })
 
   it('drops stale species candidates when the common name they answered is edited', async () => {
@@ -409,13 +416,11 @@ describe('PlantDetailScreen in create mode (#31)', () => {
     // text — presenting results for one name as matches for another.
     const fake = await renderCreateScreen()
     await screen.findByRole('header', { name: 'Add Plant' })
-    fake.functionsInvoke.mockResolvedValueOnce({
-      data: {
-        species: [
-          { scientificName: 'Rosa carolina', commonName: 'rose' },
-          { scientificName: 'Rosa palustris', commonName: 'rose' },
-        ],
-      },
+    fake.speciesRpc.mockResolvedValueOnce({
+      data: [
+        { scientific_name: 'Rosa carolina', common_name: 'Carolina rose' },
+        { scientific_name: 'Rosa palustris', common_name: 'swamp rose' },
+      ],
       error: null,
     })
 
@@ -432,13 +437,11 @@ describe('PlantDetailScreen in create mode (#31)', () => {
   it('names the term that was looked up, not whatever the field says now', async () => {
     const fake = await renderCreateScreen()
     await screen.findByRole('header', { name: 'Add Plant' })
-    fake.functionsInvoke.mockResolvedValueOnce({
-      data: {
-        species: [
-          { scientificName: 'Liatris spicata', commonName: 'liatris' },
-          { scientificName: 'Liatris aspera', commonName: 'liatris' },
-        ],
-      },
+    fake.speciesRpc.mockResolvedValueOnce({
+      data: [
+        { scientific_name: 'Liatris spicata', common_name: 'dense blazing star' },
+        { scientific_name: 'Liatris aspera', common_name: 'tall blazing star' },
+      ],
       error: null,
     })
 
@@ -476,6 +479,74 @@ describe('PlantDetailScreen in create mode (#31)', () => {
     expect(fake.rows()[0]).toEqual(expect.objectContaining({ mature_height_inches: 48 }))
     // Shade Tolerance is in the fixture and is deliberately ignored (#44).
     expect(fake.rows()[0].sun_requirement).toBeNull()
+  })
+
+  it('shows what USDA knows about a species that has no measurable traits (#36)', async () => {
+    // The population the profile tier exists for: ten of twelve garden
+    // ornamentals sampled during #36's research have zero conservation
+    // characteristics but still report duration and growth habit. This form
+    // used to require an *applicable* trait before it would show anything,
+    // which silenced the tier exactly where it was the only thing to show.
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+    fake.functionsInvoke.mockResolvedValueOnce({
+      data: {
+        species: [{ scientificName: 'Dahlia pinnata', commonName: 'pinnate dahlia' }],
+        profile: { durations: ['Perennial'], growthHabits: ['Forb/herb'], family: 'Asteraceae' },
+        characteristics: [],
+      },
+      error: null,
+    })
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'Dahlia')
+    await fireEvent.changeText(screen.getByLabelText('Scientific name'), 'Dahlia pinnata')
+    await fireEvent.press(screen.getByRole('button', { name: 'Add Plant' }))
+
+    await screen.findByText('What USDA knows about this species')
+    expect(
+      screen.getByText(/USDA PLANTS records this species as: perennial · forb\/herb · family Asteraceae/),
+    ).toBeTruthy()
+    // Nothing to accept, so no button offering to apply nothing.
+    expect(screen.queryByRole('button', { name: 'Use these suggested traits' })).toBeNull()
+    expect(fake.rows()).toHaveLength(0)
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Save this Plant' }))
+
+    await waitFor(() => expect(fake.rows()).toHaveLength(1))
+    expect(fake.rows()[0].mature_height_inches).toBeNull()
+  })
+
+  it('saves without a panel when USDA has nothing at all to say', async () => {
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+    fake.functionsInvoke.mockResolvedValueOnce({ data: { species: [] }, error: null })
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'Mystery')
+    await fireEvent.changeText(screen.getByLabelText('Scientific name'), 'Nothingus knownus')
+    await fireEvent.press(screen.getByRole('button', { name: 'Add Plant' }))
+
+    await waitFor(() => expect(fake.rows()).toHaveLength(1))
+    expect(screen.queryByText('What USDA knows about this species')).toBeNull()
+    expect(screen.queryByText('Suggested traits')).toBeNull()
+  })
+
+  it('says USDA was unreachable rather than implying the species has no traits (#36)', async () => {
+    const fake = await renderCreateScreen()
+    await screen.findByRole('header', { name: 'Add Plant' })
+    fake.functionsInvoke.mockResolvedValueOnce({
+      data: {
+        species: [{ scientificName: 'Dahlia pinnata', commonName: 'pinnate dahlia' }],
+        characteristics: [],
+        traitSourceUnavailable: true,
+      },
+      error: null,
+    })
+
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'Dahlia')
+    await fireEvent.changeText(screen.getByLabelText('Scientific name'), 'Dahlia pinnata')
+    await fireEvent.press(screen.getByRole('button', { name: 'Add Plant' }))
+
+    expect(await screen.findByText(/doesn't mean there are none/)).toBeTruthy()
   })
 
   it('never offers to overwrite a trait the user filled in themselves', async () => {

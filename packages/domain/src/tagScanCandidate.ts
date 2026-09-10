@@ -66,40 +66,60 @@ export function reviewTagOcrCandidates(
 /** A species as a name-lookup source (USDA today, others later) reports it. */
 export interface SpeciesNameSummary {
   scientificName: string;
-  commonName: string;
+  /**
+   * Null where the source has no common name for the taxon. USDA carries none
+   * for 5,218 of its 48,994 accepted names, and this used to be a required
+   * field, so those species were silently discarded before the user ever saw
+   * them — the same coverage gap #36 exists to close, in a second place.
+   */
+  commonName: string | null;
 }
 
-export type CommonNameResolution =
+/**
+ * What a name lookup came back with, reduced to the only three cases a UI has
+ * to handle. Named for the species rather than the common name because #36
+ * widened what can produce it: the index matches scientific names and USDA's
+ * collapsed compound common names too, so the query behind these candidates
+ * is no longer necessarily a common name.
+ */
+export type SpeciesResolution =
   | { status: "unresolved" }
   | { status: "resolved"; species: SpeciesNameSummary }
   | { status: "ambiguous"; candidates: SpeciesNameSummary[] };
 
 /**
- * A common name can span multiple species (CONTEXT.md's Liatris example:
- * "Liatris" covers both *spicata* and *aspera*) — this never guesses,
- * it surfaces every distinct species so the user can check the physical
- * tag. Distinctness is by scientific name: the same species appearing twice
- * in a source list isn't ambiguity.
+ * Turns whatever a name lookup found into the one decision the UI needs:
+ * nothing, one species, or a choice to put to the user. It never guesses — a
+ * common name can span multiple species (CONTEXT.md's Liatris example:
+ * "Liatris" covers both *spicata* and *aspera*), so every distinct candidate
+ * is surfaced for the user to check against the physical tag.
+ *
+ * Distinctness is by scientific name: the same species arriving twice — as an
+ * accepted name and again as one of USDA's 44,163 synonyms, say — isn't
+ * ambiguity.
+ *
+ * This deliberately does **not** re-check the candidates against what the
+ * user typed. It used to, back when the source was a 2,186-row list filtered
+ * with `.includes()` in an Edge Function. The name index now does the
+ * matching itself and does it better — it collapses punctuation, so "bee
+ * balm" finds USDA's "beebalm" (the file holds that spelling 29 times and the
+ * spaced one zero), and it matches scientific names too, which is what makes
+ * typing "dahlia" find *Dahlia pinnata*. Re-filtering here would throw away
+ * every one of those matches for failing a test the search had already
+ * decided, more carefully, to pass.
  */
-export function resolveCommonName(
-  commonName: string,
+export function resolveSpeciesMatches(
   knownSpecies: readonly SpeciesNameSummary[],
-): CommonNameResolution {
-  const needle = commonName.trim().toLowerCase();
-  // Substring, not exact-equality: USDA's own commonName values are always
-  // adjective-qualified compound names ("common sunflower"), never the bare
-  // word a user naturally types — an equality check would discard every
-  // real match the caller's search already found.
-  const matches = knownSpecies.filter((species) => species.commonName.trim().toLowerCase().includes(needle));
-
+): SpeciesResolution {
   const distinctByScientificName = new Map<string, SpeciesNameSummary>();
-  for (const species of matches) {
+  for (const species of knownSpecies) {
     const key = species.scientificName.trim().toLowerCase();
     if (!distinctByScientificName.has(key)) distinctByScientificName.set(key, species);
   }
   const distinct = [...distinctByScientificName.values()];
 
   if (distinct.length === 0) return { status: "unresolved" };
-  if (distinct.length === 1) return { status: "resolved", species: distinct[0] };
+  if (distinct.length === 1) return { status: "resolved", species: distinct[0]! };
   return { status: "ambiguous", candidates: distinct };
 }
+

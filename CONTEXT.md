@@ -65,8 +65,8 @@ cannot tell a binomial from marketing copy: "Follow us" has the same shape as
 only if its genus is a real one. Unknown genus means no proposal at all — a
 blank field the gardener fills in beats a confident wrong guess. This is a
 different job from trait suggestion, and deliberately a different source:
-GBIF validates names and carries no traits, USDA suggests traits and its name
-coverage is too narrow to validate against.
+GBIF validates a genus offline, from a vocabulary bundled into the app, with
+no network call and no account of what a plant is like.
 
 No single taxonomic-status filter gets the vocabulary right, so it carries a
 small hand-edited **override layer** beside it — additions for real genera the
@@ -75,20 +75,38 @@ with its reason recorded. It is data the gardener's agent edits deliberately,
 never something the app learns on its own: a filter that quietly changed its
 own behaviour would be exactly the auto-decision Tag Scan's rule forbids.
 
-Species-level trait suggestions (hardiness, mature size — never bloom
+**Species names** come from USDA PLANTS, held as our own copy of its full
+checklist — 48,994 accepted names plus 44,163 synonyms, refreshed from USDA's
+bulk file by a job that is run deliberately, never on a schedule USDA hasn't
+published (ADR-0007). Names local, traits live. Because the synonyms are
+there, a tag printing an outdated name resolves to the one USDA accepts today.
+
+**Species-level trait suggestions** (hardiness, mature size — never bloom
 window, which is climate-dependent, not a species/cultivar fact, and stays
 user-observed only regardless of source; and no longer sun/shade, whose
 USDA reading proved close to inverted and is dropped as of #44) come from
-USDA PLANTS, the starting data source — see
-`docs/research/plant-data-source-cultivar-level-evaluation.md`. Sources are
-a pluggable layer, not a single permanent choice: USDA has no cultivar-level
-data, so for now cultivar identification relies on OCR, the saved tag photo,
-and user confirmation only, with no automated lookup claiming a precision no
-current free source provides. Named candidates for closing that gap later:
-Proven Winners and similar commercial breeder/marketing programs (USDA
-structurally can't cover patented, trademarked cultivars), Missouri
-Botanical Garden's Plant Finder, and NC State's plant database. Revisit when
-cultivar-level coverage is a real gap in practice, not speculatively. A
+USDA too, but from a different, much smaller table fetched live — an NRCS
+conservation-plant set of ~2,186 species. Most garden plants are named in the
+checklist and absent from it, so **having no traits is ordinary and does not
+mean the plant is unknown**. Duration, growth habit and family are shown
+alongside, attributed to USDA and never saved: they exist for plants that
+have no traits at all, and USDA's families are Cronquist-era, so they read as
+USDA's claim rather than the app's.
+
+Native status is deliberately **not** taken from USDA. It answers per coarse
+region ("native in the lower 48"), and native is only meaningful against the
+gardener's own area — see #50 for the state-level version of the question.
+
+Sources are a pluggable layer, not a single permanent choice: USDA has no
+cultivar-level data, so for now cultivar identification relies on OCR, the
+saved tag photo, and user confirmation only, with no automated lookup
+claiming a precision no current free source provides. Named candidates for
+closing that gap later: Proven Winners and similar commercial
+breeder/marketing programs (USDA structurally can't cover patented,
+trademarked cultivars), Missouri Botanical Garden's Plant Finder, and NC
+State's plant database. **The species-level revisit already happened** (#36,
+ADR-0007) and it was answered inside USDA; what remains parked is the
+*cultivar*-level question, and that is what those candidates are for. A
 nice-to-have once richer taxonomic data exists: browsing a registry Plant's
 taxonomic relatives (e.g. every other Plant in the same genus already in the
 user's registry).

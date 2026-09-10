@@ -114,9 +114,9 @@ export type {
   BedValidationResult,
 } from "./bed.js";
 
-export { manualEntryAdapter, resolveCommonName, reviewTagOcrCandidates } from "./tagScanCandidate.js";
+export { manualEntryAdapter, resolveSpeciesMatches, reviewTagOcrCandidates } from "./tagScanCandidate.js";
 export type {
-  CommonNameResolution,
+  SpeciesResolution,
   SpeciesNameSummary,
   TagOcrAdapter,
   TagOcrCandidateFields,
@@ -130,8 +130,21 @@ export { DUPLICATE_PLANT_OFFER } from "./duplicatePlantOffer.js";
 export { checkForDuplicatePlant, parseScientificName } from "./tagScanMatching.js";
 export type { DuplicatePlantCheck, ParsedScientificName, TagScanPlantIdentity } from "./tagScanMatching.js";
 
-export { deriveHardinessZoneFromMinimumTemperatureF, projectUsdaSpeciesTraits } from "./usdaTraits.js";
-export type { UsdaCharacteristic, UsdaSpeciesSuggestedTraits } from "./usdaTraits.js";
+export {
+  deriveHardinessZoneFromMinimumTemperatureF,
+  describeUsdaSpeciesProfile,
+  projectUsdaSpeciesProfile,
+  projectUsdaSpeciesTraits,
+} from "./usdaTraits.js";
+export type {
+  UsdaCharacteristic,
+  UsdaSpeciesProfile,
+  UsdaSpeciesProfileSource,
+  UsdaSpeciesSuggestedTraits,
+} from "./usdaTraits.js";
+
+export { parseUsdaChecklist, usdaScientificNameWithoutAuthor } from "./usdaChecklist.js";
+export type { UsdaChecklistRow } from "./usdaChecklist.js";
 
 export { parseOcrTextLines } from "./tagOcrParsing.js";
 export type { TagOcrTextObservation } from "./tagOcrParsing.js";

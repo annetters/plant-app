@@ -19,8 +19,9 @@ const defaultPhotoIds = { frontTagPhotoId: 'tag-photo-1' }
 /**
  * This screen reads its Plants through TagScanRepository and its USDA
  * species lookup through SpeciesLookupRepository (#31 moved the lookup out
- * so the manual Plant form could share it), so it needs both fakes.
- * `functionsInvoke` drives the lookup.
+ * so the manual Plant form could share it), so it needs both fakes. Since
+ * #36 the lookup takes two routes: `speciesRpc` resolves names against the
+ * local index, `functionsInvoke` fetches live traits.
  */
 function createFakes(
   initialPlantRows: PlantRow[] = [],
@@ -28,7 +29,12 @@ function createFakes(
 ) {
   const tagScan = createFakeTagScanDbClient(initialPlantRows, initialTagPhotoRows)
   const species = createFakeSpeciesLookupDbClient()
-  return { ...tagScan, speciesClient: species.client, functionsInvoke: species.functionsInvoke }
+  return {
+    ...tagScan,
+    speciesClient: species.client,
+    functionsInvoke: species.functionsInvoke,
+    speciesRpc: species.rpc,
+  }
 }
 
 function Providers({ fake, children }: { fake: ReturnType<typeof createFakes>; children: ReactNode }) {
@@ -95,13 +101,11 @@ describe('TagScanReviewScreen', () => {
 
   it('surfaces an ambiguous common name as distinct species candidates instead of guessing', async () => {
     const fake = await renderReviewFlow()
-    fake.functionsInvoke.mockResolvedValueOnce({
-      data: {
-        species: [
-          { scientificName: 'Monarda didyma', commonName: 'bee balm' },
-          { scientificName: 'Monarda fistulosa', commonName: 'bee balm' },
-        ],
-      },
+    fake.speciesRpc.mockResolvedValueOnce({
+      data: [
+        { scientific_name: 'Monarda didyma', common_name: 'scarlet beebalm' },
+        { scientific_name: 'Monarda fistulosa', common_name: 'wild bergamot' },
+      ],
       error: null,
     })
     await waitFor(() => expect(screen.getByLabelText('Common name')).toBeTruthy())
@@ -112,8 +116,8 @@ describe('TagScanReviewScreen', () => {
     const ambiguousText = await screen.findByText(/ambiguous:/)
     const params = JSON.parse(ambiguousText.props.children.join('').replace('ambiguous: ', ''))
     expect(params.species).toEqual([
-      { scientificName: 'Monarda didyma', commonName: 'bee balm' },
-      { scientificName: 'Monarda fistulosa', commonName: 'bee balm' },
+      { scientificName: 'Monarda didyma', commonName: 'scarlet beebalm' },
+      { scientificName: 'Monarda fistulosa', commonName: 'wild bergamot' },
     ])
     expect(params.photoIds).toEqual(defaultPhotoIds)
   })
@@ -125,13 +129,11 @@ describe('TagScanReviewScreen', () => {
     // initial mount value. Uses the real TagScanAmbiguousSpeciesScreen (not a
     // stub) so the round trip is exercised for real.
     const fake = createFakes()
-    fake.functionsInvoke.mockResolvedValueOnce({
-      data: {
-        species: [
-          { scientificName: 'Monarda didyma', commonName: 'bee balm' },
-          { scientificName: 'Monarda fistulosa', commonName: 'bee balm' },
-        ],
-      },
+    fake.speciesRpc.mockResolvedValueOnce({
+      data: [
+        { scientific_name: 'Monarda didyma', common_name: 'scarlet beebalm' },
+        { scientific_name: 'Monarda fistulosa', common_name: 'wild bergamot' },
+      ],
       error: null,
     })
     await render(

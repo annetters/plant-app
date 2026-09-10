@@ -1,10 +1,13 @@
 import {
+  projectUsdaSpeciesProfile,
   projectUsdaSpeciesTraits,
-  resolveCommonName,
-  type CommonNameResolution,
+  resolveSpeciesMatches,
+  type SpeciesResolution,
   type PlantInput,
   type SpeciesNameSummary,
   type UsdaCharacteristic,
+  type UsdaSpeciesProfile,
+  type UsdaSpeciesProfileSource,
   type UsdaSpeciesSuggestedTraits,
 } from '@plant-app/domain'
 
@@ -15,9 +18,12 @@ import {
  */
 export interface SpeciesLookupSource {
   lookupUsdaByCommonName(commonName: string): Promise<SpeciesNameSummary[]>
-  lookupUsdaByScientificName(
-    scientificName: string,
-  ): Promise<{ species: SpeciesNameSummary[]; characteristics: UsdaCharacteristic[] }>
+  lookupUsdaByScientificName(scientificName: string): Promise<{
+    species: SpeciesNameSummary[]
+    profile?: UsdaSpeciesProfileSource
+    characteristics: UsdaCharacteristic[]
+    traitSourceUnavailable?: boolean
+  }>
 }
 
 /**
@@ -28,12 +34,16 @@ export interface SpeciesLookupSource {
  */
 
 /**
- * `resolveCommonName` matches by substring on purpose — USDA's own common
- * names are adjective-qualified compounds ("common sunflower"), so an exact
- * match would discard nearly every real hit. The cost is that one or two
- * characters match a large slice of the database, and what comes back reads
- * as an ambiguity between species when it's really just noise. Below this
- * length, don't ask at all.
+ * The name index matches by substring on purpose — USDA's own common names
+ * are adjective-qualified compounds ("common sunflower"), so an exact match
+ * would discard nearly every real hit. The cost is that one or two characters
+ * match a large slice of the database, and what comes back reads as an
+ * ambiguity between species when it's really just noise. Below this length,
+ * don't ask at all.
+ *
+ * Mirrored by the same guard inside `search_usda_plant_names`, which is what
+ * makes it true rather than merely polite — the database enforces it whoever
+ * calls.
  */
 export const MINIMUM_COMMON_NAME_LOOKUP_LENGTH = 3
 
@@ -46,22 +56,46 @@ export function canLookUpCommonName(commonName: string): boolean {
 export async function lookupSpeciesByCommonName(
   source: SpeciesLookupSource,
   commonName: string,
-): Promise<CommonNameResolution> {
-  return resolveCommonName(commonName, await source.lookupUsdaByCommonName(commonName))
+): Promise<SpeciesResolution> {
+  return resolveSpeciesMatches(await source.lookupUsdaByCommonName(commonName))
+}
+
+/**
+ * What USDA knows about a scientific name, in two piles the UI treats
+ * differently: `traits` may be applied to the Plant if the user accepts them,
+ * `profile` is only ever read.
+ *
+ * Both being empty is routine — callers treat it as "just save it", not as a
+ * failure. Since #36 it also no longer implies USDA has never heard of the
+ * plant: most garden ornamentals are in USDA's checklist and absent from its
+ * conservation-traits table.
+ */
+export interface SpeciesLookupDetail {
+  traits: UsdaSpeciesSuggestedTraits
+  profile: UsdaSpeciesProfile
+  /**
+   * USDA couldn't be reached for the live tiers. Distinct from "USDA has
+   * nothing" on purpose: those two are the same silence, and telling them
+   * apart is the whole subject of #36.
+   */
+  traitSourceUnavailable: boolean
 }
 
 /**
  * Species-level traits USDA reports for a scientific name — never a bloom
  * window, which is climate-dependent and stays user-observed (see CONTEXT.md).
- * An empty object means "USDA had nothing to suggest", a routine outcome that
- * callers treat as "just save it", not as a failure.
  */
 export async function suggestSpeciesTraits(
   source: SpeciesLookupSource,
   scientificName: string,
-): Promise<UsdaSpeciesSuggestedTraits> {
-  const { characteristics } = await source.lookupUsdaByScientificName(scientificName)
-  return projectUsdaSpeciesTraits(characteristics)
+): Promise<SpeciesLookupDetail> {
+  const { profile, characteristics, traitSourceUnavailable } =
+    await source.lookupUsdaByScientificName(scientificName)
+  return {
+    traits: projectUsdaSpeciesTraits(characteristics),
+    profile: projectUsdaSpeciesProfile(profile),
+    traitSourceUnavailable: traitSourceUnavailable ?? false,
+  }
 }
 
 /**

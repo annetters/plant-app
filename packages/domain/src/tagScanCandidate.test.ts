@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   manualEntryAdapter,
-  resolveCommonName,
+  resolveSpeciesMatches,
   reviewTagOcrCandidates,
   type SpeciesNameSummary,
 } from "./tagScanCandidate.js";
@@ -44,58 +44,52 @@ const digitalis: SpeciesNameSummary = {
 };
 const monardaDidyma: SpeciesNameSummary = {
   scientificName: "Monarda didyma",
-  commonName: "bee balm",
+  commonName: "scarlet beebalm",
 };
 const monardaFistulosa: SpeciesNameSummary = {
   scientificName: "Monarda fistulosa",
-  commonName: "bee balm",
+  commonName: "wild bergamot",
 };
 
-describe("resolveCommonName", () => {
-  it("reports unresolved when nothing matches", () => {
-    expect(resolveCommonName("bee balm", [digitalis])).toEqual({ status: "unresolved" });
+describe("resolveSpeciesMatches", () => {
+  it("reports unresolved when the source found nothing", () => {
+    expect(resolveSpeciesMatches([])).toEqual({ status: "unresolved" });
   });
 
-  it("resolves to a single species when exactly one match exists", () => {
-    expect(resolveCommonName("purple foxglove", [digitalis, monardaDidyma])).toEqual({
-      status: "resolved",
-      species: digitalis,
-    });
+  it("resolves to a single species when the source found exactly one", () => {
+    expect(resolveSpeciesMatches([digitalis])).toEqual({ status: "resolved", species: digitalis });
   });
 
-  it("matches case-insensitively", () => {
-    expect(resolveCommonName("PURPLE FOXGLOVE", [digitalis])).toEqual({
-      status: "resolved",
-      species: digitalis,
-    });
-  });
-
-  it("reports ambiguous with distinct species candidates when a common name spans multiple species", () => {
-    const result = resolveCommonName("bee balm", [digitalis, monardaDidyma, monardaFistulosa]);
-    expect(result).toEqual({
+  it("reports ambiguous with distinct candidates when a common name spans multiple species", () => {
+    expect(resolveSpeciesMatches([monardaDidyma, monardaFistulosa])).toEqual({
       status: "ambiguous",
       candidates: [monardaDidyma, monardaFistulosa],
     });
   });
 
   it("dedupes by scientific name — the same species listed twice is not ambiguity", () => {
-    const result = resolveCommonName("bee balm", [monardaDidyma, { ...monardaDidyma }]);
-    expect(result).toEqual({ status: "resolved", species: monardaDidyma });
+    expect(resolveSpeciesMatches([monardaDidyma, { ...monardaDidyma }])).toEqual({
+      status: "resolved",
+      species: monardaDidyma,
+    });
   });
 
-  it("matches a bare word against USDA's adjective-qualified compound common names", () => {
-    const commonSunflower: SpeciesNameSummary = {
-      scientificName: "Helianthus annuus",
-      commonName: "common sunflower",
+  it("keeps a species USDA has no common name for", () => {
+    // 5,218 of USDA's 48,994 accepted taxa carry no national common name.
+    // Dropping them would reintroduce exactly the coverage gap #36 closed.
+    const unnamed: SpeciesNameSummary = { scientificName: "Hosta venusta", commonName: null };
+    expect(resolveSpeciesMatches([unnamed])).toEqual({ status: "resolved", species: unnamed });
+  });
+
+  it("does not second-guess what the source matched on", () => {
+    // The name index matches "bee balm" against USDA's "beebalm" by
+    // collapsing punctuation, and matches scientific names too. Re-filtering
+    // those hits against the typed text — which this used to do — throws away
+    // every match the smarter search just found.
+    const beebalm: SpeciesNameSummary = {
+      scientificName: "Monarda didyma",
+      commonName: "scarlet beebalm",
     };
-    const swampSunflower: SpeciesNameSummary = {
-      scientificName: "Helianthus angustifolius",
-      commonName: "swamp sunflower",
-    };
-    const result = resolveCommonName("sunflower", [commonSunflower, swampSunflower]);
-    expect(result).toEqual({
-      status: "ambiguous",
-      candidates: [commonSunflower, swampSunflower],
-    });
+    expect(resolveSpeciesMatches([beebalm])).toEqual({ status: "resolved", species: beebalm });
   });
 });

@@ -106,3 +106,93 @@ export function projectUsdaSpeciesTraits(
 
   return traits;
 }
+
+/**
+ * The raw per-plant record USDA's `PlantProfile?symbol=…` endpoint carries,
+ * reshaped by the caller before this module sees it — same arrangement as
+ * `UsdaCharacteristic`, and for the same reason: the wire format is an
+ * undocumented internal API, and this module shouldn't depend on its exact
+ * field names.
+ */
+export interface UsdaSpeciesProfileSource {
+  durations: readonly string[];
+  growthHabits: readonly string[];
+  family: string | null;
+}
+
+/**
+ * Facts USDA reports about a species that the app shows but never saves.
+ *
+ * Worth having because it is free coverage for the taxa that need it most:
+ * ten of twelve garden ornamentals sampled during #36's research have *zero*
+ * conservation characteristics — no height, no minimum temperature, nothing
+ * `projectUsdaSpeciesTraits` can use — yet still report duration, growth
+ * habit and family. Before #36, those species looked to the app like plants
+ * that did not exist.
+ *
+ * Deliberately **not** a `UsdaSpeciesSuggestedTraits`. Nothing here maps onto
+ * a Plant field, and nothing here is offered for saving:
+ *
+ * - Duration (annual/perennial) and growth habit have no column on `plants`,
+ *   and inventing one to hold an unverified external reading is how #44
+ *   happened.
+ * - Family is USDA's, in Cronquist-era taxonomy — it reports *Acer palmatum*
+ *   as Aceraceae and *Hemerocallis fulva* as Liliaceae. That is the source's
+ *   known quirk, not an error, but it means the value must read as USDA's
+ *   claim rather than ours.
+ * - Native status is absent on purpose. USDA answers it per coarse region
+ *   ("L48: Native, CAN: Introduced"), and the user's judgement (2026-09-09)
+ *   is that native is only meaningful against the gardener's own area —
+ *   region-level is not useful and would be read as an answer it isn't.
+ *   Tracked separately as #50.
+ */
+export interface UsdaSpeciesProfile {
+  durations: string[];
+  growthHabits: string[];
+  family: string | null;
+}
+
+function distinctNonBlank(values: readonly string[] | undefined): string[] {
+  const seen = new Set<string>();
+  for (const value of values ?? []) {
+    const trimmed = value?.trim();
+    if (trimmed) seen.add(trimmed);
+  }
+  return [...seen];
+}
+
+function blankToNull(value: string | null | undefined): string | null {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+/**
+ * Cleans USDA's per-plant record into the reference-only shape. An
+ * all-empty result is routine — the caller shows nothing, exactly as it
+ * does for a species with no characteristics. Absence is never an error
+ * here, and since #36 it is no longer "plant not found" either.
+ */
+export function projectUsdaSpeciesProfile(
+  source: UsdaSpeciesProfileSource | undefined,
+): UsdaSpeciesProfile {
+  return {
+    durations: distinctNonBlank(source?.durations),
+    growthHabits: distinctNonBlank(source?.growthHabits),
+    family: blankToNull(source?.family),
+  };
+}
+
+/**
+ * One line of attributed reference text, or `null` when there is nothing to
+ * say. Attribution is the point: see `UsdaSpeciesProfile` on why every claim
+ * here has to stay USDA's rather than the app's.
+ */
+export function describeUsdaSpeciesProfile(profile: UsdaSpeciesProfile): string | null {
+  const parts = [
+    profile.durations.map((duration) => duration.toLowerCase()).join(", "),
+    profile.growthHabits.map((habit) => habit.toLowerCase()).join(", "),
+    profile.family ? `family ${profile.family}` : "",
+  ].filter((part) => part.length > 0);
+  if (parts.length === 0) return null;
+  return `USDA PLANTS records this species as: ${parts.join(" · ")}`;
+}

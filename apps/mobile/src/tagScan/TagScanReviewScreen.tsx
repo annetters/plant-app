@@ -1,10 +1,12 @@
 import {
   DUPLICATE_PLANT_OFFER,
   checkForDuplicatePlant,
+  describeUsdaSpeciesProfile,
   validatePlantInput,
   type Plant,
   type PlantInput,
   type PlantValidationErrors,
+  type UsdaSpeciesProfile,
   type UsdaSpeciesSuggestedTraits,
 } from '@plant-app/domain'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
@@ -55,6 +57,8 @@ export function TagScanReviewScreen() {
   const [pendingCreation, setPendingCreation] = useState<{
     input: PlantInput
     traits: UsdaSpeciesSuggestedTraits
+    profile: UsdaSpeciesProfile
+    traitSourceUnavailable: boolean
   } | null>(null)
   const [duplicateOffer, setDuplicateOffer] = useState<{
     input: PlantInput
@@ -181,12 +185,23 @@ export function TagScanReviewScreen() {
   async function offerTraitsThenCreate(input: PlantInput) {
     setBusy(true)
     try {
-      const traits = await suggestSpeciesTraits(speciesLookup, input.scientificName)
-      if (Object.keys(traits).length === 0) {
+      const { traits, profile, traitSourceUnavailable } = await suggestSpeciesTraits(
+        speciesLookup,
+        input.scientificName,
+      )
+      const profileDescription = describeUsdaSpeciesProfile(profile)
+      // Nothing to show at all — not a suggestion to accept, not a fact to
+      // read, no outage to admit — so don't interrupt the scan with an empty
+      // panel.
+      if (
+        Object.keys(traits).length === 0 &&
+        profileDescription === null &&
+        !traitSourceUnavailable
+      ) {
         await createPlant(input)
         return
       }
-      setPendingCreation({ input, traits })
+      setPendingCreation({ input, traits, profile, traitSourceUnavailable })
     } catch {
       // A USDA lookup failure shouldn't block creating the Plant itself — it only forfeits the trait suggestion.
       await createPlant(input)
@@ -248,7 +263,7 @@ export function TagScanReviewScreen() {
   }
 
   if (pendingCreation) {
-    const { input, traits } = pendingCreation
+    const { input, traits, profile, traitSourceUnavailable } = pendingCreation
     return (
       <SafeAreaView style={styles.safeArea}>
         <KeyboardAwareScrollView contentContainerStyle={styles.container}>
@@ -258,6 +273,8 @@ export function TagScanReviewScreen() {
           {formError && <Text style={styles.error}>{formError}</Text>}
           <SuggestedTraitsConfirmation
             traits={traits}
+            profile={profile}
+            traitSourceUnavailable={traitSourceUnavailable}
             busy={busy}
             onAccept={() => createPlant(input, traits)}
             onSkip={() => createPlant(input)}

@@ -6,15 +6,18 @@ import {
   NATIVE_STATUSES,
   SUN_REQUIREMENTS,
   checkForDuplicatePlant,
+  describeUsdaSpeciesProfile,
   formatOption,
   plantFormFieldsFromPlant,
   plantInputFromFormFields,
+  projectUsdaSpeciesProfile,
   validatePlantInput,
   type Plant,
   type PlantFormFields,
   type PlantInput,
   type PlantValidationErrors,
   type SpeciesNameSummary,
+  type UsdaSpeciesProfile,
   type UsdaSpeciesSuggestedTraits,
 } from '@plant-app/domain'
 import { useNavigation, useRoute, type RouteProp } from '@react-navigation/native'
@@ -94,6 +97,8 @@ export function PlantDetailScreen() {
   const [pendingCreation, setPendingCreation] = useState<{
     input: PlantInput
     traits: UsdaSpeciesSuggestedTraits
+    profile: UsdaSpeciesProfile
+    traitSourceUnavailable: boolean
   } | null>(null)
   // The registry as it stands, for the duplicate check on save (#37). Only
   // loaded when creating — an existing Plant is already its own record and
@@ -244,23 +249,34 @@ export function PlantDetailScreen() {
   async function offerTraitsThenCreate(input: PlantInput) {
     setSubmitting(true)
     let traits: UsdaSpeciesSuggestedTraits = {}
+    // `projectUsdaSpeciesProfile` owns what "USDA said nothing" looks like;
+    // spelling it out again here is a second copy to keep in step.
+    let profile: UsdaSpeciesProfile = projectUsdaSpeciesProfile(undefined)
+    let traitSourceUnavailable = false
     try {
+      const detail = await suggestSpeciesTraits(speciesLookup, input.scientificName)
       // Only what the user hasn't answered themselves: this form, unlike Tag
       // Scan's review screen, has its own Sun/shade and Mature height inputs,
       // and a suggestion must never overwrite a value they typed.
-      traits = traitsNotAlreadySetBy(
-        await suggestSpeciesTraits(speciesLookup, input.scientificName),
-        input,
-      )
+      traits = traitsNotAlreadySetBy(detail.traits, input)
+      profile = detail.profile
+      traitSourceUnavailable = detail.traitSourceUnavailable
     } catch {
       // No suggestion available — fall through and create the Plant as typed.
     } finally {
       setSubmitting(false)
     }
-    // Unlike Tag Scan, don't interrupt the save for a panel that could only
-    // report the reference-only hardiness zone and change nothing.
-    if (hasApplicableTraits(traits)) {
-      setPendingCreation({ input, traits })
+    // Anything at all to say, and the panel opens — the same condition Tag
+    // Scan's review screen uses, so the two creation paths behave alike.
+    //
+    // This used to require an *applicable* trait, on the reasoning that a
+    // panel which can only report shouldn't interrupt a save. #36 made that
+    // reasoning wrong: the species it added are precisely the ones with no
+    // measurable traits, so the gate silenced the tier exactly where it was
+    // the only thing there was to show. The panel adapts instead — with
+    // nothing to apply it offers a single "Save this Plant".
+    if (hasApplicableTraits(traits) || describeUsdaSpeciesProfile(profile) || traitSourceUnavailable) {
+      setPendingCreation({ input, traits, profile, traitSourceUnavailable })
       return
     }
     await handleCreate(input)
@@ -309,17 +325,18 @@ export function PlantDetailScreen() {
           text: `Scientific name set from USDA PLANTS: ${resolution.species.scientificName}`,
         })
       } else {
-        // Not a user error, and worth saying so plainly. What this searches is
-        // USDA's *characteristics* dataset — ~2,200 species with trait records,
-        // an NRCS conservation-plant population, not the full PLANTS flora and
-        // not a horticultural database. ADR-0004 measured the gap at 5 of 7
-        // species from real nursery tags missing, and is explicit that it is
-        // species-level, not merely cultivar-level: a plant with a perfectly
-        // ordinary binomial (Dahlia pinnata) is simply not in it. Say that,
-        // rather than anything implying the typed name was wrong.
+        // Still not a user error — but since #36 it is no longer the routine
+        // outcome it was, so the copy no longer explains away a miss as the
+        // dataset's fault. This now searches USDA's full checklist (48,994
+        // accepted names plus 44,163 synonyms), which resolved 57 of 60
+        // ordinary garden ornamentals on the panel in
+        // docs/research/usda-plants-name-resolution.md. What USDA genuinely
+        // still can't do is cultivars ('Gateway', 'Pardon My Pink') — no
+        // cultivar field exists at any endpoint — so that is what a miss most
+        // often means now, and what the message should say.
         setSpeciesLookupMessage({
           tone: 'info',
-          text: `No USDA match for "${searched}". This lookup searches USDA's conservation-plant trait dataset, not the full flora — many garden plants aren't in it, including ones with ordinary species names. Type the scientific name yourself.`,
+          text: `No USDA match for "${searched}". USDA lists species and their older names, but not cultivar names off a nursery tag — try the plain species name, or type the scientific name yourself.`,
         })
       }
     } catch {
@@ -451,13 +468,15 @@ export function PlantDetailScreen() {
   }
 
   if (pendingCreation) {
-    const { input, traits } = pendingCreation
+    const { input, traits, profile, traitSourceUnavailable } = pendingCreation
     return (
       <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
         <KeyboardAwareScrollView contentContainerStyle={styles.container}>
           {formError && <Text style={styles.error}>{formError}</Text>}
           <SuggestedTraitsConfirmation
             traits={traits}
+            profile={profile}
+            traitSourceUnavailable={traitSourceUnavailable}
             busy={submitting}
             onAccept={() => handleCreate(input, traits)}
             onSkip={() => handleCreate(input)}
@@ -545,7 +564,7 @@ export function PlantDetailScreen() {
                     onPress={() => handleSelectSpecies(species)}
                   >
                     <Text style={styles.candidateScientificName}>{species.scientificName}</Text>
-                    <Text>{species.commonName}</Text>
+                    <Text>{species.commonName ?? 'No USDA common name'}</Text>
                   </Pressable>
                 ))}
               </View>

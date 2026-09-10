@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   deriveHardinessZoneFromMinimumTemperatureF,
+  describeUsdaSpeciesProfile,
+  projectUsdaSpeciesProfile,
   projectUsdaSpeciesTraits,
   type UsdaCharacteristic,
 } from "./usdaTraits.js";
@@ -129,5 +131,83 @@ describe("projectUsdaSpeciesTraits", () => {
   it("omits the hardiness zone when the value isn't a usable number", () => {
     const traits = projectUsdaSpeciesTraits([characteristic("Temperature, Minimum (°F)", "Unknown")]);
     expect(traits).not.toHaveProperty("minimumHardinessZone");
+  });
+});
+
+describe("projectUsdaSpeciesProfile", () => {
+  it("reads duration and growth habit from USDA's per-plant record", () => {
+    expect(
+      projectUsdaSpeciesProfile({
+        durations: ["Perennial"],
+        growthHabits: ["Forb/herb"],
+        family: "Asteraceae",
+      }),
+    ).toEqual({ durations: ["Perennial"], growthHabits: ["Forb/herb"], family: "Asteraceae" });
+  });
+
+  it("keeps every value when USDA reports more than one", () => {
+    const profile = projectUsdaSpeciesProfile({
+      durations: ["Annual", "Biennial"],
+      growthHabits: ["Shrub", "Tree"],
+      family: null,
+    });
+    expect(profile).toEqual({
+      durations: ["Annual", "Biennial"],
+      growthHabits: ["Shrub", "Tree"],
+      family: null,
+    });
+  });
+
+  it("drops blank and duplicate entries rather than rendering an empty bullet", () => {
+    expect(
+      projectUsdaSpeciesProfile({
+        durations: ["Perennial", "  ", "Perennial"],
+        growthHabits: [],
+        family: "   ",
+      }),
+    ).toEqual({ durations: ["Perennial"], growthHabits: [], family: null });
+  });
+
+  it("is empty, not undefined, when USDA has nothing — a routine outcome", () => {
+    expect(projectUsdaSpeciesProfile(undefined)).toEqual({
+      durations: [],
+      growthHabits: [],
+      family: null,
+    });
+  });
+});
+
+describe("describeUsdaSpeciesProfile", () => {
+  it("reads as something USDA says, not as our own assertion", () => {
+    // USDA still uses Cronquist-era families (Aceraceae, Liliaceae), which
+    // look dated to a botanically literate gardener. Attributing the claim is
+    // what keeps that USDA's quirk rather than ours.
+    expect(
+      describeUsdaSpeciesProfile({
+        durations: ["Perennial"],
+        growthHabits: ["Forb/herb"],
+        family: "Asteraceae",
+      }),
+    ).toBe("USDA PLANTS records this species as: perennial · forb/herb · family Asteraceae");
+  });
+
+  it("omits the parts USDA has nothing for", () => {
+    expect(
+      describeUsdaSpeciesProfile({ durations: [], growthHabits: ["Shrub"], family: null }),
+    ).toBe("USDA PLANTS records this species as: shrub");
+  });
+
+  it("joins multiple values for one part", () => {
+    expect(
+      describeUsdaSpeciesProfile({
+        durations: ["Annual", "Biennial"],
+        growthHabits: [],
+        family: null,
+      }),
+    ).toBe("USDA PLANTS records this species as: annual, biennial");
+  });
+
+  it("says nothing at all rather than a dangling label when USDA has nothing", () => {
+    expect(describeUsdaSpeciesProfile({ durations: [], growthHabits: [], family: null })).toBeNull();
   });
 });
