@@ -2,50 +2,65 @@
 
 **Date:** 2026-09-09
 
-**Most recent session.** Both tickets worked this session are **closed**, and
-two follow-ups were filed from the conversation around them: **#45** (record
-where a suggested trait value came from) and **#46** (cross-check a second
-source, and bring sun/shade back if it can be trusted — blocked by #45).
+## PICK UP HERE: #28's QA has not been run
 
-**#44 fixed** (`6abcf9d`) — USDA's `Shade
-Tolerance` no longer suggests a `sunRequirement` at all. Direction 1 of the
-three the ticket offered; remapping the apparent inversion was rejected as
-shipping a guess about an undocumented field. Dropped from
-`UsdaSpeciesSuggestedTraits` itself rather than from the projection, so the
-type enforces it — #40's precedent. Device-verified and closed. See "#44: the
-inverted Shade Tolerance" below.
+**#28 is built, reviewed and committed (`0e83cc6`) but has had no QA at all.**
+Everything below about it comes from reading the code, never from using it.
+It is **open**, and closing it is the user's call.
 
-**#23 fixed** in the same session (`d3bcf6c`) — Tag Scan now validates a
-candidate genus against a bundled GBIF vocabulary instead of trusting line
-shape. Against the real transcript it goes from 3 correct / 2 confidently
-wrong / 3 empty to **3 correct / 0 wrong / 5 empty**. ADR-0006 records the
-decision. Closed. See "#23: the genus vocabulary" below.
+The pass to run is in "#28: the map scale, stated and drawn" below. Part A,
+steps 1–5, on a desktop browser — the one step that is the whole ticket is
+setting the grid to a distance the user has genuinely measured and counting
+squares along it. If the app disagrees with their tape measure, the ticket
+has failed at its only job.
 
-**The session before.** **#42 fixed and closed** (`7331099`) — the flaky
-`BedEditor` test. The cause was not the one the ticket guessed: the test
-waited on the Bed name reaching the DOM, then asserted on `onBedsChange`,
-and those are one passive-effect flush apart. `BedEditor` itself was never
-wrong — it fired correctly on every failing run too. See "#42: the flaky
-BedEditor test" below.
+**There is uncommitted work in the tree**, deliberately: a `gridTemplateRows`
+fix in `BaseMapBackground.tsx` plus a new `BaseMapBackground.test.tsx`. Held
+back because the user's standing preference is that QA findings land as one
+reviewable commit, and the pass hasn't started. Confirm it's still there
+(`git status`) before doing anything else — this worktree is shared with
+other sessions. If it's gone, it's the fix described under "The tile grid
+never sized its rows" below, and it's five lines.
 
-Also from that stretch: the dev-client QA sitting **ran, both checks
-passing** (2026-09-08), and proved cheaper than first recorded — no Xcode,
-no tag scan, nothing written. See "The dev-client QA sitting".
+---
 
-Also still standing from the same stretch of work: **#40 fixed**
-(`e44325d`) — the fabricated hardiness zone is gone from `usdaTraits.ts`,
-and `UsdaCharacteristic.value` is now `string | null` so the null case is
-enforced by the type rather than absorbed incidentally. The issue and its
-status comment hold the detail. **#42 filed**: a flaky `BedEditor` test that
-fails only under full-suite load. **#40 was closed 2026-09-08 at the user's
-explicit instruction**, its no-regression half confirmed by that sitting.
+**Most recent session.** **#28 implemented** (`0e83cc6`) — a Property's map
+scale is now stated on the page, drawn as an optional measurement grid on
+both surfaces, and a wrong one can be redone. Built with `/implement`,
+two-axis reviewed, all three suites green (278 domain / 254 mobile / 222
+web). **Not QA'd, not closed.** See its section below.
 
-The session before: three QA findings fixed (self-crossing Bed outlines
-rejected, duplicate Plants caught when the scientific name isn't a
-binomial, Bed names unique per Property), a Bed rename path added, a
-Playwright e2e suite added covering #10, and **ADR-0003 amended: a mobile
-browser is not a supported surface**. See "The full decision set" for that
-last one.
+**#47 filed** — Delete Property silently does nothing when the browser
+suppresses its confirm dialog, hit live during #28's pass. Filed, deliberately
+not fixed, at the user's explicit choice. See "#47: the dead Delete button".
+
+Two decisions the user made this session, both worth not relitigating:
+
+- **A phone browser is still not a surface they intend to support.** Asked
+  directly, they said no. So `crypto.randomUUID()` throwing over a LAN-IP
+  http origin — which breaks `BaseMapSetup` and every photo upload there —
+  is **deliberately unfiled**. Matches ADR-0003 and CONTEXT.md.
+- **Every account is throwaway during MVP.** "All accounts are intended to be
+  throwaway while we build MVP." QA no longer needs to protect one; delete and
+  recreate Properties freely. The cascade still costs the *map* (Beds, Pins,
+  photo logs) and keeps the Registry, since Plants hang off `user_id`.
+
+**The session before.** **#44 fixed** (`6abcf9d`) — USDA's `Shade Tolerance`
+no longer suggests a `sunRequirement` at all; remapping the apparent inversion
+was rejected as shipping a guess about an undocumented field. **#23 fixed**
+(`d3bcf6c`) — Tag Scan validates a candidate genus against a bundled GBIF
+vocabulary instead of trusting line shape, going from 3 correct / 2
+confidently wrong / 3 empty to 3 correct / 0 wrong / 5 empty. ADR-0006 records
+it. Both closed; **#45** and **#46** filed from the conversation around them.
+See their sections below.
+
+**Before that.** **#42 fixed and closed** (`7331099`) — the flaky `BedEditor`
+test, whose cause was not the one the ticket guessed: the test waited on the
+Bed name reaching the DOM then asserted on `onBedsChange`, one passive-effect
+flush apart. `BedEditor` was never wrong. The dev-client QA sitting ran and
+passed (2026-09-08). **#40 fixed** (`e44325d`) and closed at the user's
+explicit instruction. **ADR-0003 amended: a mobile browser is not a supported
+surface** — the decision this session leaned on twice.
 
 > Earlier entries used to be summarised here as a "previously…" chain. It
 > was removed 2026-09-07: every item in it named a section that still has
@@ -54,6 +69,151 @@ last one.
 > — same reasoning as the 2026-09-06 trim.
 
 **Repo:** `annetters/plant-app` · branch `main`
+
+---
+
+## #28: the map scale, stated and drawn — built, NOT QA'd, OPEN
+
+Committed `0e83cc6`. A Property's scale was used purely as a gate: three call
+sites asked `pixelsPerFootForProperty` whether one existed and nothing ever
+showed what it was, so a wrong calibration was indistinguishable from a right
+one. That is how #6 shipped a base map calibrated against a 512px canvas while
+the stack rendered at 768px, putting every Bed and Pin ~1.5x off — caught by
+code review, because nothing on screen would have.
+
+### What's there
+
+**`baseMapCalibration()`** (`packages/domain/src/baseMapCalibration.ts`) — the
+new seam. Answers what the scale *is*, not merely whether it exists:
+px-per-ft, where it came from (`aerial-imagery` / `scale-reference`), the
+ground width the map covers, and whether it can be redone. `mapWidthFeet` is
+the half that matters: "2.75 px per ft" reads as plausible whatever it is,
+where "about 420 ft across" is obviously wrong on a 180 ft lot.
+
+**`measurementGrid()`** (`packages/domain/src/measurementGrid.ts`) — grid line
+geometry plus `defaultGridSpacingFeet`, which picks from
+`[1, 2, 5, 10, 25, 50, 100]` ft so squares stay countable at any scale. Both
+surfaces render the same computed lines, so they cannot disagree about where a
+line goes.
+
+**Web** — `MeasurementGrid.tsx` is one absolutely-positioned SVG overlay that
+drops into all three map surfaces unchanged (preview, `BedEditor`,
+`PlantingMap`), because all three are a `position: relative` box at
+`STAGE_SIZE_PX` with `BaseMapBackground` inside. It sits over the imagery and
+under the Konva stage, so Konva never had to learn about it. Spacing is a free
+number with the round values as datalist suggestions — a known run is a 37 ft
+driveway as often as a tidy 25.
+
+**Recalibration** — `BaseMapSetup` gained a third `'recalibrate'` mode which
+reuses the stored photo/drawing and lands straight on the two-point step.
+Deliberately not `'update'` with a flag: the gardener is fixing a *scale*, not
+replacing the map it was measured against, and demanding a re-upload to move
+two dots is what kept anyone from doing it. Photo/drawn only — an aerial scale
+is derived from latitude and zoom and has no input to correct.
+
+**Mobile** — `MapScreen` shows the same scale line, a grid toggle, and a row
+of tappable square sizes. Read-only; native calibration is still #15.
+
+### Why redoing a scale is safe
+
+Beds and Plantings are stored in **real-world feet**, not pixels
+(`pixelsToFeet` rounds to a thousandth of a foot, ~300x finer than a pixel at
+any scale this app reaches). They keep their positions and simply redraw
+against the new scale. The user asked this directly and agreed no change was
+needed. Storing pixels would make Recalibrate a trap rather than a repair.
+
+### What the two-axis review caught, all fixed before the commit
+
+- **Standards:** `CONTEXT.md` said a Scale Reference is "used once per
+  Property" — true until this ticket. Already fixed by the time the review
+  landed. Also an untrue why-comment, four near-identical `lines.map` blocks,
+  a triplicated calibration guard, and an unused `stageSizePx` parameter.
+- **Spec:** the old scale **vanished** while picking the new one, removing the
+  before/after comparison the ticket exists for. And a photo that failed to
+  load still offered a clickable surface, so two clicks saved a scale measured
+  against nothing — the exact silent-wrong-scale failure #28 is about.
+- From its own test: the spacing box snapped back mid-edit, so typing "37"
+  over a "5" gave "537". Now held as text, like `BaseMapSetup`'s distance
+  field.
+
+### CONTEXT.md changes
+
+Scale Reference no longer says "used once"; it records that a scale can be
+redone, why that is safe, and that aerial has nothing to redo. New
+**Measurement grid** glossary entry: a reference, never a drawing surface —
+nothing snaps to it and turning it on stores nothing.
+
+### The tile grid never sized its rows — fix UNCOMMITTED
+
+`BaseMapBackground` set `gridTemplateColumns` for the 3x3 aerial tiles and
+left the rows implicit. Auto rows can't resolve a tile's `height: 100%`, so
+each fell back to its intrinsic 256px and the three rows stacked to 768px
+however short the container was. Only bites the `PropertyPage` preview
+(`maxWidth: 768` + `aspectRatio: 1`); the editor and Plantings map are pinned
+at `STAGE_SIZE_PX` so 1fr already equalled 256px.
+
+Cosmetic until #28 laid a `viewBox`'d SVG over the same imagery — that scales
+correctly, so a mis-sized tile grid means the squares no longer align with the
+ground they measure. Fixed with `gridTemplateRows`, plus a new
+`BaseMapBackground.test.tsx`. **Uncommitted**, awaiting the QA pass.
+
+Caveat worth carrying: jsdom does no grid layout, so that test asserts the CSS
+declaration, not a measured result. The diagnosis is reasoning from the
+cascade. It needs a human to look at it, on a Property with **zero Beds** —
+the preview is the only surface that shows it.
+
+### Deliberately not built
+
+- **Replacing a wrong photo or drawing.** That is re-sourcing a base map,
+  which CONTEXT.md calls a recreate, not an edit. Different operation.
+- **Native calibration** — still #15.
+- A custom spacing on the phone; it offers the round values only.
+
+### The QA pass, unrun
+
+Not yet exercised at all. `npm run dev`, log in, `/map`.
+
+**Part A — desktop, non-destructive.** (1) The scale line reads plausibly and
+"covers about N ft across" matches the imagery's extent. (2) No Recalibrate on
+an aerial Property. (3) **The ticket in one step:** tick Show measurement
+grid, type a distance actually measured in the real garden, count squares
+along it — it must come out to the number they know. (4) The grid follows onto
+the Bed editor and Plantings map at the same spacing, under the outlines.
+(5) Toggling off takes the spacing box with it.
+
+**Part B — a fresh Property.** Photograph a tape measure, upload it, calibrate
+against a known span, set squares to 1 ft: the lines should land on the
+ruler's own markings. Then Recalibrate with a deliberately doubled distance
+and confirm the grid goes visibly wrong, that "Current map scale" stays
+visible throughout, and that "Keep the current scale" changes nothing.
+
+No throwaway account needed — every account is throwaway now.
+
+---
+
+## #47: the dead Delete button — FILED, deliberately not fixed
+
+Hit live during #28's QA. `handleDelete`
+(`apps/web/src/routes/PropertyPage.tsx:117`) gates on `window.confirm`. The
+browser had suppressed dialogs for the origin, so it returned `false` and the
+handler returned: no prompt, no error, no spinner. Indistinguishable from a
+dead button. Re-enabling dialogs made it work first time, which is what
+identified the cause.
+
+**Not phone-specific, and newly relevant.** Chrome and Firefox both offer
+"prevent this page from creating additional dialogs" after several in quick
+succession — on desktop. The workflow that triggers it is exactly the
+delete/recreate loop QA now uses freely for a fresh Property. A suppressed
+dialog and a cancelled one are also indistinguishable to the code.
+
+The issue also records a second, latent defect in the same path:
+`PropertiesRepository.remove` doesn't `.select()`, and PostgREST returns
+`error: null` when RLS filters every row, so a delete that removed nothing
+reports success. Not currently reachable — the policy in `0006_properties.sql`
+is correct — but the app cannot tell a real delete from a no-op.
+
+**The user chose "file the issue, don't fix" explicitly.** Don't fix it
+opportunistically next session.
 
 ---
 
