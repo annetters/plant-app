@@ -1,30 +1,21 @@
 # Handoff: Personal Garden Plant Registry — plant-app
 
-**Date:** 2026-09-09
+**Date:** 2026-09-11
 
-## PICK UP HERE: #28's QA has not been run
+## PICK UP HERE: #36's QA has not been run
 
-**#28 is built, reviewed and committed (`0e83cc6`) but has had no QA at all.**
-Everything below about it comes from reading the code, never from using it.
-It is **open**, and closing it is the user's call.
+**#36 is built and live-verified but has never been used by a human.** The
+pass is in "#36: names local, traits live" below — five steps, needing a
+device or dev client, since the lookup is native-mobile-only until #43. Ask
+the user who runs it before scripting anything.
 
-The pass to run is in "#28: the map scale, stated and drawn" below. Part A,
-steps 1–5, on a desktop browser — the one step that is the whole ticket is
-setting the grid to a distance the user has genuinely measured and counting
-squares along it. If the app disagrees with their tape measure, the ticket
-has failed at its only job.
-
-**There is uncommitted work in the tree**, deliberately: a `gridTemplateRows`
-fix in `BaseMapBackground.tsx` plus a new `BaseMapBackground.test.tsx`. Held
-back because the user's standing preference is that QA findings land as one
-reviewable commit, and the pass hasn't started. Confirm it's still there
-(`git status`) before doing anything else — this worktree is shared with
-other sessions. If it's gone, it's the fix described under "The tile grid
-never sized its rows" below, and it's five lines.
+**#28 is done.** QA'd 2026-09-11 across all three surfaces with no defects,
+and its `gridTemplateRows` fix is committed (`a945f00`). It is **still
+open** — closing it is the user's call. See its section below.
 
 ---
 
-**Most recent session.** **#36 implemented** — the species lookup now
+**#36 implemented** (2026-09-09) — the species lookup now
 resolves against USDA's full checklist held in our own Postgres, not the
 2,186-row conservation-traits table it mistook for the species universe.
 "dahlia" finds *Dahlia pinnata*. **Verified against the live project**, not
@@ -32,11 +23,10 @@ only in tests. **Not QA'd by the user, not closed.** See "#36: names local,
 traits live" below. **#50 filed** — native status needs a state-level range;
 split out at the user's direction.
 
-**The session before.** **#28 implemented** (`0e83cc6`) — a Property's map
-scale is now stated on the page, drawn as an optional measurement grid on
-both surfaces, and a wrong one can be redone. Built with `/implement`,
-two-axis reviewed, all three suites green (278 domain / 254 mobile / 222
-web). **Not QA'd, not closed.** See its section below.
+**#28 implemented** (2026-09-09, `0e83cc6`) — a Property's map scale is now
+stated on the page, drawn as an optional measurement grid on both surfaces,
+and a wrong one can be redone. **QA'd 2026-09-11, all three surfaces, no
+defects. Not closed.** See its section below.
 
 **#47 fixed, QA'd and CLOSED** (2026-09-10, `29886df`) — the delete flows:
 the suppressible confirmation, the delete that reported success without
@@ -203,7 +193,7 @@ per `CLAUDE.md`.**
 
 ---
 
-## #28: the map scale, stated and drawn — built, NOT QA'd, OPEN
+## #28: the map scale, stated and drawn — QA'd, no defects, OPEN
 
 Committed `0e83cc6`. A Property's scale was used purely as a gate: three call
 sites asked `pixelsPerFootForProperty` whether one existed and nothing ever
@@ -274,24 +264,23 @@ redone, why that is safe, and that aerial has nothing to redo. New
 **Measurement grid** glossary entry: a reference, never a drawing surface —
 nothing snaps to it and turning it on stores nothing.
 
-### The tile grid never sized its rows — fix UNCOMMITTED
+### The tile grid never sized its rows — fixed, `a945f00`
 
 `BaseMapBackground` set `gridTemplateColumns` for the 3x3 aerial tiles and
 left the rows implicit. Auto rows can't resolve a tile's `height: 100%`, so
 each fell back to its intrinsic 256px and the three rows stacked to 768px
-however short the container was. Only bites the `PropertyPage` preview
+however short the container was. Only bit the `PropertyPage` preview
 (`maxWidth: 768` + `aspectRatio: 1`); the editor and Plantings map are pinned
 at `STAGE_SIZE_PX` so 1fr already equalled 256px.
 
 Cosmetic until #28 laid a `viewBox`'d SVG over the same imagery — that scales
-correctly, so a mis-sized tile grid means the squares no longer align with the
-ground they measure. Fixed with `gridTemplateRows`, plus a new
-`BaseMapBackground.test.tsx`. **Uncommitted**, awaiting the QA pass.
+correctly, so a mis-sized tile grid meant the squares no longer aligned with
+the ground they measure.
 
-Caveat worth carrying: jsdom does no grid layout, so that test asserts the CSS
-declaration, not a measured result. The diagnosis is reasoning from the
-cascade. It needs a human to look at it, on a Property with **zero Beds** —
-the preview is the only surface that shows it.
+Caveat worth carrying: jsdom does no grid layout, so its test asserts the CSS
+declaration, not a measured result — the diagnosis was reasoning from the
+cascade. Confirmed by eye during the QA pass on a Property with **zero
+Beds**, the only surface that shows the preview.
 
 ### Deliberately not built
 
@@ -300,25 +289,45 @@ the preview is the only surface that shows it.
 - **Native calibration** — still #15.
 - A custom spacing on the phone; it offers the round values only.
 
-### The QA pass, unrun
+### The QA pass — RUN 2026-09-11, all three parts passed
 
-Not yet exercised at all. `npm run dev`, log in, `/map`.
+Run by the user: desktop for Parts A and B, a device dev build for Part C.
+**Part A 8/8, Part B 6/6, Part C pass. No defects.**
 
-**Part A — desktop, non-destructive.** (1) The scale line reads plausibly and
-"covers about N ft across" matches the imagery's extent. (2) No Recalibrate on
-an aerial Property. (3) **The ticket in one step:** tick Show measurement
-grid, type a distance actually measured in the real garden, count squares
-along it — it must come out to the number they know. (4) The grid follows onto
-the Bed editor and Plantings map at the same spacing, under the outlines.
-(5) Toggling off takes the spacing box with it.
+**Part B is what validated the ticket.** A 1 ft grid over a photographed tape
+measure landed on the tape's own foot markings; recalibrating the same two
+points with a deliberately doubled distance put the lines on every *other*
+marking. A wrong Scale Reference is now visible on screen — the thing #6
+shipped without.
 
-**Part B — a fresh Property.** Photograph a tape measure, upload it, calibrate
-against a known span, set squares to 1 ft: the lines should land on the
-ruler's own markings. Then Recalibrate with a deliberately doubled distance
-and confirm the grid goes visibly wrong, that "Current map scale" stays
-visible throughout, and that "Keep the current scale" changes nothing.
+The aerial scale was also checked independently of anyone's eyes: `2.76 px
+per ft` is zoom 20 at latitude 42.3°N, and 768 ÷ 2.76 = 278 ft as displayed.
+A #6-class 1.5× error would have read 4.14 or 1.84.
 
-No throwaway account needed — every account is throwaway now.
+### Two limitations found, neither a defect in what shipped
+
+**The ground-width line can't be falsified on an aerial Property.** The
+ticket argued for it on "'about 420 ft across' is obviously wrong on a 180 ft
+lot", which assumes a lot-scoped frame. The frame is a fixed 3×3 tile window
+at whatever zoom ArcGIS has: ~140 ft at zoom 21, ~280 at 20, ~560 at 19,
+~1120 at 18. The user's covers 278 ft — their lot plus a ring of neighbours
+— and they could not say whether that was right, because nothing says how
+wide the frame *should* be. Note too that an aerial scale is a pure function
+of latitude and zoom and never touches a canvas size, so **the #6 failure
+mode is structurally impossible there**: the stated-scale half was argued for
+where it is least checkable and least needed. It earns its keep on
+photo/drawn, and Part B showed it doing so. No code change proposed.
+
+**The grid only measures along the frame's axes.** A feature running
+diagonally needs a hypotenuse, not a count, and a house is rarely square to
+north — the user hit this directly. #41 is the fix, and already treats this
+grid as the thing a map gets rotated *to*. Cross-referenced on both tickets.
+
+**#58 filed** from the pass, labelled honestly as unobserved: a hung base-map
+photo upload disables the file input permanently (no timeout on the storage
+call, `disabled={uploading}` with no recovery). It came up as a hypothesis
+while diagnosing a file-picker failure that turned out to be environmental
+and cleared on a browser restart. #6-era code, not #28's.
 
 ---
 
@@ -1906,10 +1915,10 @@ This was tracked as **#34**, closed 2026-09-07 once every item below had
 been run or ruled out of scope. These checklists are now the record; there
 is no open issue behind them.
 
-**Outstanding, both from 2026-09-09:** **#28**'s pass (top of this doc) and
-**#36**'s (in its own section above — five steps, needs a device or dev
-client, since the lookup is native-mobile-only until #43). Neither has been
-started. Ask the user who runs them before scripting anything.
+**Outstanding: #36's** (in its own section above — five steps, needs a device
+or dev client, since the lookup is native-mobile-only until #43). Not
+started. Ask the user who runs it before scripting anything. **#28's pass ran
+2026-09-11 and passed in full** — see its section.
 
 ### Ticket #10 — automated, passing
 
