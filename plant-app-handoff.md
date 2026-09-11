@@ -2247,10 +2247,17 @@ time.
 - Use the exact terminology from `CONTEXT.md` throughout — Plant vs.
   Planting, Property, Scale Reference, Bed, Landmark (deferred), Pin, Tag
   Scan. Don't drift to synonyms.
-- **Where ADRs and the spec disagree, the ADRs win** — they're newer and
-  both say so explicitly.
-- **The spec issue (#1) is the source of truth**, not `docs/plant-app-spec.md`
-  — that file is explicitly superseded and says so at the top.
+- **Three documents get called "the spec" — don't mix them up.**
+  - **GitHub issue #1** is this project's spec and its source of truth.
+  - `docs/plant-app-spec.md` is the superseded 2026-08 original; it says so
+    at the top.
+  - `docs/specs/v1-product-spec.md` is an **outside proposal** from the
+    developer team (2026-09-10), not this project's plan. **Don't open it
+    unless you're checking a specific claim against it** — 43 sections
+    describing a garden *design editor*, not this registry. Only ADR-0008
+    has been adopted from it; everything else is unadopted. Authority rules
+    in `docs/agents/domain.md`.
+  - Where ADRs and any of them disagree, the ADRs win.
 - GitHub issues are the source of truth for work tracking — run
   `gh issue list` before starting new work to avoid duplication.
 - **Prefer Docker-free tooling.** Stated explicitly when setting up the
