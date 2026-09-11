@@ -59,7 +59,8 @@ What a revisit has to settle, which this ADR explicitly does not:
 - **Attribution.** The app currently displays none — there is no Esri
   credit anywhere in `apps/web` or `apps/mobile`. That is a gap under the
   display-only model too, and a stored derived raster does not make it
-  smaller.
+  smaller. Tracked separately as **#59**, which should be settled before
+  the trigger above fires rather than as part of it.
 
 If the answer comes back unfavourable, #51 already listed the fallbacks:
 re-fetch and re-composite on demand, keep the transform live instead of
