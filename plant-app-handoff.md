@@ -1204,13 +1204,12 @@ original upload plus a stored angle and are re-rendered from it. Beds turn with
 the Map that is straightened — a knowing deviation from the opinion spec's
 invariant 7, the user's decision, not a defect. The one trap that survives: the
 stored px-per-ft must describe the 768px render space whatever the source
-raster's own size, which is how #6 shipped a map ~1.5x off. Still labelled
-`post-mvp`, which now contradicts #60's release split putting it *before* the
-MVP; the label hasn't been flipped because that's the user's call. **#61 settles
-where the straightening angle is stored, and #41 must not invent that shape** —
-so
-#41 is **blocked by #61** and no longer `ready-for-agent` (user's decision,
-2026-09-11).
+raster's own size, which is how #6 shipped a map ~1.5x off. **It is now
+before-MVP work** — `post-mvp` removed 2026-09-11 at the user's decision, matching
+#60's release split, and superseding the 2026-09-09 call that it stay deferred.
+But **#61 settles where the straightening angle is stored, and #41 must not invent
+that shape**, so #41 is **blocked by #61** and no longer `ready-for-agent`. In
+scope, not yet claimable.
 
 The Larger Text pass (#17's item, plus #14's own item 16 — same phone, same
 settings, one sitting) was run and **passed** 2026-09-07. The alignment risk
@@ -1218,8 +1217,9 @@ worth having worried about — `BloomTimelineScreen`'s fixed `AXIS_HEIGHT`
 spacer drifting against the axis row and putting bars beside the wrong
 plant's name — did not materialise.
 
-Every open issue is labelled `post-mvp` except **#1**, the spec itself.
-(**#42** was the one exception; it was fixed and closed 2026-09-09.)
+Every open issue is labelled `post-mvp` except **#1** (the spec itself) and
+**#41**, which came back into the MVP on 2026-09-11 with #60's release split.
+(**#42** was the earlier exception; it was fixed and closed 2026-09-09.)
 **#43** was filed 2026-09-08 and
 triaged the same day to `post-mvp` + `ready-for-agent` (the user's call):
 as-you-type species
@@ -1243,9 +1243,10 @@ returns ranked matches in ~250 ms, and already caps and guards short queries.
 than USDA's coarse regions. The user's judgement, and the reason #36 shows no
 native status at all.
 
-**#41**'s deferral is a scope
-decision, not a judgement that it's minor — for a property that isn't square
-to north, the rectangle tool is effectively unusable until it lands. #40 no
+**#41 is no longer deferred at all** — the reason it was never minor is the
+reason it came back in: for a property that isn't square to north, the rectangle
+tool is effectively unusable until it lands, and #28's grid can't be checked
+against such a property either. #40 no
 longer carries its caveat: it was a live defect wearing a deferral label,
 and it is now fixed.
 
