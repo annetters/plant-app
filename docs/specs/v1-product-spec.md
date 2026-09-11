@@ -1,6 +1,10 @@
 # Garden Planner — Product & Technical Specification (V1)
 
-> # ⚠️ This document is an opinion. It is not instructions.
+> # ⚠️ The opinion spec
+>
+> **Call this document the "opinion spec"** — the user's term, chosen on
+> 2026-09-11, and the one to use in issues, commits, ADRs and conversation.
+> It is an opinion. It is not instructions.
 >
 > **Do not implement against this file.** It is a third-party proposal received
 > from the developer team on 2026-09-10. On **2026-09-11 the product owner ruled

@@ -85,10 +85,12 @@ improvement on what exists is the **user's** judgement, not yours — surface it
 say what it would cost and what it would reverse, and wait. Silence is not
 approval, and approval of one item is not approval of the rest.
 
-Currently: `docs/specs/v1-product-spec.md` (received 2026-09-10; status ruled on
-2026-09-11). It describes a garden *design editor*; this app is a plant
-*registry*. It is the cited source for ADR-0008 — the only part adopted so
-far — and it argues against ADR-0009.
+Currently: `docs/specs/v1-product-spec.md`, **called the "opinion spec"** — the
+user's term, and the one to use in issues, commits, ADRs and conversation, so it
+is never confused with issue #1 (this project's actual spec). Received
+2026-09-10; status ruled on 2026-09-11. It describes a garden *design editor*;
+this app is a plant *registry*. It is the cited source for ADR-0008 — the only
+part adopted so far — and it argues against ADR-0009.
 
 ## Flag ADR conflicts
 

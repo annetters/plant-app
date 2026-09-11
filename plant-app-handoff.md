@@ -2251,8 +2251,9 @@ time.
   - **GitHub issue #1** is this project's spec and its source of truth.
   - `docs/plant-app-spec.md` is the superseded 2026-08 original; it says so
     at the top.
-  - `docs/specs/v1-product-spec.md` is an **outside proposal** from the
-    developer team (2026-09-10), not this project's plan. **Don't open it
+  - `docs/specs/v1-product-spec.md` is the **"opinion spec"** — always call
+    it that — an outside proposal from the developer team (2026-09-10), not
+    this project's plan. **Don't open it
     unless you're checking a specific claim against it** — 43 sections
     describing a garden *design editor*, not this registry. Only ADR-0008
     has been adopted from it; everything else is unadopted. Authority rules
