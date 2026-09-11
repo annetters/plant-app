@@ -18,8 +18,9 @@ produce decisions, not code — hand off to `/to-spec`, not `/implement`, and re
 #60's Notes before working any of them. **#62 is done** (2026-09-11): #41's
 write-up is re-cut — straighten all three Map sources, bake only the aerial, no
 one-shot lock — and #62 records the delta. It is **still open**; closing is the
-user's call. Two label questions are waiting on the user there. The next ticket
-in map order with no open blocker is **#61**, which #63 and #66 wait on.
+user's call. **#41 is now held until #61
+answers** and is no longer claimable. The next ticket in map order with no open
+blocker is **#61**, which #41, #63 and #66 all wait on.
 
 **#54 is paused pending a grilling session.** The user reopened the
 `plantings.bed_id` question on 2026-09-11 and wants it stress-tested **before
@@ -1207,7 +1208,9 @@ raster's own size, which is how #6 shipped a map ~1.5x off. Still labelled
 `post-mvp`, which now contradicts #60's release split putting it *before* the
 MVP; the label hasn't been flipped because that's the user's call. **#61 settles
 where the straightening angle is stored, and #41 must not invent that shape** —
-so `ready-for-agent` is not the whole story.
+so
+#41 is **blocked by #61** and no longer `ready-for-agent` (user's decision,
+2026-09-11).
 
 The Larger Text pass (#17's item, plus #14's own item 16 — same phone, same
 settings, one sitting) was run and **passed** 2026-09-07. The alignment risk
