@@ -13,6 +13,14 @@ the user who runs it before scripting anything.
 and its `gridTemplateRows` fix is committed (`a945f00`). It is **still
 open** — closing it is the user's call. See its section below.
 
+**The Maps wayfinder (#60) is charted, with nine tickets #61-#69.** These
+produce decisions, not code — hand off to `/to-spec`, not `/implement`, and read
+#60's Notes before working any of them. **#62 is done** (2026-09-11): #41's
+write-up is re-cut — straighten all three Map sources, bake only the aerial, no
+one-shot lock — and #62 records the delta. It is **still open**; closing is the
+user's call. Two label questions are waiting on the user there. The next ticket
+in map order with no open blocker is **#61**, which #63 and #66 wait on.
+
 **#54 is paused pending a grilling session.** The user reopened the
 `plantings.bed_id` question on 2026-09-11 and wants it stress-tested **before
 any of it is built**. Its design — the revised ADR-0009 (position-as-truth)
@@ -1185,12 +1193,21 @@ codebase. So tracing a rectangular bed that's square to an angled house
 means abandoning the rectangle tool for freehand or pen. The geometry is
 correct; drawing it is awkward.
 
-**Filed as #41** (`post-mvp`, user's call 2026-09-07) — rotate the view (one
-angle on the Property, applied at render) rather than rotating shapes, so
-stored outlines stay north-up and nothing migrates. Two traps are written into that ticket: don't widen the
-tile grid via `GRID_RADIUS`, because `STAGE_SIZE_PX` derives from it and
-every Scale Reference was calibrated against it; and un-rotate at capture
-so the angle stays changeable afterwards.
+**Filed as #41** (user's call 2026-09-07). **Its design is nothing like the
+filing** — read the ticket, not this paragraph. A grilling session on 2026-09-09
+replaced the original proposal (one angle applied at render, stored outlines
+staying north-up, un-rotate at capture) wholesale, and #62 re-cut it again on
+2026-09-11. What it now says: straighten the picture on all three Map sources at
+setup; bake **only** the aerial to a stored raster; photo and drawn keep their
+original upload plus a stored angle and are re-rendered from it. Beds turn with
+the Map that is straightened — a knowing deviation from the opinion spec's
+invariant 7, the user's decision, not a defect. The one trap that survives: the
+stored px-per-ft must describe the 768px render space whatever the source
+raster's own size, which is how #6 shipped a map ~1.5x off. Still labelled
+`post-mvp`, which now contradicts #60's release split putting it *before* the
+MVP; the label hasn't been flipped because that's the user's call. **#61 settles
+where the straightening angle is stored, and #41 must not invent that shape** —
+so `ready-for-agent` is not the whole story.
 
 The Larger Text pass (#17's item, plus #14's own item 16 — same phone, same
 settings, one sitting) was run and **passed** 2026-09-07. The alignment risk
