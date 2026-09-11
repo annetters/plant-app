@@ -112,6 +112,25 @@ describe('TagScanCaptureScreen', () => {
     expect(params.photoIds).toEqual({ frontTagPhotoId: fake.tagPhotoRows()[0].id })
   })
 
+  it('routes a cultivar-only reading straight to review, not to the multiple-readings screen (#38)', async () => {
+    // A tag that printed a cultivar but no scientific name now yields one
+    // candidate carrying only that cultivar. It is a single reading, so it must
+    // take the same straight-to-review path any single reading takes.
+    mockRecognize.mockResolvedValueOnce([{ cultivar: 'BLUE FORTUNE' }])
+    const fake = await renderCaptureFlow()
+    mockCameraCapture('file:///front.jpg', 'front.jpg')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Take photo' }))
+    await screen.findByText('Photograph the back')
+    await fireEvent.press(screen.getByRole('button', { name: 'Skip — no back photo' }))
+
+    expect(screen.queryByText(/multiple readings:/)).toBeNull()
+    const reviewText = await screen.findByText(/review:/)
+    const params = JSON.parse(reviewText.props.children.join('').replace('review: ', ''))
+    expect(params.candidate).toEqual({ cultivar: 'BLUE FORTUNE' })
+    expect(params.photoIds).toEqual({ frontTagPhotoId: fake.tagPhotoRows()[0].id })
+  })
+
   it('lets the user skip the back photo — it is optional, not required', async () => {
     const fake = await renderCaptureFlow()
     mockCameraCapture('file:///front.jpg', 'front.jpg')

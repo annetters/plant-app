@@ -1,7 +1,7 @@
 import { NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
-import type { PlantRow } from '@plant-app/domain'
+import { parseOcrTextLines, type PlantRow } from '@plant-app/domain'
 import type { ReactNode } from 'react'
 import { Text } from 'react-native'
 import { SpeciesLookupRepositoryProvider } from '../species/SpeciesLookupRepositoryContext'
@@ -97,6 +97,45 @@ describe('TagScanReviewScreen', () => {
     expect(screen.getByLabelText('Common name').props.value).toBe('Bee balm')
     expect(screen.getByLabelText('Scientific name').props.value).toBe('Monarda didyma')
     expect(screen.getByLabelText('Cultivar').props.value).toBe('Gateway')
+  })
+
+  it('pre-fills Cultivar alone from a tag that printed no scientific name, leaving the rest blank and editable (#38)', async () => {
+    // Drives the REAL parser rather than a hand-made candidate, so this covers
+    // the whole chain the ticket is about: OCR lines the device actually
+    // produced -> parseOcrTextLines -> this screen's three fields. The line is
+    // verbatim from #22's first on-device Vision run (the tag's typographic
+    // quotes read as an inverted exclamation mark and a bullet).
+    const [candidate] = parseOcrTextLines([{ text: '¡BLUE FORTUNE•', confidence: 1 }])
+    expect(candidate).toEqual({ cultivar: 'BLUE FORTUNE' })
+
+    await renderReviewFlow(createFakes(), { scanId: 'scan-1', photoIds: defaultPhotoIds, candidate })
+    await waitFor(() => expect(screen.getByLabelText('Common name')).toBeTruthy())
+
+    expect(screen.getByLabelText('Cultivar').props.value).toBe('BLUE FORTUNE')
+    expect(screen.getByLabelText('Common name').props.value).toBe('')
+    expect(screen.getByLabelText('Scientific name').props.value).toBe('')
+
+    // The blank fields are the user's to fill, not dead ends.
+    await fireEvent.changeText(screen.getByLabelText('Common name'), 'Anise hyssop')
+    await fireEvent.changeText(screen.getByLabelText('Scientific name'), 'Agastache foeniculum')
+    expect(screen.getByLabelText('Common name').props.value).toBe('Anise hyssop')
+    expect(screen.getByLabelText('Scientific name').props.value).toBe('Agastache foeniculum')
+    expect(screen.getByLabelText('Cultivar').props.value).toBe('BLUE FORTUNE')
+  })
+
+  it('pre-fills Cultivar alone for tag7, whose cultivar used to be discarded for want of a species (#38)', async () => {
+    const [candidate] = parseOcrTextLines([
+      { text: 'HEUCHERA', confidence: 1 },
+      { text: '"Blackout"', confidence: 1 },
+      { text: '(Coral Bells)', confidence: 1 },
+      { text: 'Zones: 4 - 9', confidence: 1 },
+    ])
+
+    await renderReviewFlow(createFakes(), { scanId: 'scan-1', photoIds: defaultPhotoIds, candidate })
+    await waitFor(() => expect(screen.getByLabelText('Common name')).toBeTruthy())
+
+    expect(screen.getByLabelText('Cultivar').props.value).toBe('Blackout')
+    expect(screen.getByLabelText('Scientific name').props.value).toBe('')
   })
 
   it('surfaces an ambiguous common name as distinct species candidates instead of guessing', async () => {
