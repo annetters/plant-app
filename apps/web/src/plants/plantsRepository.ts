@@ -3,7 +3,7 @@ import type {
   PlantInput,
   PlantRow,
 } from '@plant-app/domain'
-import { plantFromRow, plantInputToRow } from '@plant-app/domain'
+import { plantFromRow, plantInputToRow, requireRowsDeleted } from '@plant-app/domain'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 type Row = Record<string, unknown>
@@ -113,8 +113,18 @@ export class PlantsRepository {
     return plantFromRow(row)
   }
 
+  /**
+   * `.select()` is not decoration: PostgREST answers a delete that RLS
+   * filtered down to no rows with `error: null`, so without asking for the
+   * deleted rows back this reported success for a delete that removed nothing
+   * — and the caller cleared the Plant from local state only for it to
+   * reappear on the next load (#47).
+   */
   async remove(id: string): Promise<void> {
-    unwrap(await this.client.from(TABLE).delete().eq('id', id))
+    const deleted = unwrap<PlantRow[]>(
+      await this.client.from(TABLE).delete().eq('id', id).select(),
+    )
+    requireRowsDeleted(deleted, 'Plant')
   }
 
   /** Uploads a reference photo and returns its storage path — caller persists the path onto the Plant. */

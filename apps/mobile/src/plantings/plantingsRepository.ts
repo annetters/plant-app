@@ -10,6 +10,7 @@ import {
   plantingInputToRow,
   plantingPhotoFromRow,
   plantingPhotoInputToRow,
+  requireRowsDeleted,
 } from '@plant-app/domain'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import * as Crypto from 'expo-crypto'
@@ -134,7 +135,12 @@ export class PlantingsRepository {
         .remove(photos.map((photo) => photo.storage_path))
       if (error) throw new Error(error.message)
     }
-    unwrap(await this.client.from(PLANTINGS_TABLE).delete().eq('id', id))
+    // `.select()` so a delete RLS filtered down to nothing is reported rather
+    // than passing as a success — see `requireRowsDeleted` (#47).
+    const deleted = unwrap<PlantingRow[]>(
+      await this.client.from(PLANTINGS_TABLE).delete().eq('id', id).select(),
+    )
+    requireRowsDeleted(deleted, 'Planting')
   }
 
   async listPhotos(plantingId: string): Promise<PlantingPhoto[]> {

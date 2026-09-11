@@ -30,6 +30,14 @@ function unwrap<T>({ data, error }: DbResult<unknown>): T {
   return data as T
 }
 
+/**
+ * Read-only on this surface. There is deliberately no `remove` here: the phone
+ * renders Beds but offers no way to delete one, so #47's "a `remove(id)`
+ * affecting zero rows throws … on both web and native" has nothing to apply to
+ * for Beds. If a Bed delete is ever added here it must go through the
+ * `delete-map-object` Edge Function, as web's does, rather than deleting the
+ * row directly — that is what clears the planting photo files underneath it.
+ */
 export class BedsRepository {
   private readonly client: BedsDbClient
 

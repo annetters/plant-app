@@ -1,3 +1,4 @@
+import { DELETE_PLANT_CONFIRMATION } from '@plant-app/domain'
 import { NavigationContainer, useNavigation } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native'
@@ -239,6 +240,40 @@ describe('PlantDetailScreen', () => {
 
     await waitFor(() => expect(screen.getByText('registry screen')).toBeTruthy())
     expect(fake.rows()).toHaveLength(0)
+  })
+
+  /**
+   * The words come from `@plant-app/domain`, not a literal here, so this and
+   * web's in-page modal read identically (#47). `Alert` stays the native
+   * mechanism; only the wording is shared.
+   */
+  it('asks with the same words web does, naming the reach into the map', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {})
+    await renderScreen()
+    await screen.findByDisplayValue('Coneflower')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Delete Plant' }))
+
+    const [title, message, buttons] = (Alert.alert as jest.Mock).mock.calls[0]
+    expect(title).toBe(DELETE_PLANT_CONFIRMATION.heading)
+    // Deleting a Plant reaches the map too, because its Plantings go with it.
+    expect(message).toBe(DELETE_PLANT_CONFIRMATION.body)
+    expect(buttons.map((button: { text: string }) => button.text)).toEqual([
+      DELETE_PLANT_CONFIRMATION.cancelAction,
+      DELETE_PLANT_CONFIRMATION.confirmAction,
+    ])
+  })
+
+  it('deletes nothing when the confirmation is dismissed', async () => {
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      void buttons?.find((button) => button.style === 'cancel')?.onPress?.()
+    })
+    const fake = await renderScreen()
+    await screen.findByDisplayValue('Coneflower')
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Delete Plant' }))
+
+    expect(fake.rows()).toHaveLength(1)
   })
 })
 

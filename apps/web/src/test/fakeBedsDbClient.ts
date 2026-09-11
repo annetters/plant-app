@@ -1,4 +1,5 @@
-import type { BedRow } from '@plant-app/domain'
+import { NOTHING_DELETED_CODE, type BedRow } from '@plant-app/domain'
+import { vi } from 'vitest'
 import type { BedsDbClient } from '../property/bedsRepository'
 
 type DbResult = { data: unknown; error: { message: string } | null }
@@ -117,6 +118,31 @@ export function createFakeBedsDbClient(initialRows: BedRow[] = []) {
     return chain
   }
 
+  /**
+   * Stands in for the `delete-map-object` Edge Function (#47), which is what
+   * a Bed delete now goes through so the planting photo *files* underneath it
+   * are cleared server-side. The cascade itself is covered by
+   * `supabase/functions/_shared/plantingPhotoCascade.test.ts`; all this needs
+   * to reproduce is the contract the repository depends on — the row goes, and
+   * an expected failure comes back as a 200 with an `{ error }` body.
+   */
+  const invoke = vi.fn(async (name: string, options: { body: unknown }) => {
+    if (name !== 'delete-map-object') return { data: null, error: null }
+    const { id } = options.body as { kind: string; id: string }
+    const before = rows.length
+    rows = rows.filter((row) => row.id !== id)
+    if (rows.length === before) {
+      return {
+        data: {
+          error: 'This Bed could not be deleted — it may already be gone.',
+          code: NOTHING_DELETED_CODE,
+        },
+        error: null,
+      }
+    }
+    return { data: { deleted: true }, error: null }
+  })
+
   const client: BedsDbClient = {
     from(_table: 'beds') {
       return {
@@ -126,10 +152,12 @@ export function createFakeBedsDbClient(initialRows: BedRow[] = []) {
         delete: () => builder('delete'),
       }
     },
+    functions: { invoke },
   }
 
   return {
     client,
+    invoke,
     getRows: () => rows,
   }
 }

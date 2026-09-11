@@ -1,4 +1,4 @@
-import type { PropertyRow } from '@plant-app/domain'
+import { NOTHING_DELETED_CODE, type PropertyRow } from '@plant-app/domain'
 import { vi } from 'vitest'
 import type { PropertiesDbClient } from '../property/propertiesRepository'
 
@@ -21,6 +21,27 @@ export function createFakePropertiesDbClient(initialRow: PropertyRow | null = nu
   let nextId = 1
 
   const invoke = vi.fn(async (name: string, options: { body: unknown }): Promise<DbResult> => {
+    // Stands in for the `delete-map-object` Edge Function (#47), which a
+    // Property delete now goes through so its planting photo *files* are
+    // cleared server-side. The cascade itself is covered by
+    // `supabase/functions/_shared/plantingPhotoCascade.test.ts`; what this
+    // reproduces is the contract the repository depends on — the row goes, and
+    // an expected failure arrives as a 200 with an `{ error }` body.
+    if (name === 'delete-map-object') {
+      const { id } = options.body as { kind: string; id: string }
+      if (!row || row.id !== id) {
+        return {
+          data: {
+            error: 'This Property could not be deleted — it may already be gone.',
+            code: NOTHING_DELETED_CODE,
+          },
+          error: null,
+        }
+      }
+      row = null
+      return { data: { deleted: true }, error: null }
+    }
+
     if (name === 'search-addresses') {
       const { query } = options.body as { query: string }
       // A magic substring, not a real geocoder behavior — lets tests exercise

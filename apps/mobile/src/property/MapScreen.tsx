@@ -1,5 +1,6 @@
 import type { Bed, BedPoint, Plant, Planting, PlantingInput, Property } from '@plant-app/domain'
 import {
+  DELETE_PROPERTY_CONFIRMATION,
   GRID_SPACING_CHOICES_FEET,
   STAGE_SIZE_PX,
   baseMapCalibration,
@@ -477,17 +478,23 @@ export function MapScreen() {
    * undone here, rather than stranding the account until someone opens the
    * desktop app. Web grew the same control for the same reason during #5's QA.
    *
-   * The confirm is `Alert`, matching how a Planting's removal already asks.
+   * The confirm stays `Alert` — the OS draws it and offers no "prevent this
+   * page from creating additional dialogs" control, so native never had web's
+   * suppression bug (#47). Its *wording* is shared, though: the same
+   * `DELETE_PROPERTY_CONFIRMATION` web renders in its in-page modal, so the
+   * two surfaces cannot drift. It also now says what survives — losing the map
+   * is not losing the Registry, and that is the half a gardener actually
+   * worries about.
    */
   function handleDeleteProperty() {
     if (!property) return
     Alert.alert(
-      'Delete this Property?',
-      'Its Beds and Plantings go with it. This cannot be undone.',
+      DELETE_PROPERTY_CONFIRMATION.heading,
+      `${DELETE_PROPERTY_CONFIRMATION.body}\n\n${DELETE_PROPERTY_CONFIRMATION.reassurance}`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: DELETE_PROPERTY_CONFIRMATION.cancelAction, style: 'cancel' },
         {
-          text: 'Delete',
+          text: DELETE_PROPERTY_CONFIRMATION.confirmAction,
           style: 'destructive',
           onPress: async () => {
             setDeleting(true)

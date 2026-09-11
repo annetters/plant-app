@@ -3,7 +3,7 @@ import type {
   PlantInput,
   PlantRow,
 } from '@plant-app/domain'
-import { plantFromRow, plantInputToRow } from '@plant-app/domain'
+import { plantFromRow, plantInputToRow, requireRowsDeleted } from '@plant-app/domain'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import * as Crypto from 'expo-crypto'
 
@@ -123,8 +123,17 @@ export class PlantsRepository {
     return plantFromRow(row)
   }
 
+  /**
+   * `.select()` is what tells a real delete from a no-op: PostgREST answers a
+   * delete that RLS filtered down to no rows with `error: null`, so this used
+   * to report success for a delete that removed nothing, and the Plant came
+   * back on the next load (#47). Mirrors apps/web's identical method.
+   */
   async remove(id: string): Promise<void> {
-    unwrap(await this.client.from(TABLE).delete().eq('id', id))
+    const deleted = unwrap<PlantRow[]>(
+      await this.client.from(TABLE).delete().eq('id', id).select(),
+    )
+    requireRowsDeleted(deleted, 'Plant')
   }
 
   /** Reads the picked photo's local `uri` into an `ArrayBuffer` and uploads it, returning its storage path — caller persists the path onto the Plant. */

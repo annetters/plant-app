@@ -1,4 +1,5 @@
 import type { BedRow, PlantingRow, PlantRow, PropertyRow } from '@plant-app/domain'
+import { DELETE_PROPERTY_CONFIRMATION } from '@plant-app/domain'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
@@ -547,28 +548,104 @@ describe('PropertyPage — existing Property', () => {
     })
   })
 
-  it('deletes the Property after confirmation, freeing the account up to create another', async () => {
-    const user = userEvent.setup()
-    renderPage(availableRow)
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
+  // These replace two tests that stubbed `window.confirm` to return false and
+  // called that "the confirmation is declined". A suppressed dialog returns
+  // exactly the same value, so they passed for the wrong reason — the bug in
+  // #47 is invisible to them. Nothing below stubs any global: the
+  // confirmation is driven by clicking its real controls.
+  describe('deleting the Property', () => {
+    it('asks first, in the page rather than through a browser dialog', async () => {
+      const user = userEvent.setup()
+      renderPage(availableRow)
 
-    await screen.findByText('10 Main St, Cambridge, MA')
-    await user.click(screen.getByRole('button', { name: 'Delete Property' }))
+      await screen.findByText('10 Main St, Cambridge, MA')
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Delete Property' }))
 
-    expect(await screen.findByLabelText('Address')).toBeInTheDocument()
-    expect(screen.queryByText('10 Main St, Cambridge, MA')).not.toBeInTheDocument()
-  })
+      const dialog = screen.getByRole('dialog')
+      expect(dialog).toHaveTextContent(DELETE_PROPERTY_CONFIRMATION.heading)
+      // The map is what goes; the Registry is what stays. Saying only "this
+      // cannot be undone" undersells the first and omits the second.
+      expect(dialog).toHaveTextContent(DELETE_PROPERTY_CONFIRMATION.body)
+      expect(dialog).toHaveTextContent(DELETE_PROPERTY_CONFIRMATION.reassurance!)
+    })
 
-  it('does not delete the Property when the confirmation is declined', async () => {
-    const user = userEvent.setup()
-    renderPage(availableRow)
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    it('deletes nothing until the confirmation is actually confirmed', async () => {
+      const user = userEvent.setup()
+      renderPage(availableRow)
 
-    await screen.findByText('10 Main St, Cambridge, MA')
-    await user.click(screen.getByRole('button', { name: 'Delete Property' }))
+      await screen.findByText('10 Main St, Cambridge, MA')
+      await user.click(screen.getByRole('button', { name: 'Delete Property' }))
 
-    expect(screen.getByText('10 Main St, Cambridge, MA')).toBeInTheDocument()
-    expect(screen.queryByLabelText('Address')).not.toBeInTheDocument()
+      // Open, unanswered — the Property is untouched.
+      expect(screen.getByText('10 Main St, Cambridge, MA')).toBeInTheDocument()
+      expect(screen.queryByLabelText('Address')).not.toBeInTheDocument()
+    })
+
+    it('deletes the Property when confirmed, freeing the account up to create another', async () => {
+      const user = userEvent.setup()
+      renderPage(availableRow)
+
+      await screen.findByText('10 Main St, Cambridge, MA')
+      await user.click(screen.getByRole('button', { name: 'Delete Property' }))
+      await user.click(
+        within(screen.getByRole('dialog')).getByRole('button', {
+          name: DELETE_PROPERTY_CONFIRMATION.confirmAction,
+        }),
+      )
+
+      expect(await screen.findByLabelText('Address')).toBeInTheDocument()
+      expect(screen.queryByText('10 Main St, Cambridge, MA')).not.toBeInTheDocument()
+    })
+
+    it('keeps the Property when the confirmation is dismissed', async () => {
+      const user = userEvent.setup()
+      renderPage(availableRow)
+
+      await screen.findByText('10 Main St, Cambridge, MA')
+      await user.click(screen.getByRole('button', { name: 'Delete Property' }))
+      await user.click(
+        within(screen.getByRole('dialog')).getByRole('button', {
+          name: DELETE_PROPERTY_CONFIRMATION.cancelAction,
+        }),
+      )
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByText('10 Main St, Cambridge, MA')).toBeInTheDocument()
+      expect(screen.queryByLabelText('Address')).not.toBeInTheDocument()
+    })
+
+    it('keeps the Property when the confirmation is dismissed with Escape', async () => {
+      const user = userEvent.setup()
+      renderPage(availableRow)
+
+      await screen.findByText('10 Main St, Cambridge, MA')
+      await user.click(screen.getByRole('button', { name: 'Delete Property' }))
+      await user.keyboard('{Escape}')
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(screen.getByText('10 Main St, Cambridge, MA')).toBeInTheDocument()
+    })
+
+    it('reports a failed delete and leaves the confirmation open to retry', async () => {
+      const user = userEvent.setup()
+      const fake = renderPage(availableRow)
+      fake.invoke.mockResolvedValueOnce({ data: null, error: { message: 'Network is down.' } })
+
+      await screen.findByText('10 Main St, Cambridge, MA')
+      await user.click(screen.getByRole('button', { name: 'Delete Property' }))
+      await user.click(
+        within(screen.getByRole('dialog')).getByRole('button', {
+          name: DELETE_PROPERTY_CONFIRMATION.confirmAction,
+        }),
+      )
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'Could not delete this Property. Please try again.',
+      )
+      expect(screen.getByRole('dialog')).toBeInTheDocument()
+      expect(screen.getByText('10 Main St, Cambridge, MA')).toBeInTheDocument()
+    })
   })
 
   it('opens the Planting named by a ?plantingId= query param (the Registry\'s "View on the map" link, #10)', async () => {

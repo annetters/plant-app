@@ -1,3 +1,4 @@
+import { NothingDeletedError } from '@plant-app/domain'
 import { describe, expect, it } from 'vitest'
 import { createFakePlantsDbClient } from '../test/fakePlantsDbClient'
 import { plantRow as row } from '../test/plantRowFixture'
@@ -67,6 +68,24 @@ describe('PlantsRepository', () => {
     await repo.remove('p1')
 
     expect(rows()).toHaveLength(0)
+  })
+
+  // PostgREST answers a delete RLS filtered down to no rows with
+  // `error: null`, so this used to return as though it had worked — the caller
+  // cleared the Plant from local state and it came back on the next load (#47).
+  it('throws when the delete matches no row, rather than reporting success', async () => {
+    const { client } = createFakePlantsDbClient([row({ id: 'p1' })])
+    const repo = new PlantsRepository(client)
+
+    await expect(repo.remove('not-mine')).rejects.toThrow(NothingDeletedError)
+  })
+
+  it('leaves the other Plants standing when a delete matches nothing', async () => {
+    const { client, rows } = createFakePlantsDbClient([row({ id: 'p1' })])
+    const repo = new PlantsRepository(client)
+
+    await expect(repo.remove('not-mine')).rejects.toThrow()
+    expect(rows()).toHaveLength(1)
   })
 
   it('uploads a reference photo under the user/plant folder and returns its path', async () => {

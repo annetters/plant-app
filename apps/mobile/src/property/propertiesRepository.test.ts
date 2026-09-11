@@ -195,5 +195,31 @@ describe('PropertiesRepository', () => {
       await expect(repository.remove('property-1')).rejects.toThrow('boom')
       expect(fake.row()).not.toBeNull()
     })
+
+    /**
+     * Through the `delete-map-object` Edge Function, not a table delete here:
+     * the cascade reaches `planting_photos` rows but not the *files* they
+     * point at, and emptying a bucket is an external-adapter call, which
+     * ADR-0003 puts server-side. Web calls the same function, which is what
+     * stops the two surfaces drifting (#47).
+     */
+    it('deletes server-side, so no client issues the bucket removal itself', async () => {
+      const fake = createFakePropertiesDbClient(propertyRow({ id: 'property-1' }))
+      const repository = new PropertiesRepository(fake.client)
+
+      await repository.remove('property-1')
+
+      expect(fake.invoke).toHaveBeenCalledWith('delete-map-object', {
+        body: { kind: 'property', id: 'property-1' },
+      })
+    })
+
+    it('throws when the delete matches no row, rather than reporting success', async () => {
+      const fake = createFakePropertiesDbClient(propertyRow({ id: 'property-1' }))
+      const repository = new PropertiesRepository(fake.client)
+
+      await expect(repository.remove('not-mine')).rejects.toThrow(/Property/)
+      expect(fake.row()).not.toBeNull()
+    })
   })
 })

@@ -1,5 +1,5 @@
 import type { BedRow, PlantRow, PlantingRow, PropertyRow } from '@plant-app/domain'
-import { STAGE_SIZE_PX } from '@plant-app/domain'
+import { DELETE_PROPERTY_CONFIRMATION, STAGE_SIZE_PX } from '@plant-app/domain'
 import {
   NavigationContainer,
   useRoute,
@@ -343,6 +343,45 @@ describe('MapScreen — viewing the Property', () => {
 
     await waitFor(() => expect(properties.row()).toBeNull())
     expect(Alert.alert).toHaveBeenCalled()
+  })
+
+  /**
+   * The words come from `@plant-app/domain`, not a literal here, so this and
+   * web's in-page modal cannot drift apart (#47). Native keeps `Alert` as its
+   * *mechanism* — the OS draws it and offers no suppression control, so it
+   * never had web's `window.confirm` bug — but the wording is shared.
+   */
+  it('asks with the same words web does, and says the Registry survives', async () => {
+    const properties = createFakePropertiesDbClient(propertyRow({ id: 'property-1' }))
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {})
+
+    await renderScreen({ propertiesClient: properties.client })
+    await screen.findByTestId('map-overlay')
+    await fireEvent.press(screen.getByText('Delete Property'))
+
+    const [title, message, buttons] = (Alert.alert as jest.Mock).mock.calls[0]
+    expect(title).toBe(DELETE_PROPERTY_CONFIRMATION.heading)
+    expect(message).toContain(DELETE_PROPERTY_CONFIRMATION.body)
+    // The half "this cannot be undone" left out: losing the map is not losing
+    // the collection.
+    expect(message).toContain(DELETE_PROPERTY_CONFIRMATION.reassurance)
+    expect(buttons.map((button: { text: string }) => button.text)).toEqual([
+      DELETE_PROPERTY_CONFIRMATION.cancelAction,
+      DELETE_PROPERTY_CONFIRMATION.confirmAction,
+    ])
+  })
+
+  it('deletes nothing when the confirmation is dismissed', async () => {
+    const properties = createFakePropertiesDbClient(propertyRow({ id: 'property-1' }))
+    jest.spyOn(Alert, 'alert').mockImplementation((_title, _message, buttons) => {
+      void buttons?.find((button) => button.style === 'cancel')?.onPress?.()
+    })
+
+    await renderScreen({ propertiesClient: properties.client })
+    await screen.findByTestId('map-overlay')
+    await fireEvent.press(screen.getByText('Delete Property'))
+
+    expect(properties.row()).not.toBeNull()
   })
 
   it('can delete an uncalibrated Property too, which is otherwise a dead end on the phone', async () => {

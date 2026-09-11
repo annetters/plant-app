@@ -1,5 +1,6 @@
 import type { Bed, Property } from '@plant-app/domain'
 import {
+  DELETE_PROPERTY_CONFIRMATION,
   STAGE_SIZE_PX,
   baseMapCalibration,
   formatMapWidthFeet,
@@ -7,6 +8,7 @@ import {
 } from '@plant-app/domain'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { PlantingMap } from '../plantings/PlantingMap'
 import { AddressAutocomplete } from '../property/AddressAutocomplete'
 import { BaseMapBackground } from '../property/BaseMapBackground'
@@ -48,6 +50,10 @@ export function PropertyPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  // Open state for the delete confirmation. An in-page modal rather than
+  // `window.confirm`, which a browser can suppress and answer "no" without
+  // showing anything — see ConfirmDialog and #47.
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   // Up-front alternative to the address form, for a gardener who doesn't
   // want to use aerial imagery at all (unusable coverage, or privacy — see
   // CONTEXT.md's Property entry) rather than only reachable after an
@@ -120,16 +126,19 @@ export function PropertyPage() {
 
   async function handleDelete() {
     if (!property) return
-    if (!window.confirm('Delete this Property? This cannot be undone.')) return
     setDeleting(true)
     try {
       await repository.remove(property.id)
+      setConfirmingDelete(false)
       setProperty(null)
       setOwnMapMode(false)
       setPropertyName('')
       setConfirmedName(null)
       setRecalibrating(false)
     } catch {
+      // The confirmation stays open on failure: closing it would leave the
+      // Property on screen with an error above it and no obvious way to
+      // retry the thing that just failed.
       setFormError('Could not delete this Property. Please try again.')
     } finally {
       setDeleting(false)
@@ -327,9 +336,17 @@ export function PropertyPage() {
               <BaseMapSetup mode="update" property={property} onUpdated={setProperty} />
             </>
           )}
-          <button type="button" onClick={handleDelete} disabled={deleting}>
+          <button type="button" onClick={() => setConfirmingDelete(true)} disabled={deleting}>
             {deleting ? 'Deleting…' : 'Delete Property'}
           </button>
+          {confirmingDelete && (
+            <ConfirmDialog
+              copy={DELETE_PROPERTY_CONFIRMATION}
+              busy={deleting}
+              onConfirm={handleDelete}
+              onCancel={() => setConfirmingDelete(false)}
+            />
+          )}
         </section>
         </MeasurementGridProvider>
       )}

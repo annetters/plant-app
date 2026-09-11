@@ -1,5 +1,6 @@
 import type { Bed, BedInput, BedRow } from '@plant-app/domain'
-import { bedFromRow, bedInputToRow } from '@plant-app/domain'
+import { bedFromRow, bedInputToRow, deleteMapObject } from '@plant-app/domain'
+import type { MapObjectDeleteClient } from '@plant-app/domain'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 type Row = Record<string, unknown>
@@ -13,8 +14,13 @@ interface BedsQuery extends PromiseLike<DbResult<unknown>> {
   single(): BedsQuery
 }
 
-/** The narrow shape of a Supabase client the repository needs — mirrors PropertiesDbClient's pattern. */
-export interface BedsDbClient {
+/**
+ * The narrow shape of a Supabase client the repository needs — mirrors
+ * PropertiesDbClient's pattern. It extends `MapObjectDeleteClient` because a
+ * Bed delete runs server-side, so this needs the function invoker as well as
+ * the table (#47).
+ */
+export interface BedsDbClient extends MapObjectDeleteClient {
   from(table: 'beds'): {
     select(columns?: string): BedsQuery
     insert(values: Row): BedsQuery
@@ -82,7 +88,18 @@ export class BedsRepository {
     return bedFromRow(row)
   }
 
+  /**
+   * Removes a Bed, and the planting photo *files* belonging to the Plantings
+   * inside it — which the FK cascade never reaches, because it only deletes
+   * `planting_photos` rows and leaves the files orphaned in the bucket (#47).
+   *
+   * Runs through the `delete-map-object` Edge Function for the same two
+   * reasons `PropertiesRepository.remove` does: emptying a bucket is an
+   * external-adapter call (ADR-0003), and one shared path can't drift the way
+   * a copy per surface does. It also reports a delete that matched no rows,
+   * instead of returning as though it had worked.
+   */
   async remove(id: string): Promise<void> {
-    unwrap(await this.client.from(TABLE).delete().eq('id', id))
+    await deleteMapObject(this.client, 'bed', id)
   }
 }

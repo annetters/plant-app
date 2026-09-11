@@ -1,5 +1,6 @@
 import type { Property, PropertyInput, PropertyRow } from '@plant-app/domain'
-import { propertyFromRow } from '@plant-app/domain'
+import { deleteMapObject, propertyFromRow } from '@plant-app/domain'
+import type { MapObjectDeleteClient } from '@plant-app/domain'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import * as Crypto from 'expo-crypto'
 import type { PickedPhoto } from '../lib/pickPhoto'
@@ -15,8 +16,8 @@ interface PropertiesQuery extends PromiseLike<DbResult<unknown>> {
   single(): PropertiesQuery
 }
 
-/** The narrow shape of a Supabase client this app needs — mirrors apps/web's PropertiesDbClient pattern, trimmed to what the Map screen reads and what base-map setup (#15) writes and deletes. Still no `functions`: creating a Property from an *address* stays web-only, since that path needs the `search-addresses`/`create-property` Edge Functions. */
-export interface PropertiesDbClient {
+/** The narrow shape of a Supabase client this app needs — mirrors apps/web's PropertiesDbClient pattern, trimmed to what the Map screen reads and what base-map setup (#15) writes and deletes. `functions` is here only for `remove`'s `delete-map-object` call (#47): creating a Property from an *address* stays web-only, since that path needs the `search-addresses`/`create-property` Edge Functions. */
+export interface PropertiesDbClient extends MapObjectDeleteClient {
   from(table: 'properties'): {
     select(columns?: string): PropertiesQuery
     insert(values: Row): PropertiesQuery
@@ -175,10 +176,16 @@ export class PropertiesRepository {
    * before web grew this control.
    *
    * The Beds and Plantings underneath go with it, via the FK cascade.
+   *
+   * Goes through the `delete-map-object` Edge Function rather than deleting
+   * the row here (#47). The cascade reaches `planting_photos` rows but not the
+   * *files* they point at, and emptying a storage bucket is an
+   * external-adapter call, which ADR-0003 puts server-side. Web calls the same
+   * function, which is what stops the two surfaces drifting. It also reports a
+   * delete that matched no rows instead of returning as though it worked.
    */
   async remove(id: string): Promise<void> {
-    const { error } = await this.client.from(TABLE).delete().eq('id', id)
-    if (error) throw new Error(error.message)
+    await deleteMapObject(this.client, 'property', id)
   }
 
   /**

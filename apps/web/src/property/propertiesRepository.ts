@@ -1,5 +1,6 @@
 import type { AddressCandidate, Property, PropertyInput, PropertyRow } from '@plant-app/domain'
-import { propertyFromRow } from '@plant-app/domain'
+import { deleteMapObject, propertyFromRow } from '@plant-app/domain'
+import type { MapObjectDeleteClient } from '@plant-app/domain'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 type Row = Record<string, unknown>
@@ -14,7 +15,7 @@ interface PropertiesQuery extends PromiseLike<DbResult<unknown>> {
 }
 
 /** The narrow shape of a Supabase client the repository needs — mirrors PlantsDbClient's pattern. */
-export interface PropertiesDbClient {
+export interface PropertiesDbClient extends MapObjectDeleteClient {
   from(table: 'properties'): {
     select(columns?: string): PropertiesQuery
     insert(values: Row): PropertiesQuery
@@ -38,12 +39,6 @@ export interface PropertiesDbClient {
       data: { user: { id: string } | null }
       error: { message: string } | null
     }>
-  }
-  functions: {
-    invoke(
-      name: string,
-      options: { body: unknown },
-    ): Promise<{ data: unknown; error: { message: string } | null }>
   }
 }
 
@@ -191,10 +186,25 @@ export class PropertiesRepository {
     return propertyFromRow(data as PropertyRow)
   }
 
-  /** Frees the account's one-Property slot (MVP has no edit — delete and re-create instead). */
+  /**
+   * Frees the account's one-Property slot (MVP has no edit — delete and
+   * re-create instead), taking the Beds and Plantings underneath it via the
+   * FK cascade.
+   *
+   * Goes through the `delete-map-object` Edge Function rather than deleting
+   * the row here, for two reasons (#47). The cascade reaches
+   * `planting_photos` rows but not the *files* they point at, and emptying a
+   * storage bucket is an external-adapter call, which ADR-0003 puts
+   * server-side. And the function is the one path both surfaces take, so the
+   * cleanup can't drift between them the way two copies of this method would.
+   *
+   * It also answers whether anything was actually deleted — a plain
+   * `.delete()` here returned `error: null` when RLS matched no rows, so a
+   * delete that removed nothing reported success and the Property came back
+   * on the next load.
+   */
   async remove(id: string): Promise<void> {
-    const { error } = await this.client.from(TABLE).delete().eq('id', id)
-    if (error) throw new Error(error.message)
+    await deleteMapObject(this.client, 'property', id)
   }
 
   /**

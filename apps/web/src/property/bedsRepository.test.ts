@@ -1,4 +1,4 @@
-import type { BedInput, BedRow } from '@plant-app/domain'
+import { NothingDeletedError, type BedInput, type BedRow } from '@plant-app/domain'
 import { describe, expect, it } from 'vitest'
 import { createFakeBedsDbClient } from '../test/fakeBedsDbClient'
 import { BedsRepository } from './bedsRepository'
@@ -80,6 +80,42 @@ describe('BedsRepository.remove', () => {
     await repository.remove('bed-1')
 
     expect(await repository.list('property-1')).toEqual([])
+  })
+
+  /**
+   * The delete goes through the `delete-map-object` Edge Function rather than
+   * a table delete here, so the planting photo *files* under the Bed are
+   * cleared server-side — a bucket is an external adapter, which ADR-0003 puts
+   * server-side, and one shared path is what keeps web and native from
+   * drifting (#47). The cascade itself is covered by
+   * `supabase/functions/_shared/plantingPhotoCascade.test.ts`.
+   */
+  it('deletes server-side, so no client issues the bucket removal itself', async () => {
+    const { client, invoke } = createFakeBedsDbClient([EXISTING_ROW])
+    const repository = new BedsRepository(client)
+
+    await repository.remove('bed-1')
+
+    expect(invoke).toHaveBeenCalledWith('delete-map-object', {
+      body: { kind: 'bed', id: 'bed-1' },
+    })
+  })
+
+  // Same typed error Plant and Planting throw, despite arriving across the
+  // Edge Function boundary (#47).
+  it('throws when the delete matches no row, rather than reporting success', async () => {
+    const { client } = createFakeBedsDbClient([EXISTING_ROW])
+    const repository = new BedsRepository(client)
+
+    await expect(repository.remove('not-mine')).rejects.toThrow(NothingDeletedError)
+  })
+
+  it('leaves the Bed standing when the delete matched nothing', async () => {
+    const { client } = createFakeBedsDbClient([EXISTING_ROW])
+    const repository = new BedsRepository(client)
+
+    await expect(repository.remove('not-mine')).rejects.toThrow()
+    expect(await repository.list('property-1')).toHaveLength(1)
   })
 })
 

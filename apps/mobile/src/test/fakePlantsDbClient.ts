@@ -28,9 +28,14 @@ export function createFakePlantsDbClient(initialPlantRows: PlantRow[] = []) {
     const filters: Record<string, string> = {}
     let orderColumn: string | undefined
     let single = false
+    // Whether `.select()` was chained. PostgREST only hands back the rows a
+    // delete removed when it was, so modelling it is what lets these fakes
+    // catch a `remove()` that forgot to ask (#47).
+    let selected = false
 
     const chain = {
       select() {
+        selected = true
         return chain
       },
       eq(column: string, value: string) {
@@ -100,8 +105,12 @@ export function createFakePlantsDbClient(initialPlantRows: PlantRow[] = []) {
         return { data: single ? rows[idx] : [rows[idx]], error: null }
       }
       // delete
+      const removed = rows.filter(matches)
       tables[table] = rows.filter((r) => !matches(r))
-      return { data: null, error: null }
+      // `data` is null unless `.select()` asked for the deleted rows — the
+      // distinction a repository relies on to tell a real delete from one RLS
+      // filtered down to nothing.
+      return { data: selected ? removed : null, error: null }
     }
 
     return chain

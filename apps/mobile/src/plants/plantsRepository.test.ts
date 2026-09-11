@@ -89,6 +89,17 @@ describe('PlantsRepository', () => {
     expect(rows()).toHaveLength(0)
   })
 
+  // PostgREST answers a delete RLS filtered down to no rows with
+  // `error: null`, so this used to report success for a delete that removed
+  // nothing and the Plant came back on the next load (#47). Mirrors apps/web.
+  it('throws when the delete matches no row, rather than reporting success', async () => {
+    const { client, rows } = createFakePlantsDbClient([plantRow({ id: 'p1' })])
+    const repository = new PlantsRepository(client)
+
+    await expect(repository.remove('not-mine')).rejects.toThrow(/Plant/)
+    expect(rows()).toHaveLength(1)
+  })
+
   it('uploads a reference photo under the user/plant folder and returns its path', async () => {
     const { client, storage } = createFakePlantsDbClient()
     const repository = new PlantsRepository(client)

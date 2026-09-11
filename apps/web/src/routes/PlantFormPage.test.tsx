@@ -1,5 +1,6 @@
 import type { PlantRow } from '@plant-app/domain'
-import { render, screen, waitFor } from '@testing-library/react'
+import { DELETE_PLANT_CONFIRMATION } from '@plant-app/domain'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useSearchParams } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
@@ -135,25 +136,64 @@ describe('PlantFormPage — edit/view/delete', () => {
     expect(screen.queryByText('Saved.')).not.toBeInTheDocument()
   })
 
-  it('deletes the Plant after confirmation', async () => {
+  // These replace two tests that stubbed `window.confirm` to return false and
+  // called that "the confirmation is declined". A *suppressed* dialog returns
+  // the same value, so they passed for the wrong reason and the bug #47 was
+  // filed for was invisible to them. Nothing below stubs a global.
+  it('asks first, in the page rather than through a browser dialog', async () => {
     const user = userEvent.setup()
     const fake = renderAt('/registry/p1', [row({ id: 'p1' })])
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
 
     await screen.findByDisplayValue('Coneflower')
     await user.click(screen.getByRole('button', { name: 'Delete Plant' }))
+
+    const dialog = screen.getByRole('dialog')
+    expect(dialog).toHaveTextContent(DELETE_PLANT_CONFIRMATION.heading)
+    // Deleting a Plant reaches the map too, because its Plantings go with it.
+    expect(dialog).toHaveTextContent(DELETE_PLANT_CONFIRMATION.body)
+    expect(fake.rows()).toHaveLength(1)
+  })
+
+  it('deletes the Plant when the confirmation is confirmed', async () => {
+    const user = userEvent.setup()
+    const fake = renderAt('/registry/p1', [row({ id: 'p1' })])
+
+    await screen.findByDisplayValue('Coneflower')
+    await user.click(screen.getByRole('button', { name: 'Delete Plant' }))
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: DELETE_PLANT_CONFIRMATION.confirmAction,
+      }),
+    )
 
     await waitFor(() => expect(fake.rows()).toHaveLength(0))
   })
 
-  it('does not delete the Plant when the confirmation is declined', async () => {
+  it('keeps the Plant when the confirmation is dismissed', async () => {
     const user = userEvent.setup()
     const fake = renderAt('/registry/p1', [row({ id: 'p1' })])
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
 
     await screen.findByDisplayValue('Coneflower')
     await user.click(screen.getByRole('button', { name: 'Delete Plant' }))
+    await user.click(
+      within(screen.getByRole('dialog')).getByRole('button', {
+        name: DELETE_PLANT_CONFIRMATION.cancelAction,
+      }),
+    )
 
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(fake.rows()).toHaveLength(1)
+  })
+
+  it('keeps the Plant when the confirmation is dismissed with Escape', async () => {
+    const user = userEvent.setup()
+    const fake = renderAt('/registry/p1', [row({ id: 'p1' })])
+
+    await screen.findByDisplayValue('Coneflower')
+    await user.click(screen.getByRole('button', { name: 'Delete Plant' }))
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(fake.rows()).toHaveLength(1)
   })
 })

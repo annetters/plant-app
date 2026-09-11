@@ -1,4 +1,5 @@
 import {
+  DELETE_PLANT_CONFIRMATION,
   DUPLICATE_PLANT_OFFER,
   EMPTY_PLANT_FORM_FIELDS,
   FOLIAGE_TYPES,
@@ -18,6 +19,7 @@ import {
 } from '@plant-app/domain'
 import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
+import { ConfirmDialog } from '../components/ConfirmDialog'
 import { usePlantsRepository } from '../plants/PlantsRepositoryContext'
 
 export function PlantFormPage() {
@@ -34,6 +36,10 @@ export function PlantFormPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  // Open state for the delete confirmation — an in-page modal rather than
+  // `window.confirm`, which a browser can suppress and answer "no" on the
+  // gardener's behalf without showing anything (#47).
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [photoBusy, setPhotoBusy] = useState(false)
   // Only ever loaded in create mode, and `null` until it arrives — "no Plants
   // yet" and "not known yet" are different answers, and Add Plant waits for
@@ -241,12 +247,14 @@ export function PlantFormPage() {
 
   async function handleDelete() {
     if (!plantId) return
-    if (!window.confirm('Delete this plant? This cannot be undone.')) return
     setSubmitting(true)
     try {
       await repository.remove(plantId)
       navigate('/registry', { replace: true })
     } catch {
+      // The confirmation stays open on failure, so the retry is where the
+      // gardener already is. On success we navigate away and it goes with
+      // the page.
       setFormError('Could not delete this plant. Please try again.')
       setSubmitting(false)
     }
@@ -559,9 +567,17 @@ export function PlantFormPage() {
 
         <hr />
 
-        <button type="button" onClick={handleDelete} disabled={submitting}>
+        <button type="button" onClick={() => setConfirmingDelete(true)} disabled={submitting}>
           Delete Plant
         </button>
+        {confirmingDelete && (
+          <ConfirmDialog
+            copy={DELETE_PLANT_CONFIRMATION}
+            busy={submitting}
+            onConfirm={handleDelete}
+            onCancel={() => setConfirmingDelete(false)}
+          />
+        )}
         </>
       )}
 

@@ -1,4 +1,4 @@
-import type { AddressCandidate, PropertyRow } from '@plant-app/domain'
+import { NothingDeletedError, type AddressCandidate, type PropertyRow } from '@plant-app/domain'
 import { describe, expect, it } from 'vitest'
 import { createFakePropertiesDbClient } from '../test/fakePropertiesDbClient'
 import { PropertiesRepository } from './propertiesRepository'
@@ -118,6 +118,47 @@ describe('PropertiesRepository.remove', () => {
     await repository.remove('property-1')
 
     expect(await repository.get()).toBeNull()
+  })
+
+  /**
+   * Through the `delete-map-object` Edge Function, not a table delete here:
+   * the cascade reaches `planting_photos` rows but not the *files* they point
+   * at, and emptying a bucket is an external-adapter call, which ADR-0003 puts
+   * server-side. Native calls the same function, which is what stops the two
+   * drifting (#47). The cascade itself is covered by
+   * `supabase/functions/_shared/plantingPhotoCascade.test.ts`.
+   */
+  it('deletes server-side, so no client issues the bucket removal itself', async () => {
+    const { client, invoke } = createFakePropertiesDbClient(EXISTING_ROW)
+    const repository = new PropertiesRepository(client)
+
+    await repository.remove('property-1')
+
+    expect(invoke).toHaveBeenCalledWith('delete-map-object', {
+      body: { kind: 'property', id: 'property-1' },
+    })
+  })
+
+  // Used to return as though it had worked, because PostgREST answers a delete
+  // RLS filtered down to no rows with `error: null` — so the Property was
+  // cleared from local state and reappeared on the next load.
+  // The same error type Plant and Planting throw from `requireRowsDeleted`,
+  // even though this one comes back across the Edge Function boundary — a
+  // caller sees one kind of "nothing was deleted" whichever record it asked
+  // about, without matching on message text (#47).
+  it('throws when the delete matches no row, rather than reporting success', async () => {
+    const { client } = createFakePropertiesDbClient(EXISTING_ROW)
+    const repository = new PropertiesRepository(client)
+
+    await expect(repository.remove('not-mine')).rejects.toThrow(NothingDeletedError)
+  })
+
+  it('leaves the Property standing when the delete matched nothing', async () => {
+    const { client } = createFakePropertiesDbClient(EXISTING_ROW)
+    const repository = new PropertiesRepository(client)
+
+    await expect(repository.remove('not-mine')).rejects.toThrow()
+    expect(await repository.get()).not.toBeNull()
   })
 })
 

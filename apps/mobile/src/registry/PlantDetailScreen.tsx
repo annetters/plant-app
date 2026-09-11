@@ -1,4 +1,5 @@
 import {
+  DELETE_PLANT_CONFIRMATION,
   DUPLICATE_PLANT_OFFER,
   EMPTY_PLANT_FORM_FIELDS,
   FOLIAGE_TYPES,
@@ -414,12 +415,20 @@ export function PlantDetailScreen() {
     }
   }
 
+  /**
+   * `Alert` stays the native mechanism — the OS draws it and offers no
+   * suppression control, so native never had web's `window.confirm` bug
+   * (#47). The wording comes from `@plant-app/domain` so it reads identically
+   * to web's in-page modal, and says the thing "this cannot be undone" left
+   * out: deleting a Plant reaches the *map* too, because its Plantings go
+   * with it.
+   */
   function handleDelete() {
     if (!plantId) return
-    Alert.alert('Delete this Plant?', 'This cannot be undone.', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(DELETE_PLANT_CONFIRMATION.heading, DELETE_PLANT_CONFIRMATION.body, [
+      { text: DELETE_PLANT_CONFIRMATION.cancelAction, style: 'cancel' },
       {
-        text: 'Delete',
+        text: DELETE_PLANT_CONFIRMATION.confirmAction,
         style: 'destructive',
         onPress: async () => {
           setSubmitting(true)

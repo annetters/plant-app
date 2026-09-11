@@ -127,6 +127,18 @@ export type {
 
 export { DUPLICATE_PLANT_OFFER } from "./duplicatePlantOffer.js";
 
+export {
+  DELETE_PLANT_CONFIRMATION,
+  DELETE_PROPERTY_CONFIRMATION,
+} from "./deleteConfirmations.js";
+export type { DeleteConfirmationCopy } from "./deleteConfirmations.js";
+
+export { NothingDeletedError, requireRowsDeleted } from "./deleteOutcome.js";
+export type { DeleteTarget } from "./deleteOutcome.js";
+
+export { NOTHING_DELETED_CODE, deleteMapObject } from "./deleteMapObject.js";
+export type { MapObjectDeleteClient, MapObjectKind } from "./deleteMapObject.js";
+
 export { checkForDuplicatePlant, parseScientificName } from "./tagScanMatching.js";
 export type { DuplicatePlantCheck, ParsedScientificName, TagScanPlantIdentity } from "./tagScanMatching.js";
 
