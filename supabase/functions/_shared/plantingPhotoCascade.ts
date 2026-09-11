@@ -169,10 +169,13 @@ export async function deletePropertyWithPhotos(
  * Deletes a Bed, and every planting photo file beneath it, all or nothing.
  *
  * **This reaches Plantings only because `plantings.bed_id` still cascades**
- * (`0013_plantings.sql`). ADR-0009 reverses that: a Bed stops being on the path
- * to a Planting, and deleting one will unassign its Plantings rather than
- * destroy them. When #54 lands there are no photos beneath a Bed to clean up
- * and this function goes with the cascade it exists to compensate for.
+ * (`0013_plantings.sql`) — which is the state today: `bed_id` is `not null`
+ * and cascades on delete. ADR-0009 decides to drop it, so that a Planting is
+ * associated with a Bed only by where its Pin sits, and deleting a Bed
+ * removes its outline and nothing else. **That is #54, and it is not built
+ * yet — nothing below has changed.** If it lands as specified there are no
+ * photos beneath a Bed to clean up, and this function goes with the cascade
+ * it exists to compensate for.
  */
 export async function deleteBedWithPhotos(
   client: PlantingPhotoCascadeClient,
