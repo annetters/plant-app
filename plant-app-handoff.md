@@ -13,6 +13,16 @@ the user who runs it before scripting anything.
 and its `gridTemplateRows` fix is committed (`a945f00`). It is **still
 open** — closing it is the user's call. See its section below.
 
+**#54 is paused, and its design is loose in the tree.** The user reopened the
+`plantings.bed_id` question on 2026-09-11 and wants a **grilling session
+before any of it is built**. The revised ADR-0009 (position-as-truth) and the
+matching `CONTEXT.md` entries are **uncommitted on purpose** — committing them
+would make a contested decision the repo's record. Two traps: don't `git
+checkout` them away, and don't read *committed* ADR-0009 as current, because
+it is the superseded draft that says the opposite. #54 is also still labelled
+`ready-for-agent`, which it should not be picked up on. See #54's 2026-09-11
+comment.
+
 ---
 
 **#36 implemented** (2026-09-09) — the species lookup now
