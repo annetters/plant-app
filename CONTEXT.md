@@ -1,5 +1,21 @@
 # CONTEXT.md — Personal Garden Plant Registry
 
+> ## ⚠️ Five entries below are under review and describe unbuilt behaviour
+>
+> **Reopened 2026-09-11 (#54, ADR-0009).** The user is undecided about
+> dropping `plantings.bed_id` and deriving a Planting's Bed from its Pin's
+> position, and wants that stress-tested before it is built. These entries were
+> rewritten for that decision and **do not describe how the app behaves today**:
+> **Planting**, **Bed membership**, **Pin**, **Ownership and deletion**,
+> **Bloom Timeline**.
+>
+> What is actually true right now: `plantings.bed_id` is `not null` and
+> cascades on delete (`0013_plantings.sql`), a Pin must be dropped inside a
+> Bed to save, and deleting a Bed destroys its Plantings and their photo logs.
+>
+> Remove this notice when the grilling settles the question, whichever way it
+> goes.
+
 ## Surfaces
 
 There are **two** surfaces, and only two (ADR-0003): the **web app**, which is
@@ -120,7 +136,8 @@ other photo.
 ### Planting
 A specific placement decision: one cluster of a given Plant at a given
 location in the garden. Fields: reference to Plant, quantity, map location
-(pin coordinates, plus an optional Bed assignment — see Bed membership),
+(pin coordinates — a Planting stores no Bed of its own; which Beds it is
+associated with is derived from where its Pin sits, see Bed membership),
 year acquired, source/nursery, dated photo log.
 A Planting with quantity 24 = one record for 24 specimens, not 24 records.
 
@@ -250,22 +267,41 @@ later replaced or its scale is re-derived. Landmarks are optional: a Pin
 placed by rough tap needs none.
 
 ### Bed membership
-Which Bed a Planting is **assigned** to — a decision the gardener makes, not
-a fact derived from where its Pin happens to sit (ADR-0009).
+> **Under review (#54, ADR-0009) — reopened 2026-09-11.** The rules in this
+> entry describe a decision the user has not settled, and none of it is
+> implemented: a Planting still stores `bed_id`, and deleting a Bed still
+> destroys its Plantings. Read it as a proposal, not as how the app behaves.
 
-A Planting may have no Bed at all. That is an ordinary state, not missing
-data: a pot on the patio, a specimen in the lawn, the gap between two beds,
-nursery stock not yet in the ground.
+A Bed is a region drawn on the map. A Planting is **associated** with a Bed
+when its Pin falls inside that Bed's outline. **Association is not ownership
+and not containment** (ADR-0009) — nothing is held, and nothing is stored: a
+Planting records a position, and its Beds are worked out from it wherever
+they are needed.
 
-Dropping a Pin inside a Bed **proposes** that Bed, because it is almost
-always the right answer and saves a step. It never decides, and nothing is
-ever refused for landing outside every Bed.
+**Position is the only truth.** Dropping a Pin inside a Bed associates the
+Planting with it; dropping it on bare ground associates it with none. There
+is no Bed picker and no override, so a Planting cannot be associated with a
+Bed its Pin does not sit inside — that state is not warned about, it is
+unrepresentable.
 
-When the geometry and the assignment disagree — a Planting assigned to a Bed
-its Pin does not sit inside — the app **warns and changes nothing**. It
-never silently reassigns a Planting, never clears an
-assignment, never moves a Pin. A plant that has spread past the edge of its
-bed is a real thing to record, not an error to correct.
+**A Planting may have no Bed at all.** That is an ordinary state, not
+missing data: a tree standing in the lawn has a real position on the map and
+belongs to no Bed. The distinction that matters is *on the map versus not on
+the map*, never *in a bed versus in a container* — a plant the gardener has
+not placed anywhere is a Plant with no Planting, which is a different thing
+and already works.
+
+**A Pin marks the plant's centre, not its extent.** A plant whose foliage
+has spread past its bed's edge has not moved, so it has not changed Beds.
+
+**Beds are independent geometric objects and may overlap.** Drawing,
+redrawing or deleting one never modifies, trims, merges or moves another.
+Overlap is legal rather than an error, and a Pin inside two overlapping
+outlines is associated with **both** — every surface that names a Planting's
+Bed names all of them.
+
+Redrawing a Bed therefore changes what is inside it, silently and with no
+notification, because nothing was ever assigned to lose.
 
 ### Landmark
 **Deferred — not a required feature for MVP.** Originally spec'd as a named
@@ -280,8 +316,10 @@ numeric input.
 ### Pin
 A map marker for a Planting's location on the Property, placed by dragging
 directly to position on the map. No manual distance or number entry is
-required. A Pin may land inside a Bed or nowhere near one — see Bed
-membership. Works identically on the **desktop web app and the iPhone app** —
+required. A Pin may land inside a Bed, inside two overlapping Beds, or
+nowhere near one — see Bed membership. Its position is what determines the
+Planting's Bed association, so it is never adjusted on the gardener's
+behalf. Works identically on the **desktop web app and the iPhone app** —
 the two supported surfaces (see Surfaces). This is not a claim about a phone
 browser; the iPhone app is what makes Pin placement work on a phone.
 Optional precision-assist suggestions (e.g. referencing a Landmark) may be
@@ -318,10 +356,14 @@ bloom month, sun/shade, and other Plant fields. Each entry links to its
 Planting location(s) on the Property's map.
 
 ### Ownership and deletion
-The gardener's own model, and the one the app follows:
+The Registry is a collection of items, owned by the account.
 
-> The Registry is a collection of items. A Bed is a shelf where the items go.
-> The Map holds the shelves.
+**A Bed is not a shelf those items sit on.** That half of the older metaphor
+is retired (ADR-0009): a shelf holds what is put on it, and a Bed holds
+nothing. It is an outline drawn on the map, and a Planting is associated
+with it only because the Planting's Pin happens to fall inside — see Bed
+membership. Association is not ownership and not containment, so a Bed going
+away takes nothing with it.
 
 Deleting a Map or a Bed **never** removes items from the Registry. Plants are
 owned by the account, not by the map. The cascade runs downward from the
@@ -329,23 +371,22 @@ Property, and **a Bed is not on the path to a Planting** (ADR-0009):
 
 ```
 Property -> Map
-Property -> Bed            (its Plantings are unassigned, not deleted)
+Property -> Bed            (no Plantings beneath it)
 Property -> Planting -> planting photos
 ```
 
-Deleting a Bed clears its Plantings' Bed assignment and leaves them standing.
-A Planting can sit on no shelf at all — a pot, the lawn, the gap between two
-beds — so losing a shelf no longer has to mean losing what was on it. A Bed
-delete is still destructive, because the outline is gone and cannot be
-recovered, and its confirmation has to say what actually happens now (#48).
+Deleting a Bed removes its outline and nothing else; the Plantings inside it
+stay where they are. This is not a cascade that was corrected but one that no
+longer exists, because a Planting never references a Bed to begin with. A Bed
+delete is still destructive — the outline is gone and cannot be recovered —
+and its confirmation says exactly that and no more (#48).
 
 What a Planting records is still the placement's own: quantity, year
 acquired, source/nursery and dated photo log belong to the Planting, not to
 the Plant, and deleting the *Planting* loses them. The Plant record
 itself — name, color, bloom window, reference
 photos — always survives. In the other direction, deleting a Plant removes it
-from the collection *and* from every shelf it sits on, since its Plantings
-go with it.
+from the collection *and* from the map, since its Plantings go with it.
 
 **Every destructive action confirms first**, on every surface, and states
 which of the two is being lost in those terms. A destructive action is one
@@ -362,13 +403,18 @@ a photo lives both as a record and as a file in a storage bucket, and the
 database cascade only ever reaches the first.
 
 ### Bloom Timeline
-Year-view bar chart of Plant bloom windows, filterable by Bed. A
-month-filtered list view is a secondary presentation of the same data —
-no separate data model. Unfiltered (no Bed selected), both views show
-every Plant with a bloom window, planted or not — the Bed filter narrows
-to only Plants actually planted in that Bed. It is not a "planted
-somewhere" toggle: there is no filter state that means "every Planting
-across every Bed" as distinct from "every Plant in the Registry."
+Year-view bar chart of Plant bloom windows. A month-filtered list view is a
+secondary presentation of the same data — no separate data model.
+Unfiltered, both views show every Plant with a bloom window, planted or not.
+
+Two independent filters narrow it:
+
+- **By Bed** — only Plants with a Planting associated with that Bed. A Plant
+  whose Pin falls inside two overlapping Beds appears under both.
+- **On the map / not on the map** — whether a Plant has any Planting at all.
+  This is the "planted somewhere" distinction that an earlier version of this
+  entry explicitly ruled out; it is now wanted, on the Timeline and in the
+  Registry alike, and being in a Bed has nothing to do with it.
 
 ### Dashboard
 The home screen. Quick access to Map, Registry, and Bloom Timeline.
