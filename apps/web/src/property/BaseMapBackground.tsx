@@ -42,6 +42,18 @@ export function BaseMapBackground({ property }: { property: Property }) {
           inset: 0,
           display: 'grid',
           gridTemplateColumns: `repeat(${GRID_RADIUS * 2 + 1}, 1fr)`,
+          // Rows sized explicitly, not left implicit. An auto row can't
+          // resolve a tile's `height: 100%`, so each tile fell back to its
+          // intrinsic 256px and the three rows stacked to 768px however
+          // short the container was — squashing the tiles and spilling them
+          // past the bottom edge on any surface narrower than the full
+          // stage. That is only the preview on `PropertyPage` (the editor
+          // and Plantings map are both pinned at `STAGE_SIZE_PX`), and it
+          // read as merely ugly until #28 put a measurement grid over the
+          // same imagery: that overlay is a `viewBox`'d SVG and scales
+          // correctly, so a mis-sized tile grid meant the squares no longer
+          // aligned with the ground they were measuring.
+          gridTemplateRows: `repeat(${GRID_RADIUS * 2 + 1}, 1fr)`,
         }}
       >
         {baseMapTiles(property).map((tile) => (
