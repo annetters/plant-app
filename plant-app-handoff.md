@@ -38,9 +38,11 @@ both surfaces, and a wrong one can be redone. Built with `/implement`,
 two-axis reviewed, all three suites green (278 domain / 254 mobile / 222
 web). **Not QA'd, not closed.** See its section below.
 
-**#47 filed** — Delete Property silently does nothing when the browser
-suppresses its confirm dialog, hit live during #28's pass. Filed, deliberately
-not fixed, at the user's explicit choice. See "#47: the dead Delete button".
+**#47 fixed, QA'd and CLOSED** (2026-09-10, `29886df`) — the delete flows:
+the suppressible confirmation, the delete that reported success without
+deleting, and orphaned planting photo files. **#56 filed** from it: deleting a
+*Plant* orphans photo files the same way, which no ticket covered. See "#47:
+the delete flows".
 
 Two decisions the user made this session, both worth not relitigating:
 
@@ -320,29 +322,43 @@ No throwaway account needed — every account is throwaway now.
 
 ---
 
-## #47: the dead Delete button — FILED, deliberately not fixed
+## #47: the delete flows — fixed, QA'd, CLOSED
 
-Hit live during #28's QA. `handleDelete`
-(`apps/web/src/routes/PropertyPage.tsx:117`) gates on `window.confirm`. The
-browser had suppressed dialogs for the origin, so it returned `false` and the
-handler returned: no prompt, no error, no spinner. Indistinguishable from a
-dead button. Re-enabling dialogs made it work first time, which is what
-identified the cause.
+Built with `/implement`, two-axis reviewed, committed as `29886df`, Edge
+Function deployed, and a full manual pass run 2026-09-10 with **no findings**.
+Suites: 308 domain / 270 mobile / 249 web / **17 edge-function** — that last
+runner is new (`vitest.functions.config.ts`); Edge Functions had no test
+coverage at all before this.
 
-**Not phone-specific, and newly relevant.** Chrome and Firefox both offer
-"prevent this page from creating additional dialogs" after several in quick
-succession — on desktop. The workflow that triggers it is exactly the
-delete/recreate loop QA now uses freely for a fresh Property. A suppressed
-dialog and a cancelled one are also indistinguishable to the code.
+The issue and the commit message carry the detail. What matters going forward:
 
-The issue also records a second, latent defect in the same path:
-`PropertiesRepository.remove` doesn't `.select()`, and PostgREST returns
-`error: null` when RLS filters every row, so a delete that removed nothing
-reports success. Not currently reachable — the policy in `0006_properties.sql`
-is correct — but the app cannot tell a real delete from a no-op.
+**`delete-map-object` must be deployed or Property *and Bed* deletes fail** on
+both surfaces. Bed removal has no confirmation in front of it (#48), so it
+fails silently from the gardener's point of view. Check the deploy first if a
+delete ever looks dead again — `npx supabase functions list`.
 
-**The user chose "file the issue, don't fix" explicitly.** Don't fix it
-opportunistically next session.
+**`deleteBedWithPhotos` exists only because `plantings.bed_id` still cascades.**
+ADR-0009 reverses that. When #54 lands there are no photos beneath a Bed to
+clean up, and that function should be deleted along with the cascade it
+compensates for. It's commented as such, but it's the kind of thing that
+survives a refactor by accident.
+
+**Confirmation wording is shared, and must stay that way.**
+`packages/domain/src/deleteConfirmations.ts` is the single source for both
+surfaces; #48 should extend it rather than growing a second set of strings.
+Web renders it through `ConfirmDialog`, native through `Alert` — only the
+mechanism differs.
+
+**Web confirms with a plain `role="dialog"`, not `<dialog>`.** jsdom 25 ships
+`HTMLDialogElement` but implements neither `showModal()` nor `close()`, so
+testing one means polyfilling the behaviour under test. Don't "upgrade" it to
+`<dialog>` without solving that first.
+
+**A stale `vite` process cost real time during the pass.** The first QA report
+was "I still get a browser dialog" — the code was correct and both dev servers
+were serving it; the browser tab held pre-change JS, and a server left running
+from an earlier session held :5173, pushing the new one to :5174. Check
+`ps aux | grep vite` and hard-reload before believing a web fix didn't land.
 
 ---
 
@@ -1861,7 +1877,14 @@ ever produced.
 
 ## Known unfixed defects
 
-**None outstanding in code.** One *data* residue is known and deliberate:
+**One outstanding: #56.** Deleting a Plant orphans its Plantings' photo files
+in the `planting-photos` bucket, via `plantings.plant_id`'s cascade — the same
+defect #47 fixed for Property and Bed, reached by a third route neither #47's
+criteria nor #49's covered. Filed 2026-09-10, not fixed: #47's machinery
+extends to it (`delete-map-object` already takes a `kind`), but widening an
+approved brief mid-implementation was the wrong call.
+
+One *data* residue is also known and deliberate:
 Plants created before `6abcf9d` may carry a USDA-sourced `sunRequirement`
 from the inverted Shade Tolerance mapping (#44), and nothing distinguishes
 them from user-typed values. Not a code defect, not backfilled, awaiting the
