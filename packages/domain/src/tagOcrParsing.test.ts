@@ -119,15 +119,16 @@ describe("parseOcrTextLines", () => {
     it("does not rescue a rejected candidate by attaching a real cultivar to it (tag3)", () => {
       // tag3's real shape: the false-positive "Sum mer" used to capture the
       // genuine cultivar 'Wildberry' and bind it to a nonsense species. With
-      // the species rejected there is no candidate to attach it to, so tag3
-      // degrades to nothing here. Whether it should instead yield a
-      // cultivar-only candidate is #38's decision, not this one's.
+      // the species rejected there is nothing for the cultivar to attach to.
+      // #38 since answered the question this test deferred: tag3 degrades to a
+      // cultivar-only candidate rather than to nothing. The rule this test
+      // exists for is unchanged either way — no candidate carries "Sum mer".
       const result = parseOcrTextLines([
         line("Sum mer"),
         line("'Wildberry'"),
         line("Heucheralla Capture the Fag'"),
       ]);
-      expect(result).toEqual([]);
+      expect(result).toEqual([{ cultivar: "Wildberry" }]);
     });
 
     it("still accepts every genus the real tags actually print", () => {
@@ -161,6 +162,77 @@ describe("parseOcrTextLines", () => {
       // is held out only by the whole-line anchor. #23 explicitly does not
       // loosen that anchor.
       expect(parseOcrTextLines([line("Mangave Catch a Wave PPAF")])).toEqual([]);
+    });
+  });
+
+  // #38: a tag that prints a cultivar but no scientific name used to yield
+  // nothing at all — the cultivar path was structurally gated behind a
+  // scientific-name match. Real tags do this: tag7 prints "Blackout" with no
+  // binomial anywhere, and the Agastache tag from #22's first on-device run
+  // had no binomial across any of its recognised lines.
+  describe("cultivar-only candidates (#38)", () => {
+    it("emits no cultivar-only candidate when two different tags each name a cultivar", () => {
+      // #38's rule, mirroring the one that stops a standalone cultivar attaching
+      // to one of two scientific names. ADR-0004's tag2 finding supplies the
+      // fact underneath it — one photo can hold two unrelated tags — but not
+      // the remedy: there it means "surface both", and here #38 chose to
+      // suppress instead, since picking one of two cultivars would be a guess
+      // and there is no second field to surface the loser in.
+      const result = parseOcrTextLines([
+        line("'Wildberry'"),
+        line("'PARDON MY PINK'"),
+      ]);
+      expect(result).toEqual([]);
+    });
+
+    it("treats one cultivar recognized twice as one cultivar, not as an ambiguity", () => {
+      // tag1 shows Vision doing exactly this with a scientific-name line; the
+      // printed cultivar can duplicate the same way.
+      const result = parseOcrTextLines([line("'Wildberry'"), line("'Wildberry'")]);
+      expect(result).toEqual([{ cultivar: "Wildberry" }]);
+    });
+
+    it("accepts the quote glyphs Vision returned for a decorative print style (#22's Agastache 'Blue Fortune' tag)", () => {
+      // Verbatim from #22's first real on-device Vision run. The tag prints the
+      // cultivar in ordinary typographic quotes; Vision read the opening quote
+      // as an inverted exclamation mark and the closing one as a bullet. This
+      // line is the only one from that tag recorded anywhere — the rest of the
+      // seven were never transcribed — but the tag carried no binomial at all,
+      // which is what makes it a cultivar-only tag.
+      const result = parseOcrTextLines([line("¡BLUE FORTUNE•")]);
+      expect(result).toEqual([{ cultivar: "BLUE FORTUNE" }]);
+    });
+
+    it("recovers a cultivar from a tag whose only other text is care copy (tag7: Blackout)", () => {
+      const result = parseOcrTextLines([
+        line("HEUCHERA"),
+        line('"Blackout"'),
+        line("(Coral Bells)"),
+        line("Deep charcoal black foliage with"),
+        line("smooth shiny surface. Compact"),
+        line("Zones: 4 - 9"),
+      ]);
+      expect(result).toEqual([{ cultivar: "Blackout" }]);
+    });
+
+    it("never reads a bullet-list line as a cultivar (tag5/tag1 real lines)", () => {
+      // `•` opens dozens of feature and care lines in the real transcript. It
+      // is accepted as a closing glyph only, so none of these can match.
+      expect(parseOcrTextLines([line("• BRIGHT COLORS • FAST GROWING • EASY CARE")])).toEqual([]);
+      expect(
+        parseOcrTextLines([line("• Showy, large clusters of hot coral pink flowers")]),
+      ).toEqual([]);
+      expect(parseOcrTextLines([line("• Sun to Part Shade")])).toEqual([]);
+      expect(parseOcrTextLines([line("• Performs best in rich, moist, well-drained soil")])).toEqual([]);
+    });
+
+    it("never reads an inch-mark measurement as a cultivar (tag2/tag4/tag8 real lines)", () => {
+      // `"` is a legitimate cultivar quote, so these are held out by needing a
+      // quote glyph at BOTH ends — a measurement only ever closes with one.
+      expect(parseOcrTextLines([line('10-12"')])).toEqual([]);
+      expect(parseOcrTextLines([line('42"')])).toEqual([]);
+      expect(parseOcrTextLines([line('H: 18-24" W: 12-18"')])).toEqual([]);
+      expect(parseOcrTextLines([line('12" (30cm)')])).toEqual([]);
     });
   });
 });

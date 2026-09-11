@@ -29,8 +29,23 @@ export interface TagOcrTextObservation {
 const SCIENTIFIC_NAME_LINE_PATTERN =
   /^([A-Z][a-zà-ÿ]+)\s+([a-zà-ÿ][a-zà-ÿ-]+)(?:\s*['"“‘]([^'"”’]{2,})['"”’])?$/;
 
-/** A cultivar named on its own line, unattached to any scientific name. */
-const STANDALONE_CULTIVAR_PATTERN = /^['"“‘]([^'"”’]{2,})['"”’]$/;
+/**
+ * A cultivar named on its own line, unattached to any scientific name.
+ *
+ * The glyph classes are widened by character, from what Vision actually
+ * returned on real tags, and never by stripping arbitrary leading and trailing
+ * punctuation — the real transcript uses `•` pervasively as a bullet-list
+ * marker and `"` constantly as an inch mark, and a strip-and-accept rule
+ * swallows both. The two additions are asymmetric on purpose: on #22's
+ * Agastache tag, a decorative print style had Vision read the *opening* quote
+ * of `'BLUE FORTUNE'` as an inverted exclamation mark and the *closing* one as
+ * a bullet. Neither glyph is a quote character, so each is accepted only at the
+ * end it was misread at — `•` opens nothing, which is what keeps the bullet
+ * lists out. Both are excluded from the cultivar text itself, so a match can
+ * never span from one bullet to another.
+ */
+const STANDALONE_CULTIVAR_PATTERN =
+  /^['"“‘¡]([^'"”’¡•]{2,})['"”’•]$/;
 
 /**
  * Best-effort interpretation of raw OCR text lines into Tag Scan candidates
@@ -64,7 +79,11 @@ export function parseOcrTextLines(
     });
   }
 
-  if (matches.length === 0) return [];
+  const standaloneCultivars = collectStandaloneCultivars(observations);
+
+  if (matches.length === 0) {
+    return standaloneCultivars.length === 1 ? [{ cultivar: standaloneCultivars[0] }] : [];
+  }
 
   // Distinct by scientific name + cultivar — Vision can recognize the same
   // printed line twice (a duplicated insert, or two identical tags).
@@ -79,15 +98,31 @@ export function parseOcrTextLines(
   // exactly one distinct scientific-name candidate — attaching it with
   // multiple candidates present risks pairing one tag's cultivar with a
   // different tag's species (ADR-0004's tag2 finding).
-  if (deduped.length === 1 && !deduped[0].cultivar) {
-    for (const { text } of observations) {
-      const cultivarMatch = text.trim().match(STANDALONE_CULTIVAR_PATTERN);
-      if (cultivarMatch) {
-        deduped[0] = { ...deduped[0], cultivar: cultivarMatch[1] };
-        break;
-      }
-    }
+  if (deduped.length === 1 && !deduped[0].cultivar && standaloneCultivars.length > 0) {
+    deduped[0] = { ...deduped[0], cultivar: standaloneCultivars[0] };
   }
 
   return deduped;
+}
+
+/**
+ * The distinct cultivars printed on their own lines, in the order Vision
+ * recognized them. Distinct is case-insensitive: Vision can recognize the same
+ * printed line twice (a duplicated insert, or two identical tags), and one
+ * cultivar read twice is not two cultivars.
+ */
+function collectStandaloneCultivars(
+  observations: readonly TagOcrTextObservation[],
+): string[] {
+  const distinct = new Map<string, string>();
+  for (const { text } of observations) {
+    const match = text.trim().match(STANDALONE_CULTIVAR_PATTERN);
+    if (!match) continue;
+    // Captured verbatim, not trimmed — the rule that attaches one of these to a
+    // lone scientific name predates #38 and keeps its behavior exactly.
+    const cultivar = match[1];
+    const key = cultivar.toLowerCase();
+    if (!distinct.has(key)) distinct.set(key, cultivar);
+  }
+  return [...distinct.values()];
 }
