@@ -13,13 +13,14 @@ the user who runs it before scripting anything.
 and its `gridTemplateRows` fix is committed (`a945f00`). It is **still
 open** — closing it is the user's call. See its section below.
 
-**#54 is paused, and its design is loose in the tree.** The user reopened the
-`plantings.bed_id` question on 2026-09-11 and wants a **grilling session
-before any of it is built**. The revised ADR-0009 (position-as-truth) and the
-matching `CONTEXT.md` entries are **uncommitted on purpose** — committing them
-would make a contested decision the repo's record. Two traps: don't `git
-checkout` them away, and don't read *committed* ADR-0009 as current, because
-it is the superseded draft that says the opposite. #54 is also still labelled
+**#54 is paused pending a grilling session.** The user reopened the
+`plantings.bed_id` question on 2026-09-11 and wants it stress-tested **before
+any of it is built**. Its design — the revised ADR-0009 (position-as-truth)
+and five `CONTEXT.md` entries — is committed (`349a3b3`), but committed **as a
+proposal**: ADR-0009's status reads Proposed-and-reopened, and `CONTEXT.md`
+opens with a notice naming the five entries that describe unbuilt behaviour.
+Read neither as how the app behaves. Nothing is implemented — `bed_id` is
+still `not null` and still cascades. #54 is also still labelled
 `ready-for-agent`, which it should not be picked up on. See #54's 2026-09-11
 comment.
 
